@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Switch to scikit-build-core once the C++ extension is ready:
+# requires = ["scikit-build-core>=0.9", "pybind11>=2.12"]
+# build-backend = "scikit-build-core.build"
+
+[project]
+name = "simulon"
+version = "0.1.0"
+description = "AI cluster simulator"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.scripts]
+simulon = "simulon.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/simulon"]
