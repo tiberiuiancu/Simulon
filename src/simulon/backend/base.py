@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
 
-from simulon.config.dc import DatacenterConfig
-from simulon.config.workload import WorkloadConfig
+from simulon.config.scenario import ScenarioConfig
 
 
 class Backend(ABC):
     @abstractmethod
-    def run(self, dc: DatacenterConfig, workload: WorkloadConfig) -> dict:
+    def run(self, scenario: ScenarioConfig) -> dict:
         """Run the simulation and return results."""
         ...

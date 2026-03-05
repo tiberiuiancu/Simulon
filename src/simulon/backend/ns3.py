@@ -1,9 +1,8 @@
-from simulon.config.dc import DatacenterConfig
-from simulon.config.workload import WorkloadConfig
+from simulon.config.scenario import ScenarioConfig
 
 from .base import Backend
 
 
 class NS3Backend(Backend):
-    def run(self, dc: DatacenterConfig, workload: WorkloadConfig) -> dict:
+    def run(self, scenario: ScenarioConfig) -> dict:
         raise NotImplementedError
