@@ -42,6 +42,13 @@ the two files are validated together at simulation time rather than being couple
 framework: megatron      # megatron | inference  (more planned: deepspeed, vllm, ...)
 ```
 
+> **Mutual exclusivity:** A workload file uses exactly **one** framework. The `megatron`
+> framework requires `model`, `parallelism`, and `training` blocks. The `inference`
+> framework requires `model`, `parallelism`, and `inference` blocks. Mixing blocks from
+> different frameworks (e.g. a `framework: megatron` file that also contains an
+> `inference:` key) is a validation error — both `MegatronWorkload` and
+> `InferenceWorkload` use `extra="forbid"`.
+
 ---
 
 ## Model Profiles and Inline Specs
