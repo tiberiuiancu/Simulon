@@ -34,6 +34,8 @@ class NetworkTopology:
     nv_switch_num: int
     switches_excluding_nvswitch: int
     gpu_type: str
+    nvlink_bandwidth_efficiency: float = 1.0  # Scale-up (intra-node) efficiency
+    nic_bandwidth_efficiency: float = 0.85  # Scale-out (inter-node) efficiency
 
 
 def _parse_bandwidth(bw_str: str) -> float:
@@ -190,6 +192,10 @@ class TopologyConverter:
         else:
             gpu_type = (gpu_spec.name or "UNKNOWN").upper()
 
+        # Extract bandwidth efficiency from config
+        nvlink_efficiency = datacenter.scale_up.bandwidth_efficiency if datacenter.scale_up else 1.0
+        nic_efficiency = datacenter.scale_out.nic.bandwidth_efficiency if datacenter.scale_out and datacenter.scale_out.nic else 0.85
+
         return NetworkTopology(
             nodes=nodes,
             links=links,
@@ -197,6 +203,8 @@ class TopologyConverter:
             nv_switch_num=total_nvswitches,
             switches_excluding_nvswitch=network_switches,
             gpu_type=gpu_type,
+            nvlink_bandwidth_efficiency=nvlink_efficiency,
+            nic_bandwidth_efficiency=nic_efficiency,
         )
 
     def _create_fat_tree_topology(

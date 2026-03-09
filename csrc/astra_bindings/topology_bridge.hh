@@ -26,6 +26,8 @@ struct NetworkTopology {
     int nv_switch_num;
     int switches_excluding_nvswitch;
     std::string gpu_type;
+    float nvlink_bandwidth_efficiency;  // Scale-up (intra-node) efficiency
+    float nic_bandwidth_efficiency;     // Scale-out (inter-node) efficiency
 };
 
 // Forward declaration for ASTRA-Sim type

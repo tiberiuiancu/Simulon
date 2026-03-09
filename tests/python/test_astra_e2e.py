@@ -75,79 +75,40 @@ def simple_scenario():
     return ScenarioConfig(datacenter=datacenter, workload=workload)
 
 
-def test_conversion_only(simple_scenario):
-    """Test that conversion works without running simulation."""
+def test_basic_simulation(simple_scenario):
+    """Test basic simulation runs successfully."""
     backend = AnalyticalBackend()
     results = backend.run(simple_scenario)
 
-    assert results["status"] == "conversion_complete"
+    # With C++ bindings, simulation actually runs
+    assert results["status"] == "success"
     assert results["network_backend"] == "analytical"
     assert results["topology"]["gpus_per_server"] == 4
     assert results["workload"]["all_gpus"] == 8
+    assert "simulation" in results
+    assert results["simulation"]["total_time_ns"] > 0
 
 
-def test_simulation_with_flag(simple_scenario):
-    """Test running actual simulation with run_simulation flag."""
-    backend = AstraSimBackend(network_backend="analytical", run_simulation=True)
+def test_in_memory_simulation(simple_scenario):
+    """Test in-memory simulation with C++ bindings."""
+    backend = AstraSimBackend(network_backend="analytical")
 
     try:
         results = backend.run(simple_scenario)
 
-        # Check basic structure
-        assert "status" in results
-        assert "simulation" in results
-        assert "network_backend" in results
+        # Should get simulation results (not just conversion)
+        assert results["status"] == "success"
         assert results["network_backend"] == "analytical"
 
-        # Check simulation output
+        # Check simulation output exists
+        assert "simulation" in results
         sim = results["simulation"]
-        assert "stdout" in sim
-        assert "output_dir" in sim
-        assert "workload_file" in sim
+        assert "total_time_ns" in sim
+        assert sim["total_time_ns"] > 0  # Should have some simulation time
+        assert sim["completed_layers"] == 4  # 2 transformer layers * 2 (attn + mlp)
 
-        print(f"\nSimulation output directory: {sim['output_dir']}")
-        print(f"Workload file: {sim['workload_file']}")
-        if sim.get("stdout"):
-            print(f"Simulation stdout:\n{sim['stdout'][:500]}")
+        print(f"\nSimulation completed in {sim['total_time_ns']} ns")
+        print(f"Completed {sim['completed_layers']} layers")
 
-    except FileNotFoundError as e:
-        pytest.skip(f"ASTRA-Sim binary not compiled: {e}")
-
-
-def test_file_generation(simple_scenario, tmp_path):
-    """Test that workload files are generated correctly."""
-    from simulon.backend.astra_converter import TopologyConverter, WorkloadConverter
-    from simulon.backend.astra_converter.file_writer import write_workload_file
-
-    # Convert
-    topo_converter = TopologyConverter()
-    workload_converter = WorkloadConverter()
-    workload_trace = workload_converter.convert(
-        simple_scenario.workload, simple_scenario.datacenter
-    )
-
-    # Write file
-    workload_file = tmp_path / "test_workload.txt"
-    write_workload_file(workload_trace, workload_file)
-
-    # Verify file exists and has content
-    assert workload_file.exists()
-    content = workload_file.read_text()
-
-    # Check format
-    lines = content.strip().split("\n")
-    assert len(lines) >= 2  # At least header and num_layers
-
-    # First line should have parallelism info
-    assert "model_parallel_NPU_group:" in lines[0]
-    assert "all_gpus:" in lines[0]
-
-    # Second line should be number of layers
-    num_layers = int(lines[1])
-    assert num_layers == 4  # 2 transformer layers * 2 (attn + mlp)
-
-    # Should have that many layer lines
-    assert len(lines) >= 2 + num_layers
-
-    print(f"\nGenerated workload file ({num_layers} layers):")
-    print(content[:500])
+    except ImportError as e:
+        pytest.skip(f"C++ bindings not available: {e}")

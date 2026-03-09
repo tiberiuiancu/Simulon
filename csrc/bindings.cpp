@@ -31,7 +31,9 @@ PYBIND11_MODULE(_sim, m) {
         .def_readwrite("gpus_per_server", &simulon::astra::NetworkTopology::gpus_per_server)
         .def_readwrite("nv_switch_num", &simulon::astra::NetworkTopology::nv_switch_num)
         .def_readwrite("switches_excluding_nvswitch", &simulon::astra::NetworkTopology::switches_excluding_nvswitch)
-        .def_readwrite("gpu_type", &simulon::astra::NetworkTopology::gpu_type);
+        .def_readwrite("gpu_type", &simulon::astra::NetworkTopology::gpu_type)
+        .def_readwrite("nvlink_bandwidth_efficiency", &simulon::astra::NetworkTopology::nvlink_bandwidth_efficiency)
+        .def_readwrite("nic_bandwidth_efficiency", &simulon::astra::NetworkTopology::nic_bandwidth_efficiency);
 
     // Workload bindings
     py::class_<simulon::astra::LayerTrace>(m, "LayerTrace")

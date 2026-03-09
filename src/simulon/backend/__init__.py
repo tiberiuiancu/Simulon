@@ -1,10 +1,18 @@
-"""Simulation backends for simulon.
+"""Simulation backend for simulon.
 
-All backends are based on ASTRA-Sim, differing only in their network simulation approach:
-- AnalyticalBackend: Fast analytical network model (queueing theory)
-- NS3Backend: Detailed packet-level network simulation using NS-3
+Simulon uses ASTRA-Sim as the simulation engine. The only difference between
+configurations is the network simulation backend:
 
-You can also use AstraSimBackend directly with the network_backend parameter.
+- network_backend="analytical": Fast analytical network model (queueing theory)
+- network_backend="ns3": Detailed packet-level network simulation (not yet implemented)
+
+Usage:
+    backend = AstraSimBackend(network_backend="analytical")
+    results = backend.run(scenario)
+
+For convenience, you can also use:
+    backend = AnalyticalBackend()  # Same as AstraSimBackend(network_backend="analytical")
+    backend = NS3Backend()          # Same as AstraSimBackend(network_backend="ns3")
 """
 
 from .analytical import AnalyticalBackend

@@ -45,6 +45,7 @@ typedef struct {
 
 BusBwResult cal_busbw(GPUType node_type, float bw_intra, float bw_per_nic, float nics_pernode, int node_count, char* coll_type, int gpus_pernode, char* nic_type);
 float cal_ratio(std::vector<std::vector<std::string>> nic_ratio_data,std::vector<std::vector<std::string>> nvlink_ratio_data,std::vector<std::vector<std::string>> ata_ratio_data,uint64_t data_size,int nranks,int tp_size,uint32_t gpus_per_server,char* group_type,char* coll_type,bool is_nvlink);
+float cal_ratio_simple(float nvlink_efficiency, float nic_efficiency, bool is_nvlink);
 std::vector<std::vector<std::string>> readCSV(const std::string &filePath);
 float getValue(double datasize, int _temp_nnode, const std::vector<std::vector<std::string>>& data);
 #endif // CALBUSBW_H

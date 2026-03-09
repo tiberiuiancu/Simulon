@@ -36,6 +36,8 @@ def to_cpp_topology(py_topo: NetworkTopology) -> "CppNetworkTopology":
     cpp_topo.nv_switch_num = py_topo.nv_switch_num
     cpp_topo.switches_excluding_nvswitch = py_topo.switches_excluding_nvswitch
     cpp_topo.gpu_type = py_topo.gpu_type
+    cpp_topo.nvlink_bandwidth_efficiency = py_topo.nvlink_bandwidth_efficiency
+    cpp_topo.nic_bandwidth_efficiency = py_topo.nic_bandwidth_efficiency
 
     # Convert nodes
     for node in py_topo.nodes:

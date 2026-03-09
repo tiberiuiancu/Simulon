@@ -165,6 +165,13 @@ class ScaleUpSpec(BaseModel):
     link_latency: Optional[str] = None
     link_cost: Optional[CostField] = None
     switch: Optional[Union[str, SwitchSpec]] = None
+    bandwidth_efficiency: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Bandwidth efficiency factor (0.0-1.0) for collective operations. "
+        "Accounts for protocol overhead, contention, etc. 1.0 = ideal, 0.8 = 80% efficient.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +189,14 @@ class NICSpec(BaseModel):
     latency: Optional[str] = None
     tdp_w: Optional[float] = None
     cost: Optional[CostField] = None
+    bandwidth_efficiency: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Bandwidth efficiency factor (0.0-1.0) for network collectives. "
+        "Accounts for protocol overhead, serialization, etc. Defaults to 0.85 (85% efficient) "
+        "which is realistic for multi-node collective operations.",
+    )
 
 
 class LinkSpec(BaseModel):

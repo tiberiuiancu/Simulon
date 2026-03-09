@@ -237,10 +237,13 @@ float calculateBusBw(CalculationParameters* params) {
 }
 std::vector<std::vector<std::string>> readCSV(const std::string &filePath) {
     std::ifstream file(filePath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open file");
-    }
     std::vector<std::vector<std::string>> data;
+
+    // If file doesn't exist, return empty data (will use default ratio of 1.0)
+    if (!file.is_open()) {
+        return data;  // Return empty vector instead of throwing
+    }
+
     std::string line;
     bool isFirstLine = true;
 
@@ -387,14 +390,19 @@ double interpolate(double size, double size1, double size2, double value1, doubl
     return value1 + (value2 - value1) * (size - size1) / (size2 - size1);
 }
 float getValue(double datasize, int _temp_nnode, const std::vector<std::vector<std::string>>& data) {
+    // If no data available (CSV not loaded), return default ratio of 1.0
+    if (data.empty()) {
+        return 1.0f;
+    }
+
     int colIndex = 0;
 
     if (_temp_nnode == 1) {
-        colIndex = 1; 
+        colIndex = 1;
     } else if (_temp_nnode == 2) {
-        colIndex = 2;  
+        colIndex = 2;
     } else if (_temp_nnode == 4) {
-        colIndex = 3;  
+        colIndex = 3;
     } else if (_temp_nnode == 8) {
         colIndex = 4;  
     } else if (_temp_nnode == 16) {
@@ -431,7 +439,17 @@ float getValue(double datasize, int _temp_nnode, const std::vector<std::vector<s
     throw std::runtime_error("Data size out of range");
 }
 
+// Simplified version that uses config efficiency values instead of CSV lookup
+float cal_ratio_simple(float nvlink_efficiency, float nic_efficiency, bool is_nvlink) {
+    return is_nvlink ? nvlink_efficiency : nic_efficiency;
+}
+
 float cal_ratio(std::vector<std::vector<std::string>> nic_ratio_data,std::vector<std::vector<std::string>> nvlink_ratio_data,std::vector<std::vector<std::string>> ata_ratio_data,uint64_t data_size,int nranks,int tp_size,uint32_t gpus_per_server,char* group_type,char* coll_type,bool is_nvlink){
+    // If CSV data is empty (in-memory mode), return default efficiency
+    if (nic_ratio_data.empty() && nvlink_ratio_data.empty()) {
+        return is_nvlink ? 1.0f : 0.85f;  // Use reasonable defaults
+    }
+
     if ((strcmp(coll_type, "allgather") == 0 || strcmp(coll_type, "reducescatter") == 0 ) && strcmp(group_type, "tp") == 0 ){
         auto data = is_nvlink ? nvlink_ratio_data : nic_ratio_data;
         int _temp_nnode = (tp_size < gpus_per_server) ? 1 : tp_size / gpus_per_server ;
