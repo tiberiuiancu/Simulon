@@ -1,0 +1,33 @@
+name: Mock-H100
+vendor: nvidia
+memory_capacity_gb: 80
+tdp_w: 700
+flops_multiplier: 1.0
+kernel_runs:
+  - kernel: embedding
+    params: {hidden_size: 4096, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [0.857, 0.782, 0.799]
+  - kernel: layernorm
+    params: {hidden_size: 4096, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [0.084, 0.043, 0.070]
+  - kernel: attn_qkv
+    params: {hidden_size: 4096, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [1.255, 0.862, 0.889]
+  - kernel: attn_flash
+    params: {hidden_size: 4096, num_heads: 32, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [0.786, 0.460, 0.512]
+  - kernel: attn_proj
+    params: {hidden_size: 4096, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [0.939, 0.333, 0.349]
+  - kernel: mlp_linear1
+    params: {hidden_size: 4096, ffn_hidden_size: 16384, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [1.876, 1.372, 1.408]
+  - kernel: mlp_act
+    params: {ffn_hidden_size: 16384, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [0.560, 0.246, 0.257]
+  - kernel: mlp_linear2
+    params: {hidden_size: 4096, ffn_hidden_size: 16384, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [1.183, 0.720, 0.742]
+  - kernel: logit
+    params: {hidden_size: 4096, vocab_size: 32000, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [15.476, 12.435, 12.824]

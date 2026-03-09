@@ -68,6 +68,8 @@ class MegatronTraining(BaseModel):
 
 
 class MegatronWorkload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     framework: Literal["megatron"]
     model: Union[str, LLMSpec]
     parallelism: MegatronParallelism
@@ -97,6 +99,8 @@ class InferenceRun(BaseModel):
 
 
 class InferenceWorkload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     framework: Literal["inference"]
     model: Union[str, LLMSpec]
     parallelism: InferenceParallelism
