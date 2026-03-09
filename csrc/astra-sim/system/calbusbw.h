@@ -19,9 +19,9 @@
 #define H100_PCIE_BW 51.2 // 64*0.8
 #define A100_PCIE_BW 25.6 // 32*0.8
 #define A800_PCIE_BW 25.6 // 32*0.8
-#define NIC_RATIO_PATH "astra-sim-alibabacloud/inputs/ratio/nic_ratio.csv"
-#define NVLINK_RATIO_PATH "astra-sim-alibabacloud/inputs/ratio/nvlink_ratio.csv"
-#define ATA_RATIO_PATH "astra-sim-alibabacloud/inputs/ratio/ata_ratio.csv"
+#define NIC_RATIO_PATH "csrc/astra-sim-inputs/ratio/nic_ratio.csv"
+#define NVLINK_RATIO_PATH "csrc/astra-sim-inputs/ratio/nvlink_ratio.csv"
+#define ATA_RATIO_PATH "csrc/astra-sim-inputs/ratio/ata_ratio.csv"
 typedef struct {
     GPUType node_type;
     int node_count;
