@@ -1,6 +1,6 @@
 [build-system]
-requires = ["scikit-build-core>=0.9", "pybind11>=2.12"]
-build-backend = "scikit-build-core.build"
+requires = ["hatchling", "pybind11>=2.12", "cmake", "ninja"]
+build-backend = "hatchling.build"
 
 [project]
 name = "simulon"
@@ -18,10 +18,11 @@ dependencies = [
 [project.scripts]
 simulon = "simulon.cli:app"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.20"
-cmake.build-type = "Release"
-wheel.packages = ["src/simulon"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/simulon"]
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

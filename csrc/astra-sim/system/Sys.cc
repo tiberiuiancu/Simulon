@@ -66,7 +66,7 @@ Sys::~Sys() {
               << "Total streams injected: " << streams_injected << std::endl
               << "Total streams finished: " << streams_finished << std::endl
               << "Percentage of finished streams: "
-              << (((double)streams_finished) / streams_injected) * 100 << " %"
+              << (streams_injected > 0 ? (((double)streams_finished) / streams_injected) * 100 : 0.0) << " %"
               << std::endl
               << "*****" << std::endl;
   }
@@ -990,7 +990,9 @@ std::vector<double> Sys::SchedulerUnit::get_average_latency_per_dimension() {
   std::vector<double> result;
   result.resize(latency_per_dimension.size(), -1);
   for (int i = 0; i < result.size(); i++) {
-    result[i] = latency_per_dimension[i] / total_chunks_per_dimension[i];
+    result[i] = total_chunks_per_dimension[i] > 0
+        ? latency_per_dimension[i] / total_chunks_per_dimension[i]
+        : 0.0;
   }
   return result;
 }
