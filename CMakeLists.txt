@@ -8,8 +8,13 @@ find_package(pybind11 REQUIRED)
 
 pybind11_add_module(_sim
     csrc/bindings.cpp
+    csrc/astra_bindings/topology_bridge.cc
+    csrc/astra_bindings/workload_bridge.cc
 )
 
-target_include_directories(_sim PRIVATE csrc)
+target_include_directories(_sim PRIVATE
+    csrc
+    csrc/astra-sim
+)
 
 install(TARGETS _sim DESTINATION simulon)
