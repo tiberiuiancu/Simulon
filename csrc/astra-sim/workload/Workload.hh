@@ -90,7 +90,8 @@ class Workload : Callable {
       int total_rows,
       int stat_row,
       std::string path,
-      bool seprate_log);
+      bool seprate_log,
+      const std::string& workload_content = "");
   ParallelismPolicy decode_parallelsim(std::string parallelism);
   void call(EventType event, CallData* data);
   void iterate_micro_benchmark();
@@ -104,6 +105,7 @@ class Workload : Callable {
   void iterate_model_parallel();
   void iterate_distributed_inference();
   bool initialize_workload(std::string name);
+  bool initialize_workload_from_string(const std::string& content);
   void initialize_stat_files();
   std::map<std::string, std::vector<bool>> decode_involved_dimensions(
       ParallelismPolicy policy,

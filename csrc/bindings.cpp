@@ -3,6 +3,7 @@
 
 #include "astra_bindings/topology_bridge.hh"
 #include "astra_bindings/workload_bridge.hh"
+#include "astra_bindings/analytical_runner.hh"
 
 namespace py = pybind11;
 
@@ -59,4 +60,20 @@ PYBIND11_MODULE(_sim, m) {
         .def_readwrite("all_gpus", &simulon::astra::WorkloadTrace::all_gpus)
         .def_readwrite("num_layers", &simulon::astra::WorkloadTrace::num_layers)
         .def_readwrite("layers", &simulon::astra::WorkloadTrace::layers);
+
+    // Analytical simulation results
+    py::class_<simulon::astra::AnalyticalResults>(m, "AnalyticalResults")
+        .def(py::init<>())
+        .def_readwrite("success", &simulon::astra::AnalyticalResults::success)
+        .def_readwrite("total_time_ns", &simulon::astra::AnalyticalResults::total_time_ns)
+        .def_readwrite("compute_time_ns", &simulon::astra::AnalyticalResults::compute_time_ns)
+        .def_readwrite("communication_time_ns", &simulon::astra::AnalyticalResults::communication_time_ns)
+        .def_readwrite("completed_layers", &simulon::astra::AnalyticalResults::completed_layers)
+        .def_readwrite("error_message", &simulon::astra::AnalyticalResults::error_message)
+        .def_readwrite("metrics", &simulon::astra::AnalyticalResults::metrics);
+
+    // Analytical simulation runner
+    m.def("run_analytical", &simulon::astra::run_analytical,
+          "Run ASTRA-Sim analytical backend simulation",
+          py::arg("topology"), py::arg("workload"));
 }

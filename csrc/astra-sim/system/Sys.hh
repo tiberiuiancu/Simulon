@@ -246,7 +246,8 @@ class Sys : public Callable {
       GPUType _gpu_type,
       std::vector<int> _all_gpus,
       std::vector<int> _NVSwitchs,
-      int _ngpus_per_node);
+      int _ngpus_per_node,
+      const std::string& workload_content = "");
 
   void iterate();
   bool initialize_sys(std::string name);

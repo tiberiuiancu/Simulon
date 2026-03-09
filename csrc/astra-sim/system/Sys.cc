@@ -138,7 +138,8 @@ Sys::Sys(
     GPUType _gpu_type,
     std::vector<int>_all_gpus,
     std::vector<int>_NVSwitchs,
-    int _ngpus_per_node) {
+    int _ngpus_per_node,
+    const std::string& workload_content) {
   scheduler_unit = nullptr;
   vLevels = nullptr;
   memBus = nullptr;
@@ -290,7 +291,8 @@ Sys::Sys(
       total_stat_rows,
       stat_row,
       path,
-      this->seprate_log);
+      this->seprate_log,
+      workload_content);
   if (workload->initialized == false) {
     sys_panic(
         "Unable to initialize the workload layer because it can not open the workload file");

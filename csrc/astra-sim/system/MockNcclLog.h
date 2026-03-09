@@ -26,7 +26,7 @@
 #include <cstdarg>
 #include <thread>
 
-#define LOG_PATH  "/etc/astra-sim/"
+#define LOG_PATH  "/tmp/"  // Changed from /etc/astra-sim/ to /tmp/ for no-root access
 
 enum class NcclLogLevel { DEBUG, INFO, WARNING,ERROR};
 
@@ -41,7 +41,8 @@ class MockNcclLog {
     const char* logLevelEnv = std::getenv("AS_LOG_LEVEL");
     logLevel = logLevelEnv ? static_cast<NcclLogLevel>(std::atoi(logLevelEnv))
                            : NcclLogLevel::INFO;
-    logfile.open(LogName, std::ios::app);
+    // Disabled file logging for in-memory simulation
+    // logfile.open(LogName, std::ios::app);
   }
   std::string getCurrentTime() {
     auto now = std::chrono::system_clock::now();
@@ -67,37 +68,13 @@ class MockNcclLog {
     LogName = LOG_PATH + log_name;
   }
   void writeLog(NcclLogLevel level, const char* format,...) {
-    if (level >= logLevel) {
-      std::string levelStr;
-      switch (level) {
-        case NcclLogLevel::DEBUG:
-          levelStr = "DEBUG";
-          break;
-        case NcclLogLevel::INFO:
-          levelStr = "INFO";
-          break;
-        case NcclLogLevel::WARNING:
-          levelStr = "WARNING";
-          break;
-        case NcclLogLevel::ERROR:
-          levelStr = "ERROR";
-          break;
-        default:
-          levelStr = "UNKNOWN";
-      }
-      char buffer[256];
-      va_list args;
-      va_start(args, format);
-      vsnprintf(buffer, sizeof(buffer), format, args);
-      va_end(args);
-      std::thread::id this_id = std::this_thread::get_id();
-      std::lock_guard<std::mutex> lock(mtx);
-      logfile << "[" << getCurrentTime() << "]"
-              << "[" << levelStr << "] " << "["<< std::hex << this_id <<"]"<< buffer << std::endl;
-    }
+    // Disabled file logging for in-memory simulation
+    // All log writes are no-ops to avoid filesystem side-effects
+    (void)level;
+    (void)format;
   }
   ~MockNcclLog() {
-        logfile.close();  
+        // No file to close - logging disabled
     }
 };
 #endif 
