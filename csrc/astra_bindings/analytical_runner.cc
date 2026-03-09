@@ -4,6 +4,7 @@
  */
 
 #include "analytical_runner.hh"
+#include "workload_bridge.hh"
 
 #include <iostream>
 #include <memory>
@@ -25,58 +26,6 @@
 
 namespace simulon {
 namespace astra {
-
-namespace {
-
-/**
- * Create in-memory workload from our WorkloadTrace.
- * Returns a temporary file content that Workload class can parse.
- */
-std::string create_workload_content(const WorkloadTrace& workload) {
-    std::ostringstream oss;
-
-    // Line 1: Parallelism policy and parameters
-    // Map our policy names to ASTRA-Sim names
-    // Valid: DATA, MODEL, HYBRID_DATA_MODEL, HYBRID_MODEL_DATA, TRANSFORMER, TRANSFORMERFWDINBCKWD
-    std::string policy = "TRANSFORMER";
-    if (workload.parallelism_policy == "HYBRID_TRANSFORMER" ||
-        workload.parallelism_policy == "hybrid") {
-        policy = "HYBRID_DATA_MODEL";
-    } else if (workload.parallelism_policy == "transformer") {
-        policy = "TRANSFORMER";
-    }
-
-    oss << policy << " "
-        << "model_parallel_NPU_group: " << workload.model_parallel_npu_group << " "
-        << "pp: " << workload.pipeline_model_parallelism << " "
-        << "ep: " << workload.expert_parallel_npu_group << " "
-        << "vpp: " << workload.vpp << " "
-        << "ga: " << workload.ga << " "
-        << "all_gpus: " << workload.all_gpus << "\n";
-
-    // Line 2: Number of layers
-    oss << workload.num_layers << "\n";
-
-    // Lines 3+: Layer specifications
-    for (const auto& layer : workload.layers) {
-        oss << layer.layer_id << " "
-            << layer.dependency << " "
-            << layer.fwd_compute_time_ns << " "
-            << layer.fwd_comm_type << " "
-            << layer.fwd_comm_size_bytes << " "
-            << layer.ig_compute_time_ns << " "
-            << layer.ig_comm_type << " "
-            << layer.ig_comm_size_bytes << " "
-            << layer.wg_compute_time_ns << " "
-            << layer.wg_comm_type << " "
-            << layer.wg_comm_size_bytes << " "
-            << layer.wg_update_time_ns << "\n";
-    }
-
-    return oss.str();
-}
-
-}  // namespace
 
 AnalyticalResults run_analytical(
     const NetworkTopology& topology,
@@ -101,10 +50,8 @@ AnalyticalResults run_analytical(
         // Create analytical network backend
         AnalyticalNetWork* analytical_network = new AnalyticalNetWork(0);
 
-        // Create workload content in memory (no file I/O)
-        std::string workload_content = create_workload_content(workload);
-
-        // Create ASTRA-Sim system (fully in-memory, no file I/O)
+        // Create ASTRA-Sim system with "DIRECT_INIT" sentinel value
+        // This tells Workload constructor to skip text parsing
         AstraSim::Sys* system = nullptr;
         try {
             system = new AstraSim::Sys(
@@ -116,7 +63,7 @@ AnalyticalResults run_analytical(
             physical_dims,       // physical dimensions
             queues_per_dim,      // queues per dimension
             "",                  // sys name
-            "",                  // workload path (unused - using content instead)
+            "",                  // workload path (unused)
             1.0,                 // comm_scale
             1.0,                 // compute_scale
             1.0,                 // injection_scale
@@ -130,18 +77,22 @@ AnalyticalResults run_analytical(
             physical_dims,       // all_gpus
             {},                  // NVSwitchs (empty for now)
             topology.gpus_per_server,  // ngpus_per_node
-            workload_content     // workload content (in-memory)
+            "DIRECT_INIT"        // sentinel: skip text parsing
             );
         } catch (const std::exception& e) {
             results.error_message = std::string("Failed to create Sys: ") + e.what();
             return results;
         }
 
+        // Now directly initialize workload from structured data
+        // No text serialization/parsing!
+        initialize_workload_direct(system->workload, system, workload);
+
         // Set additional system parameters
         system->num_gpus = workload.all_gpus;
 
         // Fire the workload to start simulation
-        if (system->workload) {
+        if (system->workload && system->workload->initialized) {
             system->workload->fire();
 
             // Run the analytical simulation

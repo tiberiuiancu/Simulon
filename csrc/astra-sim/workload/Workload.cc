@@ -1051,6 +1051,12 @@ int Workload::get_layer_numbers(std::string workload_input) {
 }
 
 bool Workload::initialize_workload_from_string(const std::string& content) {
+  // Check for sentinel value indicating direct initialization will follow
+  if (content == "DIRECT_INIT") {
+    this->initialized = false;  // Will be set to true by direct initialization
+    return false;  // Don't parse, direct init will be called separately
+  }
+
   // In-memory version of initialize_workload that reads from string instead of file
   std::istringstream inFile(content);
   std::map<int, bool> chekpoints;

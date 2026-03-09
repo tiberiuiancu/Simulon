@@ -293,7 +293,7 @@ Sys::Sys(
       path,
       this->seprate_log,
       workload_content);
-  if (workload->initialized == false) {
+  if (workload->initialized == false && workload_content != "DIRECT_INIT") {
     sys_panic(
         "Unable to initialize the workload layer because it can not open the workload file");
     return;

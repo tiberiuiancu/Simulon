@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 
 #include "astra_bindings/topology_bridge.hh"
 #include "astra_bindings/workload_bridge.hh"
@@ -7,8 +8,18 @@
 
 namespace py = pybind11;
 
+// Bind std::vector types for proper Python list interface
+PYBIND11_MAKE_OPAQUE(std::vector<simulon::astra::LayerTrace>);
+PYBIND11_MAKE_OPAQUE(std::vector<simulon::astra::NetworkNode>);
+PYBIND11_MAKE_OPAQUE(std::vector<simulon::astra::NetworkLink>);
+
 PYBIND11_MODULE(_sim, m) {
     m.doc() = "simulon C++ simulation backend";
+
+    // Bind vector types to provide full Python list interface
+    py::bind_vector<std::vector<simulon::astra::LayerTrace>>(m, "LayerTraceVector");
+    py::bind_vector<std::vector<simulon::astra::NetworkNode>>(m, "NetworkNodeVector");
+    py::bind_vector<std::vector<simulon::astra::NetworkLink>>(m, "NetworkLinkVector");
 
     // Topology bindings
     py::class_<simulon::astra::NetworkNode>(m, "NetworkNode")

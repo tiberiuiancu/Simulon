@@ -34,17 +34,26 @@ struct WorkloadTrace {
     std::vector<LayerTrace> layers;
 };
 
-// Forward declaration for ASTRA-Sim types
-// This will be implemented once we integrate with ASTRA-Sim internals
-// namespace AstraSim {
-//     class Workload;
-//     class Sys;
-// }
-// AstraSim::Workload* createWorkload(
-//     const WorkloadTrace& trace,
-//     AstraSim::Sys* sys,
-//     const std::string& run_name
-// );
+}  // namespace astra
+}  // namespace simulon
+
+// Forward declarations for ASTRA-Sim types (must be outside our namespace)
+namespace AstraSim {
+    class Workload;
+    class Sys;
+}
+
+namespace simulon {
+namespace astra {
+
+/**
+ * Directly initialize a Workload with Layers from structured WorkloadTrace.
+ * Eliminates text serialization/parsing overhead.
+ */
+void initialize_workload_direct(
+    AstraSim::Workload* workload,
+    AstraSim::Sys* sys,
+    const WorkloadTrace& trace);
 
 }  // namespace astra
 }  // namespace simulon
