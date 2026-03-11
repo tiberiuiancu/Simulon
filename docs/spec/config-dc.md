@@ -17,14 +17,11 @@ This file describes the hardware and network topology of the simulated datacente
    - [GPU](#gpu)
    - [CPU](#cpu)
    - [Node-Level Cooling](#node-level-cooling)
-8. [`scale_up` Block (Intra-Node Network)](#scale_up-block-intra-node-network)
-9. [`scale_out` Block (Inter-Node Network)](#scale_out-block-inter-node-network)
-   - [NIC](#nic)
-   - [Topology](#topology)
+8. [`network` Block](#network-block)
+   - [`network.scale_up` (Intra-Node)](#networkscale_up-intra-node)
+   - [`network.scale_out` (Inter-Node)](#networkscale_out-inter-node)
    - [Topology Templates](#topology-templates)
-   - [Switches](#switches)
-   - [Links](#links)
-10. [Full Example](#full-example)
+9. [Full Example](#full-example)
 
 ---
 
@@ -108,8 +105,7 @@ cost:
 datacenter:   { ... }   # datacenter-level infrastructure
 cluster:      { ... }   # cluster scale and layout
 node:         { ... }   # per-node hardware specification
-scale_up:     { ... }   # intra-node (GPU-to-GPU) network
-scale_out:    { ... }   # inter-node network
+network:      { ... }   # network fabric (scale-up + scale-out)
 ```
 
 ---
@@ -184,8 +180,10 @@ Every node must have at least one GPU.
 | Field | Type | Description |
 |---|---|---|
 | `gpus_per_node` | int | Number of GPUs in this node |
-| `num_switches_per_node` | int | Number of intra-node switch chips per node (e.g. NVSwitch). Only relevant when `scale_up.topology: switched`. |
 | `gpus_per_nic` | int | Number of GPUs sharing each NIC. Default: `1`. Simulator support for values > 1 is limited. |
+
+> **Note:** One NVSwitch per node is assumed for switched NVLink configurations.
+> This is specified via `network.scale_up.switch`, not in the node block.
 
 **GPU fields:**
 
@@ -230,7 +228,6 @@ kernel_runs:
 ```yaml
 node:
   gpus_per_node: 8                # number of GPUs in this node
-  num_switches_per_node: 4        # NVSwitch chips per node (switched topology only)
   gpus_per_nic: 1                 # GPUs sharing each NIC
 
   gpu: H100                       # short-form profile reference
@@ -296,60 +293,59 @@ per chassis). This is in addition to rack-level and datacenter-level (PUE) cooli
 
 ---
 
-## `scale_up` Block (Intra-Node Network)
+## `network` Block
 
-Describes the GPU-to-GPU interconnect fabric within a node (e.g. NVLink, UALink, Infinity Fabric).
-
-**Topology modes:**
-
-| Value | Description |
-|---|---|
-| `switched` | GPUs connected via one or more intra-node switches (e.g. NVSwitch). Default for NVIDIA nodes. |
-| `p2p` | Direct point-to-point links between GPUs, no switch. Common for AMD configurations. |
-
-**Technology values:** `nvlink`, `ualink`, `infinity_fabric`
+The `network` block contains two sub-blocks: `scale_up` for the intra-node fabric and
+`scale_out` for the inter-node fabric. Both are optional.
 
 ```yaml
-scale_up:
-  topology: switched              # switched | p2p
-  technology: nvlink              # nvlink | ualink | infinity_fabric
-
-  # Per-link bandwidth (GPU ↔ switch or GPU ↔ GPU for p2p), per direction.
-  link_bandwidth: 900Gbps
-
-  # Per-link latency.
-  link_latency: 0.000025ms
-
-  # Cost of intra-node links (optional, per link).
-  link_cost:
-    value: 0                      # typically included in GPU/switch cost
-
-  # ---- Switch configuration (required when topology: switched) ----
-  # Uses the same SwitchSpec format as scale_out.topology.switch.
-  # NS-3 queue fields (buffer_per_port, queue_discipline) are optional here
-  # and typically only set when using the NS-3 backend.
-  switch:
-    from: NVSwitch3               # optional profile reference
-
-    # --- OR inline ---
-    name: NVSwitch3
-    tdp_w: 110                    # per switch chip
-    cost:
-      value: 3000                 # per switch chip
+network:
+  scale_up:   { ... }   # intra-node NVLink fabric
+  scale_out:  { ... }   # inter-node network
 ```
-
-For `topology: p2p`, the `switch` block is omitted and GPUs are connected in a mesh or ring
-as determined by the simulator's AMD topology model.
 
 ---
 
-## `scale_out` Block (Inter-Node Network)
+### `network.scale_up` (Intra-Node)
 
-Describes the inter-node network fabric connecting nodes within the cluster.
+Describes the intra-node GPU interconnect. One NVSwitch per node is assumed.
+The `switch` field specifies the NVSwitch hardware using `SwitchSpec`.
 
-### NIC
+**`SwitchSpec` fields** (used for both `scale_up.switch` and `scale_out` leaf/spine switches):
 
-**Fields:**
+| Field | Type | Description |
+|---|---|---|
+| `from` | string | Profile name to inherit from |
+| `name` | string | Display name |
+| `vendor` | string | e.g. `nvidia` |
+| `port_count` | int | Number of switch ports |
+| `port_speed` | bandwidth | Per-port bandwidth, e.g. `2880Gbps`. For NVSwitch, this is the NVLink bandwidth. |
+| `latency` | time | Switch propagation latency, e.g. `0.000025ms` |
+| `buffer_per_port` | string | Per-port TX queue buffer (NS-3 backend only), e.g. `32MB` |
+| `queue_discipline` | string | `drop_tail` \| `red` \| `codel` \| `fq_codel` (NS-3 backend only) |
+| `tdp_w` | float | Power draw per switch chip |
+| `cost` | cost | Cost per switch chip |
+
+```yaml
+network:
+  scale_up:
+    switch:                       # NVSwitch specification (1 per node)
+      name: NVSwitch3
+      port_speed: 2880Gbps        # NVLink bandwidth per port
+      latency: 0.000025ms         # propagation latency
+      tdp_w: 110
+      cost:
+        value: 3000
+```
+
+---
+
+### `network.scale_out` (Inter-Node)
+
+Describes the inter-node network. Contains the NIC spec, optional switch specs for leaf
+and spine tiers, and the topology configuration.
+
+**NIC fields:**
 
 | Field | Type | Description |
 |---|---|---|
@@ -360,77 +356,48 @@ Describes the inter-node network fabric connecting nodes within the cluster.
 | `latency` | time | End-to-end NIC latency contribution |
 | `tdp_w` | float | Power draw per NIC |
 | `cost` | cost | Cost per NIC |
+| `bandwidth_efficiency` | float | Effective bandwidth fraction (0.0–1.0). Default: `0.85`. |
 
 The number of GPUs sharing each NIC is set via `node.gpus_per_nic` (default: `1`).
 
 ```yaml
-scale_out:
-  nic:
-    from: ConnectX-7              # optional profile reference
-
-    # --- OR inline ---
-    name: "Mellanox ConnectX-7"
-    vendor: mellanox
-    speed: 400Gbps
-    latency: 0.0005ms
-    tdp_w: 25
-    cost:
-      value: 2000
-```
-
-### Topology
-
-The inter-node network topology is specified under `scale_out.topology`.
-
-```yaml
-  topology:
-    type: spectrum_x              # see Topology Templates below
-
-    # Template-specific parameters (see per-template tables below)
-    params:
-      # ...
-
-    # Switch hardware specification (shared across all inter-node switches
-    # unless overridden per switch tier; see per-template notes).
-    # Same SwitchSpec format is used for scale_up.switch.
-    switch:
-      from: "Spectrum-4"          # optional profile reference
+network:
+  scale_out:
+    nic:
+      from: ConnectX-7              # optional profile reference
       # --- OR inline ---
-      name: "NVIDIA Spectrum-4"
-      vendor: nvidia
+      name: "Mellanox ConnectX-7"
+      vendor: mellanox
+      speed: 400Gbps
+      latency: 0.0005ms
+      bandwidth_efficiency: 0.85
+      tdp_w: 25
+      cost:
+        value: 2000
+
+    leaf_switch:                    # optional; absent for topologies without leaf tier
+      name: Spectrum-4
       port_count: 64
       port_speed: 400Gbps
-      # Per-port transmit queue buffer size (used by NS-3 packet-level backend).
-      # Accepts packet count (e.g. "100p") or byte count (e.g. "10MB").
       buffer_per_port: 32MB
-      # Queue discipline for the NS-3 traffic control layer.
-      # Options: drop_tail | red | codel | fq_codel
       queue_discipline: fq_codel
-      # Queue discipline parameters (optional; discipline-specific).
-      # Omit to use simulator defaults for the chosen discipline.
-      queue_params:
-        # fq_codel
-        flows: 1024               # number of flow queues
-        target_delay: 5ms         # CoDel target queue delay
-        interval: 100ms           # CoDel control interval
-        quantum: 1514             # bytes per flow dequeue round
-        # red (example, use instead of above for red discipline)
-        # min_th: 5MB
-        # max_th: 15MB
-        # use_ecn: true
-      tdp_w: 300
       cost:
         value: 50000
 
-    # Physical link properties applied to all inter-node links
-    # unless overridden at the template level.
-    link:
-      latency: 0.0005ms           # propagation latency per link
-      error_rate: 0.0             # bit error rate (0.0 = lossless)
+    spine_switch:                   # optional; absent for topologies without spine tier
+      name: Spectrum-4
+      port_count: 128
       cost:
-        value: 200                # per physical link (cable + transceivers)
-      cost_per_meter: 2.5         # optional; USD/m for cable runs
+        value: 80000
+
+    topology:
+      type: fat_tree                # see Topology Templates below
+      params:
+        k: 64
+        oversubscription: 1.0
 ```
+
+---
 
 ### Topology Templates
 
@@ -446,13 +413,13 @@ description (format TBD).
 #### `spectrum_x`
 
 NVIDIA Spectrum-X rail-optimized topology. Two-tier fabric (leaf + spine) with optional
-dual-ToR and dual-plane configurations. NVLink handles intra-node; NICs connect to leaf switches.
+dual-ToR and dual-plane configurations.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `nics_per_leaf` | int | derived | NICs connected to each leaf (aggregate) switch |
+| `nics_per_leaf` | int | derived | NICs connected to each leaf switch |
 | `num_leaf_switches` | int | derived | Total number of leaf switches |
-| `num_spine_switches` | int | derived | Total number of spine (pod) switches |
+| `num_spine_switches` | int | derived | Total number of spine switches |
 | `leaf_to_spine_bandwidth` | bandwidth | = NIC speed | Uplink bandwidth from leaf to spine |
 | `switches_per_spine` | int | derived | Leaf switches per spine switch |
 | `nvlink_switches_per_node` | int | derived | NVLink switch chips per node (scale-up) |
@@ -466,8 +433,6 @@ dual-ToR and dual-plane configurations. NVLink handles intra-node; NICs connect 
         num_leaf_switches: 8
         num_spine_switches: 16
         leaf_to_spine_bandwidth: 400Gbps
-        switches_per_spine: 4
-        nvlink_switches_per_node: 4
         dual_tor: false
         dual_plane: false
 ```
@@ -476,8 +441,7 @@ dual-ToR and dual-plane configurations. NVLink handles intra-node; NICs connect 
 
 #### `alibaba_hpn`
 
-Alibaba High-Performance Network topology, as described in the AlibabaHPN reference architecture.
-Three-tier design with optional dual-ToR and dual-plane.
+Alibaba High-Performance Network topology. Three-tier design with optional dual-ToR and dual-plane.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -594,8 +558,7 @@ inter-group links are sparse.
 #### `custom`
 
 No generator is invoked. The full topology must be provided via an external description file
-(format TBD). The `switch` and `link` blocks under `scale_out.topology` still apply as
-defaults for any switch or link not explicitly overridden in the custom topology file.
+(format TBD).
 
 ```yaml
       type: custom
@@ -630,7 +593,6 @@ cluster:
 
 node:
   gpus_per_node: 8
-  num_switches_per_node: 4
   gpus_per_nic: 1
   gpu:
     from: H100
@@ -657,37 +619,26 @@ node:
     cost:
       value: 1000
 
-scale_up:
-  topology: switched
-  technology: nvlink
-  link_bandwidth: 900Gbps
-  link_latency: 0.000025ms
-  switch:
-    from: NVSwitch3
-    tdp_w: 110
-    cost:
-      value: 3000
-
-scale_out:
-  nic:
-    from: ConnectX-7
-    speed: 400Gbps
-    latency: 0.0005ms
-    tdp_w: 25
-    cost:
-      value: 2000
-
-  topology:
-    type: spectrum_x
-    params:
-      nics_per_leaf: 64
-      num_leaf_switches: 8
-      num_spine_switches: 8
-      leaf_to_spine_bandwidth: 400Gbps
-      dual_tor: false
-      dual_plane: false
-
+network:
+  scale_up:
     switch:
+      name: NVSwitch3
+      port_speed: 2880Gbps
+      latency: 0.000025ms
+      tdp_w: 110
+      cost:
+        value: 3000
+
+  scale_out:
+    nic:
+      from: ConnectX-7
+      speed: 400Gbps
+      latency: 0.0005ms
+      tdp_w: 25
+      cost:
+        value: 2000
+
+    leaf_switch:
       from: Spectrum-4
       buffer_per_port: 32MB
       queue_discipline: fq_codel
@@ -695,10 +646,9 @@ scale_out:
       cost:
         value: 50000
 
-    link:
-      latency: 0.0005ms
-      error_rate: 0.0
-      cost:
-        value: 200
-      cost_per_meter: 2.5
+    topology:
+      type: fat_tree
+      params:
+        k: 64
+        oversubscription: 1.0
 ```
