@@ -1,10 +1,6 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "pybind11>=2.12", "cmake", "ninja"]
 build-backend = "hatchling.build"
-
-# Switch to scikit-build-core once the C++ extension is ready:
-# requires = ["scikit-build-core>=0.9", "pybind11>=2.12"]
-# build-backend = "scikit-build-core.build"
 
 [project]
 name = "simulon"
@@ -25,8 +21,16 @@ simulon = "simulon.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["src/simulon"]
 
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/python"]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
