@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "astra-sim/system/AstraParamParse.hh"
+
 namespace simulon {
 namespace astra {
 
@@ -30,10 +32,17 @@ struct NetworkTopology {
     float nic_bandwidth_efficiency;     // Scale-out (inter-node) efficiency
 };
 
-// Forward declaration for ASTRA-Sim type
-// This will be implemented once we integrate with ASTRA-Sim internals
-// struct NetWorkParam;
-// NetWorkParam toNetWorkParam(const NetworkTopology& topology);
+/**
+ * Convert a NetworkTopology to a NetWorkParam suitable for passing to ASTRA-Sim.
+ * Derives nvlink_bw, bw_per_nic, NVSwitchs, all_gpus, etc. from the topology graph.
+ */
+NetWorkParam toNetWorkParam(const NetworkTopology& topology);
+
+/**
+ * Serialize a NetworkTopology to the SimAI text topology file format.
+ * Used by the NS3 backend which requires a file on disk.
+ */
+std::string toTopoFileContent(const NetworkTopology& topology);
 
 }  // namespace astra
 }  // namespace simulon

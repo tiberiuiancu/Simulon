@@ -42,3 +42,30 @@ target_sources(_sim PRIVATE ${ASTRA_SIM_SOURCES})
 target_compile_definitions(_sim PRIVATE ANALYTI)
 
 install(TARGETS _sim DESTINATION simulon)
+
+option(SIMULON_NS3 "Build NS3 backend (requires NS3 submodule built)" OFF)
+
+if(SIMULON_NS3)
+    set(NS3_SIM_DIR "${CMAKE_SOURCE_DIR}/csrc/ns3/simulation")
+    set(NS3_BUILD_DIR "${NS3_SIM_DIR}/build")
+
+    target_sources(_sim PRIVATE
+        csrc/astra-sim/network_frontend/ns3/AstraSimNetwork.cc
+    )
+    target_include_directories(_sim PRIVATE
+        ${NS3_SIM_DIR}
+        ${NS3_BUILD_DIR}/include
+    )
+    target_compile_definitions(_sim PRIVATE SIMULON_NS3)
+
+    foreach(ns3_mod core network internet point-to-point applications csma)
+        find_library(NS3_LIB_${ns3_mod}
+            NAMES
+                "ns3.36.1-${ns3_mod}-optimized"
+                "ns3-${ns3_mod}"
+                "ns3.optimized-${ns3_mod}-default"
+            PATHS "${NS3_BUILD_DIR}/lib"
+            REQUIRED)
+        target_link_libraries(_sim PRIVATE ${NS3_LIB_${ns3_mod}})
+    endforeach()
+endif()

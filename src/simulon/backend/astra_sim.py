@@ -121,7 +121,54 @@ class AstraSimBackend(Backend):
                 # C++ bindings not available, return conversion results only
                 return self._conversion_only_result(network_topo, workload_trace)
         elif self.network_backend == NetworkBackend.NS3:
-            raise NotImplementedError("NS-3 backend not yet implemented")
+            try:
+                from simulon._sim import run_ns3
+                from simulon.backend.astra_converter.cpp_bridge import (
+                    to_cpp_topology,
+                    to_cpp_workload,
+                )
+
+                cpp_topology = to_cpp_topology(network_topo)
+                cpp_workload = to_cpp_workload(workload_trace)
+
+                sim_results = run_ns3(cpp_topology, cpp_workload)
+
+                return {
+                    "status": "success" if sim_results.success else "error",
+                    "network_backend": self.network_backend.value,
+                    "simulation": {
+                        "total_time_ns": sim_results.total_time_ns,
+                        "compute_time_ns": sim_results.compute_time_ns,
+                        "communication_time_ns": sim_results.communication_time_ns,
+                        "completed_layers": sim_results.completed_layers,
+                        "error_message": sim_results.error_message,
+                        "metrics": dict(sim_results.metrics),
+                    },
+                    "topology": {
+                        "num_nodes": len(network_topo.nodes),
+                        "num_links": len(network_topo.links),
+                        "gpus_per_server": network_topo.gpus_per_server,
+                        "nv_switch_num": network_topo.nv_switch_num,
+                        "switches_excluding_nvswitch": network_topo.switches_excluding_nvswitch,
+                        "gpu_type": network_topo.gpu_type,
+                    },
+                    "workload": {
+                        "parallelism_policy": workload_trace.parallelism_policy,
+                        "tensor_parallel": workload_trace.model_parallel_npu_group,
+                        "expert_parallel": workload_trace.expert_parallel_npu_group,
+                        "pipeline_parallel": workload_trace.pipeline_model_parallelism,
+                        "gradient_accumulation": workload_trace.ga,
+                        "virtual_pipeline_parallel": workload_trace.vpp,
+                        "all_gpus": workload_trace.all_gpus,
+                        "num_layers": workload_trace.num_layers,
+                    },
+                }
+            except ImportError:
+                raise ImportError(
+                    "NS3 backend unavailable. Rebuild with SIMULON_NS3=1 "
+                    "after building NS3 in csrc/ns3/simulation/ "
+                    "(./waf configure && ./waf build)."
+                )
 
         return self._conversion_only_result(network_topo, workload_trace)
 

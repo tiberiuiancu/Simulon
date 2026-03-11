@@ -5,6 +5,9 @@
 #include "astra_bindings/topology_bridge.hh"
 #include "astra_bindings/workload_bridge.hh"
 #include "astra_bindings/analytical_runner.hh"
+#ifdef SIMULON_NS3
+#include "astra_bindings/ns3_runner.hh"
+#endif
 
 namespace py = pybind11;
 
@@ -89,4 +92,10 @@ PYBIND11_MODULE(_sim, m) {
     m.def("run_analytical", &simulon::astra::run_analytical,
           "Run ASTRA-Sim analytical backend simulation",
           py::arg("topology"), py::arg("workload"));
+
+#ifdef SIMULON_NS3
+    m.def("run_ns3", &simulon::astra::run_ns3,
+          "Run ASTRA-Sim with NS-3 network backend",
+          py::arg("topology"), py::arg("workload"));
+#endif
 }

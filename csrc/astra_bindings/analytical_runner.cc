@@ -5,6 +5,7 @@
 
 #include "analytical_runner.hh"
 #include "workload_bridge.hh"
+#include "topology_bridge.hh"
 
 #include <iostream>
 #include <memory>
@@ -21,6 +22,7 @@
 // ASTRA-Sim includes (paths relative to csrc/)
 #include "astra-sim/network_frontend/analytical/AnalyticalNetwork.h"
 #include "astra-sim/network_frontend/analytical/AnaSim.h"
+#include "astra-sim/system/AstraParamParse.hh"
 #include "astra-sim/system/Sys.hh"
 #include "astra-sim/workload/Workload.hh"
 
@@ -39,10 +41,12 @@ AnalyticalResults run_analytical(
     results.completed_layers = 0;
 
     try {
+        // Build NetWorkParam from topology graph and populate UserParam singleton
+        NetWorkParam net_param = toNetWorkParam(topology);
+        UserParam::getInstance()->net_work_param = net_param;
+
         // Create physical dimensions for ASTRA-Sim
         std::vector<int> physical_dims;
-        int total_nodes = topology.gpus_per_server > 0 ?
-            (workload.all_gpus / topology.gpus_per_server) : 1;
         physical_dims.push_back(workload.all_gpus);
 
         std::vector<int> queues_per_dim(physical_dims.size(), 1);
@@ -55,29 +59,29 @@ AnalyticalResults run_analytical(
         AstraSim::Sys* system = nullptr;
         try {
             system = new AstraSim::Sys(
-            analytical_network,  // network backend
-            nullptr,             // memory API
-            0,                   // id
-            0,                   // npu_offset
-            1,                   // num_passes
-            physical_dims,       // physical dimensions
-            queues_per_dim,      // queues per dimension
-            "",                  // sys name
-            "",                  // workload path (unused)
-            1.0,                 // comm_scale
-            1.0,                 // compute_scale
-            1.0,                 // injection_scale
-            1,                   // total_stat_rows
-            0,                   // stat_row
-            "",                  // path (empty = no output)
-            "",                  // run_name (empty = no output)
-            false,               // separate_log (disable logging)
-            false,               // rendezvous_enabled
-            GPUType::H100,       // gpu_type (map from topology.gpu_type)
-            physical_dims,       // all_gpus
-            {},                  // NVSwitchs (empty for now)
-            topology.gpus_per_server,  // ngpus_per_node
-            "DIRECT_INIT"        // sentinel: skip text parsing
+            analytical_network,       // network backend
+            nullptr,                  // memory API
+            0,                        // id
+            0,                        // npu_offset
+            1,                        // num_passes
+            physical_dims,            // physical dimensions
+            queues_per_dim,           // queues per dimension
+            "",                       // sys name
+            "",                       // workload path (unused)
+            1.0,                      // comm_scale
+            1.0,                      // compute_scale
+            1.0,                      // injection_scale
+            1,                        // total_stat_rows
+            0,                        // stat_row
+            "",                       // path (empty = no output)
+            "",                       // run_name (empty = no output)
+            false,                    // separate_log (disable logging)
+            false,                    // rendezvous_enabled
+            net_param.gpu_type,       // gpu_type from topology
+            physical_dims,            // all_gpus (flat list)
+            net_param.NVswitchs,      // NVSwitch IDs from topology
+            topology.gpus_per_server, // ngpus_per_node
+            "DIRECT_INIT"             // sentinel: skip text parsing
             );
         } catch (const std::exception& e) {
             results.error_message = std::string("Failed to create Sys: ") + e.what();

@@ -10,11 +10,12 @@ from simulon.config.dc import (
     DatacenterMeta,
     GPUSpec,
     NICSpec,
+    NetworkSpec,
     NodeSpec,
     ScaleOutSpec,
-    ScaleOutTopologySpec,
     ScaleUpSpec,
-    ScaleUpTopology,
+    SwitchSpec,
+    TopologySpec,
     TopologyType,
 )
 from simulon.config.scenario import ScenarioConfig
@@ -34,19 +35,15 @@ def simple_scenario():
         cluster=ClusterSpec(num_nodes=2),
         node=NodeSpec(
             gpus_per_node=4,
-            num_switches_per_node=2,
             gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
         ),
-        scale_up=ScaleUpSpec(
-            topology=ScaleUpTopology.switched,
-            link_bandwidth="900Gbps",
-            link_latency="0.001ms",
-        ),
-        scale_out=ScaleOutSpec(
-            nic=NICSpec(speed="400Gbps", latency="0.005ms"),
-            topology=ScaleOutTopologySpec(
-                type=TopologyType.fat_tree,
-                params={"k": 4},
+        network=NetworkSpec(
+            scale_up=ScaleUpSpec(
+                switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms"),
+            ),
+            scale_out=ScaleOutSpec(
+                nic=NICSpec(speed="400Gbps", latency="0.005ms"),
+                topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
             ),
         ),
     )
@@ -112,3 +109,41 @@ def test_in_memory_simulation(simple_scenario):
 
     except ImportError as e:
         pytest.skip(f"C++ bindings not available: {e}")
+
+
+def test_ns3_backend_unavailable_raises_import_error(simple_scenario):
+    """When NS3 bindings are absent, NS3 backend raises ImportError (not NotImplementedError)."""
+    try:
+        from simulon._sim import run_ns3  # noqa: F401
+        pytest.skip("NS3 bindings present — skipping unavailability test")
+    except ImportError:
+        pass
+
+    backend = AstraSimBackend(network_backend="ns3")
+    with pytest.raises(ImportError, match="NS3 backend unavailable"):
+        backend.run(simple_scenario)
+
+
+def test_ns3_simulation(simple_scenario):
+    """Test NS3 backend end-to-end when bindings are available."""
+    try:
+        from simulon._sim import run_ns3  # noqa: F401
+    except ImportError:
+        pytest.skip("NS3 bindings not available (build with SIMULON_NS3=ON)")
+
+    backend = AstraSimBackend(network_backend="ns3")
+    results = backend.run(simple_scenario)
+
+    assert results["network_backend"] == "ns3"
+    assert results["status"] in ("success", "error")
+
+    assert results["topology"]["gpus_per_server"] == 4
+    assert results["workload"]["all_gpus"] == 8
+
+    if results["status"] == "success":
+        sim = results["simulation"]
+        assert sim["total_time_ns"] > 0
+        assert sim["completed_layers"] == 4
+        print(f"\nNS3 simulation completed in {sim['total_time_ns']} ns")
+    else:
+        pytest.fail(f"NS3 simulation failed: {results['simulation']['error_message']}")

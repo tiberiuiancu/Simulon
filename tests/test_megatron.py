@@ -19,7 +19,7 @@ from simulon.workload.trace import CommOp, CommOpType, ComputeOp, ParallelGroup
 # Fixtures
 # ---------------------------------------------------------------------------
 
-TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 
 
 def _llama7b() -> LLMSpec:

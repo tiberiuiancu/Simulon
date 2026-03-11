@@ -9,6 +9,7 @@ from simulon.config.dc import (
     KernelRun,
     LinkSpec,
     NICSpec,
+    NetworkSpec,
     NodeCoolingSpec,
     NodeSpec,
     GPUSpec,
@@ -16,11 +17,9 @@ from simulon.config.dc import (
     RackCoolingSpec,
     RackSpec,
     ScaleOutSpec,
-    ScaleOutTopologySpec,
     ScaleUpSpec,
-    ScaleUpTopology,
-    ScaleUpTechnology,
     SwitchSpec,
+    TopologySpec,
     TopologyType,
 )
 from simulon.config.scenario import ScenarioConfig
@@ -56,7 +55,6 @@ def make_scenario() -> ScenarioConfig:
             cluster=ClusterSpec(num_nodes=64),
             node=NodeSpec(
                 gpus_per_node=8,
-                num_switches_per_node=4,
                 gpus_per_nic=1,
                 gpu=GPUSpec(
                     name="H100-SXM5-80GB",
@@ -93,30 +91,26 @@ def make_scenario() -> ScenarioConfig:
                     cost=Cost(value=1500),
                 ),
             ),
-            scale_up=ScaleUpSpec(
-                topology=ScaleUpTopology.switched,
-                technology=ScaleUpTechnology.nvlink,
-                link_bandwidth="900Gbps",
-                link_latency="0.000025ms",
-                switch=SwitchSpec(
-                    name="NVSwitch3",
-                    tdp_w=110.0,
-                    cost=Cost(value=3000),
-                ),
-            ),
-            scale_out=ScaleOutSpec(
-                nic=NICSpec(
-                    name="ConnectX-7",
-                    vendor="mellanox",
-                    speed="400Gbps",
-                    latency="0.0005ms",
-                    tdp_w=25.0,
-                    cost=2000.0,  # scalar cost form
-                ),
-                topology=ScaleOutTopologySpec(
-                    type=TopologyType.fat_tree,
-                    params={"k": 64, "num_tiers": 3, "oversubscription": 1.0},
+            network=NetworkSpec(
+                scale_up=ScaleUpSpec(
                     switch=SwitchSpec(
+                        name="NVSwitch3",
+                        port_speed="2880Gbps",
+                        latency="0.000025ms",
+                        tdp_w=110.0,
+                        cost=Cost(value=3000),
+                    ),
+                ),
+                scale_out=ScaleOutSpec(
+                    nic=NICSpec(
+                        name="ConnectX-7",
+                        vendor="mellanox",
+                        speed="400Gbps",
+                        latency="0.0005ms",
+                        tdp_w=25.0,
+                        cost=2000.0,  # scalar cost form
+                    ),
+                    leaf_switch=SwitchSpec(
                         name="Spectrum-4",
                         vendor="nvidia",
                         port_count=64,
@@ -127,11 +121,9 @@ def make_scenario() -> ScenarioConfig:
                         tdp_w=300.0,
                         cost=Cost(value=50000),
                     ),
-                    link=LinkSpec(
-                        latency="0.0005ms",
-                        error_rate=0.0,
-                        cost=200.0,
-                        cost_per_meter=2.5,
+                    topology=TopologySpec(
+                        type=TopologyType.fat_tree,
+                        params={"k": 64, "num_tiers": 3, "oversubscription": 1.0},
                     ),
                 ),
             ),

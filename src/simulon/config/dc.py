@@ -24,17 +24,6 @@ class KernelRun(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ScaleUpTopology(str, Enum):
-    switched = "switched"
-    p2p = "p2p"
-
-
-class ScaleUpTechnology(str, Enum):
-    nvlink = "nvlink"
-    ualink = "ualink"
-    infinity_fabric = "infinity_fabric"
-
-
 class QueueDiscipline(str, Enum):
     drop_tail = "drop_tail"
     red = "red"
@@ -129,7 +118,6 @@ class NodeCoolingSpec(BaseModel):
 
 class NodeSpec(BaseModel):
     gpus_per_node: int
-    num_switches_per_node: Optional[int] = None
     gpus_per_nic: int = 1
     gpu: Union[str, GPUSpec]
     cpu: Optional[Union[str, CPUSpec]] = None
@@ -142,7 +130,7 @@ class NodeSpec(BaseModel):
 
 
 class SwitchSpec(BaseModel):
-    """Unified switch spec used by both scale_up.switch and scale_out.topology.switch."""
+    """Unified switch spec used by scale_up.switch and scale_out leaf/spine switches."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -151,6 +139,7 @@ class SwitchSpec(BaseModel):
     vendor: Optional[str] = None
     port_count: Optional[int] = None
     port_speed: Optional[str] = None
+    latency: Optional[str] = None  # propagation latency, e.g. "0.000025ms"
     buffer_per_port: Optional[str] = None
     queue_discipline: Optional[QueueDiscipline] = None
     queue_params: Optional[dict[str, Any]] = None  # discipline-specific; typed later
@@ -158,24 +147,8 @@ class SwitchSpec(BaseModel):
     cost: Optional[CostField] = None
 
 
-class ScaleUpSpec(BaseModel):
-    topology: ScaleUpTopology = ScaleUpTopology.switched
-    technology: ScaleUpTechnology = ScaleUpTechnology.nvlink
-    link_bandwidth: Optional[str] = None
-    link_latency: Optional[str] = None
-    link_cost: Optional[CostField] = None
-    switch: Optional[Union[str, SwitchSpec]] = None
-    bandwidth_efficiency: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Bandwidth efficiency factor (0.0-1.0) for collective operations. "
-        "Accounts for protocol overhead, contention, etc. 1.0 = ideal, 0.8 = 80% efficient.",
-    )
-
-
 # ---------------------------------------------------------------------------
-# Scale-out block
+# Network block (scale-up + scale-out)
 # ---------------------------------------------------------------------------
 
 
@@ -261,17 +234,33 @@ class CustomTopologyParams(BaseModel):
     topology_file: str
 
 
-class ScaleOutTopologySpec(BaseModel):
+class TopologySpec(BaseModel):
+    """Scale-out topology type and parameters."""
+
     type: TopologyType
-    # params are validated against the correct model for `type` at load time
     params: Optional[dict[str, Any]] = None
-    switch: Optional[Union[str, SwitchSpec]] = None
-    link: Optional[LinkSpec] = None
+
+
+class ScaleUpSpec(BaseModel):
+    """Intra-node (NVLink) network — one NVSwitch per node assumed."""
+
+    switch: Optional[Union[str, SwitchSpec]] = None  # NVSwitch spec
 
 
 class ScaleOutSpec(BaseModel):
-    nic: Union[str, NICSpec]
-    topology: Optional[ScaleOutTopologySpec] = None
+    """Inter-node network."""
+
+    nic: Optional[Union[str, NICSpec]] = None
+    leaf_switch: Optional[Union[str, SwitchSpec]] = None
+    spine_switch: Optional[Union[str, SwitchSpec]] = None
+    topology: Optional[TopologySpec] = None
+
+
+class NetworkSpec(BaseModel):
+    """Top-level network block containing scale-up and scale-out sub-configs."""
+
+    scale_up: Optional[ScaleUpSpec] = None
+    scale_out: Optional[ScaleOutSpec] = None
 
 
 # ---------------------------------------------------------------------------
@@ -283,5 +272,4 @@ class DatacenterConfig(BaseModel):
     datacenter: DatacenterMeta
     cluster: ClusterSpec
     node: NodeSpec
-    scale_up: Optional[ScaleUpSpec] = None
-    scale_out: Optional[ScaleOutSpec] = None
+    network: Optional[NetworkSpec] = None

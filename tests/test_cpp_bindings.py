@@ -1,104 +1,56 @@
-"""Integration tests for ASTRA-Sim converters with C++ bindings."""
+"""Tests for the Python-to-C++ bridge: verifies converter output can be passed to C++ bindings."""
 
-from simulon._sim import NetworkTopology, NetworkNode, NetworkLink, WorkloadTrace, LayerTrace
+import pytest
+
+from simulon._sim import LayerTrace, NetworkLink, NetworkNode, NetworkTopology, WorkloadTrace
 from simulon.backend.astra_converter import TopologyConverter, WorkloadConverter
+from simulon.config.common import DType
 from simulon.config.dc import (
+    ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
-    ClusterSpec,
-    NodeSpec,
     GPUSpec,
-    ScaleUpSpec,
-    ScaleUpTopology,
-    ScaleOutSpec,
     NICSpec,
-    ScaleOutTopologySpec,
+    NetworkSpec,
+    NodeSpec,
+    ScaleOutSpec,
+    ScaleUpSpec,
+    SwitchSpec,
+    TopologySpec,
     TopologyType,
 )
 from simulon.config.workload import (
-    MegatronWorkload,
+    LLMSpec,
     MegatronParallelism,
     MegatronTraining,
-    LLMSpec,
+    MegatronWorkload,
 )
-from simulon.config.common import DType
 
 
-def test_topology_python_to_cpp():
-    """Test that Python NetworkTopology can be passed to C++ bindings."""
-    # Create a minimal datacenter config
-    datacenter = DatacenterConfig(
+@pytest.fixture
+def simple_datacenter():
+    return DatacenterConfig(
         datacenter=DatacenterMeta(name="test"),
         cluster=ClusterSpec(num_nodes=2),
         node=NodeSpec(
             gpus_per_node=4,
-            num_switches_per_node=2,
             gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
         ),
-        scale_up=ScaleUpSpec(
-            topology=ScaleUpTopology.switched,
-            link_bandwidth="900Gbps",
-            link_latency="0.001ms",
-        ),
-        scale_out=ScaleOutSpec(
-            nic=NICSpec(speed="400Gbps", latency="0.005ms"),
-            topology=ScaleOutTopologySpec(
-                type=TopologyType.fat_tree,
-                params={"k": 4},
+        network=NetworkSpec(
+            scale_up=ScaleUpSpec(
+                switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms"),
+            ),
+            scale_out=ScaleOutSpec(
+                nic=NICSpec(speed="400Gbps", latency="0.005ms"),
+                topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
             ),
         ),
     )
 
-    # Convert to NetworkTopology
-    converter = TopologyConverter()
-    py_topology = converter.convert(datacenter)
 
-    # Create C++ NetworkTopology and copy data
-    cpp_topology = NetworkTopology()
-    cpp_topology.gpus_per_server = py_topology.gpus_per_server
-    cpp_topology.nv_switch_num = py_topology.nv_switch_num
-    cpp_topology.switches_excluding_nvswitch = py_topology.switches_excluding_nvswitch
-    cpp_topology.gpu_type = py_topology.gpu_type
-
-    # Copy nodes
-    cpp_topology.nodes = []
-    for node in py_topology.nodes:
-        cpp_node = NetworkNode()
-        cpp_node.node_id = node.node_id
-        cpp_node.node_type = node.node_type
-        cpp_topology.nodes.append(cpp_node)
-
-    # Copy links
-    cpp_topology.links = []
-    for link in py_topology.links:
-        cpp_link = NetworkLink()
-        cpp_link.source = link.source
-        cpp_link.dest = link.dest
-        cpp_link.bandwidth_gbps = link.bandwidth_gbps
-        cpp_link.latency_ns = link.latency_ns
-        cpp_link.error_rate = link.error_rate
-        cpp_topology.links.append(cpp_link)
-
-    # Verify data was copied correctly
-    assert cpp_topology.gpus_per_server == 4
-    assert cpp_topology.gpu_type == "H100"
-    assert len(cpp_topology.nodes) == len(py_topology.nodes)
-    assert len(cpp_topology.links) == len(py_topology.links)
-
-
-def test_workload_python_to_cpp():
-    """Test that Python WorkloadTrace can be passed to C++ bindings."""
-    # Create minimal configs
-    datacenter = DatacenterConfig(
-        datacenter=DatacenterMeta(name="test"),
-        cluster=ClusterSpec(num_nodes=2),
-        node=NodeSpec(
-            gpus_per_node=4,
-            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
-        ),
-    )
-
-    workload = MegatronWorkload(
+@pytest.fixture
+def simple_workload():
+    return MegatronWorkload(
         framework="megatron",
         model=LLMSpec(
             name="test-model",
@@ -119,11 +71,42 @@ def test_workload_python_to_cpp():
         ),
     )
 
-    # Convert to WorkloadTrace
-    converter = WorkloadConverter()
-    py_trace = converter.convert(workload, datacenter)
 
-    # Create C++ WorkloadTrace and copy data
+def test_topology_python_to_cpp(simple_datacenter):
+    """Python NetworkTopology can be converted to C++ bound type."""
+    py_topology = TopologyConverter().convert(simple_datacenter)
+
+    cpp_topology = NetworkTopology()
+    cpp_topology.gpus_per_server = py_topology.gpus_per_server
+    cpp_topology.nv_switch_num = py_topology.nv_switch_num
+    cpp_topology.switches_excluding_nvswitch = py_topology.switches_excluding_nvswitch
+    cpp_topology.gpu_type = py_topology.gpu_type
+
+    for node in py_topology.nodes:
+        cpp_node = NetworkNode()
+        cpp_node.node_id = node.node_id
+        cpp_node.node_type = node.node_type
+        cpp_topology.nodes.append(cpp_node)
+
+    for link in py_topology.links:
+        cpp_link = NetworkLink()
+        cpp_link.source = link.source
+        cpp_link.dest = link.dest
+        cpp_link.bandwidth_gbps = link.bandwidth_gbps
+        cpp_link.latency_ns = link.latency_ns
+        cpp_link.error_rate = link.error_rate
+        cpp_topology.links.append(cpp_link)
+
+    assert cpp_topology.gpus_per_server == 4
+    assert cpp_topology.gpu_type == "H100"
+    assert len(cpp_topology.nodes) == len(py_topology.nodes)
+    assert len(cpp_topology.links) == len(py_topology.links)
+
+
+def test_workload_python_to_cpp(simple_datacenter, simple_workload):
+    """Python WorkloadTrace can be converted to C++ bound type."""
+    py_trace = WorkloadConverter().convert(simple_workload, simple_datacenter)
+
     cpp_trace = WorkloadTrace()
     cpp_trace.parallelism_policy = py_trace.parallelism_policy
     cpp_trace.model_parallel_npu_group = py_trace.model_parallel_npu_group
@@ -134,8 +117,6 @@ def test_workload_python_to_cpp():
     cpp_trace.all_gpus = py_trace.all_gpus
     cpp_trace.num_layers = py_trace.num_layers
 
-    # Copy layers
-    cpp_trace.layers = []
     for layer in py_trace.layers:
         cpp_layer = LayerTrace()
         cpp_layer.layer_id = layer.layer_id
@@ -152,7 +133,6 @@ def test_workload_python_to_cpp():
         cpp_layer.wg_update_time_ns = layer.wg_update_time_ns
         cpp_trace.layers.append(cpp_layer)
 
-    # Verify data was copied correctly
     assert cpp_trace.parallelism_policy == "HYBRID_TRANSFORMER"
     assert cpp_trace.model_parallel_npu_group == 2
     assert cpp_trace.num_layers == 4  # 2 transformer layers * 2 sublayers

@@ -102,77 +102,52 @@ class TopologyConverter:
             nodes.append(NetworkNode(node_id=i, node_type="gpu"))
         next_node_id = total_gpus
 
-        # 2. Create intra-node topology (scale-up network)
-        nvswitch_ids_per_node: list[list[int]] = []
+        # 2. Create intra-node topology (scale-up: always switched NVLink, 1 NVSwitch per node)
         num_nvswitches_per_node = 0
+        scale_up = datacenter.network.scale_up if datacenter.network else None
 
-        if datacenter.scale_up and datacenter.scale_up.topology.value == "switched":
-            # Create NVSwitch nodes for each server
-            num_nvswitches_per_node = datacenter.node.num_switches_per_node or 0
+        if scale_up and scale_up.switch:
+            switch = scale_up.switch
+            if isinstance(switch, str):
+                raise ValueError("NVSwitch spec must be inline, not a reference string")
 
-            # Parse bandwidth and latency
-            link_bandwidth_gbps = _parse_bandwidth(datacenter.scale_up.link_bandwidth)
-            link_latency_ns = _parse_latency(datacenter.scale_up.link_latency)
+            link_bandwidth_gbps = _parse_bandwidth(switch.port_speed) if switch.port_speed else 900.0
+            link_latency_ns = _parse_latency(switch.latency) if switch.latency else 25.0
+
+            num_nvswitches_per_node = 1  # one NVSwitch per node
 
             for node_idx in range(num_nodes):
-                node_nvswitch_ids = []
-                for switch_idx in range(num_nvswitches_per_node):
-                    nvswitch_id = next_node_id
-                    nodes.append(NetworkNode(node_id=nvswitch_id, node_type="nvswitch"))
-                    node_nvswitch_ids.append(nvswitch_id)
-                    next_node_id += 1
-                nvswitch_ids_per_node.append(node_nvswitch_ids)
+                nvswitch_id = next_node_id
+                nodes.append(NetworkNode(node_id=nvswitch_id, node_type="nvswitch"))
+                next_node_id += 1
 
-                # Connect GPUs to NVSwitches (full bipartite graph)
                 gpu_start = node_idx * gpus_per_node
                 gpu_end = gpu_start + gpus_per_node
 
                 for gpu_id in range(gpu_start, gpu_end):
-                    for nvswitch_id in node_nvswitch_ids:
-                        # Bidirectional links
-                        links.append(
-                            NetworkLink(
-                                source=gpu_id,
-                                dest=nvswitch_id,
-                                bandwidth_gbps=link_bandwidth_gbps,
-                                latency_ns=link_latency_ns,
-                            )
+                    links.append(
+                        NetworkLink(
+                            source=gpu_id,
+                            dest=nvswitch_id,
+                            bandwidth_gbps=link_bandwidth_gbps,
+                            latency_ns=link_latency_ns,
                         )
-                        links.append(
-                            NetworkLink(
-                                source=nvswitch_id,
-                                dest=gpu_id,
-                                bandwidth_gbps=link_bandwidth_gbps,
-                                latency_ns=link_latency_ns,
-                            )
+                    )
+                    links.append(
+                        NetworkLink(
+                            source=nvswitch_id,
+                            dest=gpu_id,
+                            bandwidth_gbps=link_bandwidth_gbps,
+                            latency_ns=link_latency_ns,
                         )
-
-        elif datacenter.scale_up and datacenter.scale_up.topology.value == "p2p":
-            # Direct GPU-to-GPU connections (all-to-all within node)
-            link_bandwidth_gbps = _parse_bandwidth(datacenter.scale_up.link_bandwidth)
-            link_latency_ns = _parse_latency(datacenter.scale_up.link_latency)
-
-            for node_idx in range(num_nodes):
-                gpu_start = node_idx * gpus_per_node
-                gpu_end = gpu_start + gpus_per_node
-
-                for src_gpu in range(gpu_start, gpu_end):
-                    for dst_gpu in range(gpu_start, gpu_end):
-                        if src_gpu != dst_gpu:
-                            links.append(
-                                NetworkLink(
-                                    source=src_gpu,
-                                    dest=dst_gpu,
-                                    bandwidth_gbps=link_bandwidth_gbps,
-                                    latency_ns=link_latency_ns,
-                                )
-                            )
+                    )
 
         # 3. Create inter-node topology (scale-out network)
         total_nvswitches = num_nodes * num_nvswitches_per_node
+        scale_out = datacenter.network.scale_out if datacenter.network else None
 
-        if datacenter.scale_out and datacenter.scale_out.topology:
-            topology_type = datacenter.scale_out.topology.type.value
+        if scale_out and scale_out.topology:
+            topology_type = scale_out.topology.type.value
             if topology_type == "fat_tree":
                 network_switches = self._create_fat_tree_topology(
                     datacenter, num_nodes, gpus_per_node, next_node_id, nodes, links
@@ -193,8 +168,12 @@ class TopologyConverter:
             gpu_type = (gpu_spec.name or "UNKNOWN").upper()
 
         # Extract bandwidth efficiency from config
-        nvlink_efficiency = datacenter.scale_up.bandwidth_efficiency if datacenter.scale_up else 1.0
-        nic_efficiency = datacenter.scale_out.nic.bandwidth_efficiency if datacenter.scale_out and datacenter.scale_out.nic else 0.85
+        nic_spec = scale_out.nic if scale_out else None
+        nic_efficiency = (
+            nic_spec.bandwidth_efficiency
+            if (nic_spec and not isinstance(nic_spec, str))
+            else 0.85
+        )
 
         return NetworkTopology(
             nodes=nodes,
@@ -203,7 +182,7 @@ class TopologyConverter:
             nv_switch_num=total_nvswitches,
             switches_excluding_nvswitch=network_switches,
             gpu_type=gpu_type,
-            nvlink_bandwidth_efficiency=nvlink_efficiency,
+            nvlink_bandwidth_efficiency=1.0,
             nic_bandwidth_efficiency=nic_efficiency,
         )
 
@@ -229,7 +208,8 @@ class TopologyConverter:
         Returns:
             Number of network switches created (excluding NVSwitches)
         """
-        params = datacenter.scale_out.topology.params or {}
+        scale_out = datacenter.network.scale_out
+        params = scale_out.topology.params or {}
         k = params.get("k", 4)
         oversubscription = params.get("oversubscription", 1.0)
 
@@ -284,7 +264,7 @@ class TopologyConverter:
             next_node_id += 1
 
         # Get NIC parameters and parse them
-        nic_spec = datacenter.scale_out.nic
+        nic_spec = scale_out.nic
         if isinstance(nic_spec, str):
             raise ValueError("NIC spec must be inline, not a reference")
 

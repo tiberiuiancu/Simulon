@@ -35,17 +35,18 @@ class CustomBuildHook(BuildHookInterface):
             raise RuntimeError(f"Failed to find pybind11: {e}")
 
         # Configure CMake with explicit Python version
-        subprocess.run(
-            [
-                "cmake",
-                "-B", str(build_dir),
-                "-S", str(root),
-                f"-Dpybind11_DIR={pybind11_dir}",
-                f"-DPYTHON_EXECUTABLE={sys.executable}",
-                "-DCMAKE_BUILD_TYPE=Release",
-            ],
-            check=True,
-        )
+        cmake_args = [
+            "cmake",
+            "-B", str(build_dir),
+            "-S", str(root),
+            f"-Dpybind11_DIR={pybind11_dir}",
+            f"-DPYTHON_EXECUTABLE={sys.executable}",
+            "-DCMAKE_BUILD_TYPE=Release",
+        ]
+        # Pass through SIMULON_NS3 env var to enable NS3 backend
+        if os.environ.get("SIMULON_NS3", "").upper() in ("1", "ON", "TRUE", "YES"):
+            cmake_args.append("-D" + "SIMUL" + "ON_NS3=ON")
+        subprocess.run(cmake_args, check=True)
 
         # Build
         subprocess.run(
