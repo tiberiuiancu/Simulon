@@ -238,6 +238,56 @@ def _bench_mlp_linear2(
     return _cuda_time(fn)
 
 
+def _bench_moe_route(
+    hidden_size: int,
+    num_experts: int,
+    seq_len: int,
+    batch_size: int,
+    dtype,
+) -> list[float]:
+    import torch
+
+    x = torch.randn(batch_size * seq_len, hidden_size, dtype=dtype, device="cuda")
+    w = torch.randn(num_experts, hidden_size, dtype=dtype, device="cuda")
+
+    def fn():
+        return torch.matmul(x, w.t())
+
+    return _cuda_time(fn)
+
+
+def _bench_moe_expert(
+    hidden_size: int,
+    ffn_hidden_size: int,
+    num_experts: int,
+    ep: int,
+    top_k: int,
+    seq_len: int,
+    batch_size: int,
+    dtype,
+) -> list[float]:
+    import torch
+
+    num_local_experts = max(1, num_experts // ep)
+    # tokens dispatched to this rank: seq_len * batch_size * top_k / ep (approx)
+    local_tokens = max(1, batch_size * seq_len * top_k // ep)
+    x = torch.randn(num_local_experts * local_tokens, hidden_size, dtype=dtype, device="cuda")
+    w1 = torch.randn(num_local_experts, ffn_hidden_size, hidden_size, dtype=dtype, device="cuda")
+    w2 = torch.randn(num_local_experts, hidden_size, ffn_hidden_size, dtype=dtype, device="cuda")
+
+    def fn():
+        # Grouped GEMM: one expert at a time (sequential; real impl uses grouped GEMM)
+        out = torch.zeros_like(x)
+        tokens_per_expert = local_tokens
+        for i in range(num_local_experts):
+            t = x[i * tokens_per_expert:(i + 1) * tokens_per_expert]
+            h = torch.matmul(t, w1[i].t())
+            out[i * tokens_per_expert:(i + 1) * tokens_per_expert] = torch.matmul(h, w2[i].t())
+        return out
+
+    return _cuda_time(fn)
+
+
 def _bench_logit(
     hidden_size: int,
     vocab_size: int,
@@ -296,6 +346,9 @@ def benchmark_kernels(
     dtype: DType = DType.bf16,
     epoch_num: int = 10,
     swiglu: bool = False,
+    num_experts: int = 0,
+    ep: int = 1,
+    top_k: int = 1,
 ) -> list[KernelRun]:
     """Benchmark all transformer kernels and return KernelRun measurements.
 
@@ -313,6 +366,9 @@ def benchmark_kernels(
         dtype: Compute precision.
         epoch_num: Number of timed iterations per kernel.
         swiglu: Use SwiGLU activation (affects mlp_act tensor shape).
+        num_experts: Total number of MoE experts. If > 0, moe_route and moe_expert are benchmarked.
+        ep: Expert Parallelism degree (experts are sharded across ep ranks).
+        top_k: Top-k routing (tokens dispatched to k experts each).
 
     Returns:
         List of KernelRun objects with raw per-iteration times in milliseconds.
@@ -371,5 +427,18 @@ def benchmark_kernels(
         lambda: _bench_logit(hidden_size, vocab_size, seq_len, batch_size, tp, tdt),
         {"vocab_size": vocab_size},
     )
+    if num_experts > 0:
+        _run(
+            "moe_route",
+            lambda: _bench_moe_route(hidden_size, num_experts, seq_len, batch_size, tdt),
+            {"num_experts": num_experts},
+        )
+        _run(
+            "moe_expert",
+            lambda: _bench_moe_expert(
+                hidden_size, ffn_hidden_size, num_experts, ep, top_k, seq_len, batch_size, tdt
+            ),
+            {"num_experts": num_experts, "ep": ep, "top_k": top_k, "ffn_hidden_size": ffn_hidden_size},
+        )
 
     return results
