@@ -15,6 +15,7 @@ class DAGTracerConfig:
     num_channels: int = 1
     algorithm: str = "ring"
     dtype_bytes: int = 2  # bf16
+    steady_state_only: bool = False
 
 
 def _resolve_model(model: str | LLMSpec) -> LLMSpec:
@@ -121,8 +122,22 @@ class DAGTracer:
         #     all slots/layers/sublayers, so every operation is chained to the previous.
         #   slot_last_node: records the exit node at the end of each (gpu, mb, direction)
         #     slot so PP_Send nodes can depend on the right slot's compute.
+        #   slot_entry_node: records the entry (first) node of each (gpu, mb, direction)
+        #     slot so incoming PP_Send flows can gate the slot's start.
         last_node_per_gpu: dict[int, int | None] = {}
         slot_last_node: dict[tuple[int, int, str], int] = {}
+        slot_entry_node: dict[tuple[int, int, str], int] = {}
+
+        # PP_Send cross-stage deps collected during the main loop and applied afterwards
+        # because the destination stage may not have been visited yet.
+        # Each entry: (pp_send_node_id, dst_gpu, mb, direction)
+        pending_pp_deps: list[tuple[int, int, int, str]] = []
+
+        get_slots = (
+            scheduler.schedule_steady_state_for_stage
+            if cfg.steady_state_only
+            else scheduler.schedule_for_stage
+        )
 
         # Iterate over all GPUs
         for dp_rank in range(dp):
@@ -132,11 +147,12 @@ class DAGTracer:
                     tp_group = [global_rank(dp_rank, pp_stage, r) for r in range(tp)]
                     dp_group = [global_rank(r, pp_stage, tp_rank) for r in range(dp)]
 
-                    slots = scheduler.schedule_for_stage(pp_stage)
+                    slots = get_slots(pp_stage)
 
                     for slot in slots:
                         mb = slot.microbatch_id
                         direction = slot.direction
+                        slot_first_entry_set = False
 
                         for layer_idx in range(num_layers):
                             for sublayer in ("attn", "mlp"):
@@ -203,6 +219,12 @@ class DAGTracer:
                                     entry_id, exit_id = _sublayer_entry_exit(
                                         c_nodes, comm_stubs, stub_to_comm_ids
                                     )
+
+                                    # Record the first entry node of this slot (for PP_Send recv deps)
+                                    if not slot_first_entry_set and entry_id is not None:
+                                        slot_entry_node[(gpu, mb, direction)] = entry_id
+                                        slot_first_entry_set = True
+
                                     prev = last_node_per_gpu.get(gpu)
                                     if prev is not None and entry_id is not None:
                                         dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
@@ -216,7 +238,7 @@ class DAGTracer:
 
                 # PP_Send at stage boundaries
                 if pp > 1:
-                    slots = scheduler.schedule_for_stage(pp_stage)
+                    slots = get_slots(pp_stage)
                     for slot in slots:
                         mb = slot.microbatch_id
                         if slot.direction == "fwd" and pp_stage < pp - 1:
@@ -251,6 +273,21 @@ class DAGTracer:
                                 src_node_id=slot_last_node[slot_key],
                                 dst_node_id=pp_send.node_id,
                             ))
+
+                        # Defer the recv-side edges for ALL tp_ranks of the dst stage.
+                        # This ensures every TP rank waits for the activations/gradients,
+                        # not just tp_rank=0 (the PP_Send destination).
+                        for tr in range(tp):
+                            dst_gpu_tr = global_rank(dp_rank, dst_stage, tr)
+                            pending_pp_deps.append((pp_send.node_id, dst_gpu_tr, mb, slot.direction))
+
+        # Add cross-stage edges: PP_Send → first node of the receiving stage's slot.
+        # This enforces that a downstream stage cannot begin a slot until it has
+        # received the activations (fwd) or gradients (bwd) from its neighbour.
+        for pp_send_id, dst_gpu, mb, direction in pending_pp_deps:
+            key = (dst_gpu, mb, direction)
+            if key in slot_entry_node:
+                dag.edges.append(DAGEdge(src_node_id=pp_send_id, dst_node_id=slot_entry_node[key]))
 
         return dag
 
