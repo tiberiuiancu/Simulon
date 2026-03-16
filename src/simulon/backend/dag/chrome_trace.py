@@ -34,15 +34,16 @@ _TID_PP_SEND   = 1003   # PP_Send (inter-stage point-to-point, send side)
 _TID_PP_RECV   = 1004   # PP_Send recv side
 
 
-def _decode_rank(gpu_rank: int, tp: int, pp: int) -> tuple[int, int, int]:
-    """Return (dp_rank, pp_stage, tp_rank) for a gpu_rank."""
+def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int, int, int]:
+    """Return (dp_rank, pp_stage, ep_rank, tp_rank) for a gpu_rank."""
     tp_rank = gpu_rank % tp
-    pp_stage = (gpu_rank // tp) % pp
-    dp_rank = gpu_rank // (tp * pp)
-    return dp_rank, pp_stage, tp_rank
+    ep_rank = (gpu_rank // tp) % ep
+    pp_stage = (gpu_rank // (tp * ep)) % pp
+    dp_rank = gpu_rank // (tp * ep * pp)
+    return dp_rank, pp_stage, ep_rank, tp_rank
 
 
-def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int) -> dict[str, Any]:
+def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -> dict[str, Any]:
     """Build a Chrome Trace dict from a timing-populated ExecutionDAG.
 
     Args:
@@ -67,11 +68,11 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int) -> dict[str, A
     # Emit process/thread metadata sorted by (dp, pp, tp) = natural gpu_rank order
     for gpu in sorted(all_gpus):
         pid = 1000 + gpu
-        dp_rank, pp_stage, tp_rank = _decode_rank(gpu, tp, pp)
+        dp_rank, pp_stage, ep_rank, tp_rank = _decode_rank(gpu, tp, pp, ep)
 
-        # Group label: DP replicas together, PP stages within, TP ranks innermost
-        proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} TP={tp_rank}"
-        sort_idx = dp_rank * (pp * tp) + pp_stage * tp + tp_rank
+        # Group label: DP replicas together, PP stages within, EP/TP ranks innermost
+        proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} EP={ep_rank} TP={tp_rank}"
+        sort_idx = dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
 
         events += [
             {"name": "process_name",       "ph": "M", "pid": pid, "tid": 0,
@@ -180,9 +181,10 @@ def write_chrome_trace(
     pp: int,
     dp: int,
     path: str | Path,
+    ep: int = 1,
 ) -> None:
     """Write a Chrome Trace JSON file from a populated ExecutionDAG."""
     import json
-    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp)
+    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep)
     with open(path, "w") as f:
         json.dump(trace, f)

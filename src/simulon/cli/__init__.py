@@ -67,9 +67,10 @@ def chrome_trace_cmd(
     t = sc.workload.training
     tp = p.tp
     pp_val = p.pp
-    dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val)
+    ep = p.ep
+    dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
 
-    trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp)
+    trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
 
     if output is None:
         output = Path("trace.json")
