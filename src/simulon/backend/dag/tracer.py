@@ -49,6 +49,29 @@ def _resolve_model(model: str | LLMSpec) -> LLMSpec:
     return LLMSpec.model_validate(data)
 
 
+def _sublayer_entry_exit(
+    c_nodes: list[ComputeNode],
+    comm_stubs: list[CommNode],
+    stub_to_comm_ids: dict[int, list[int]],
+) -> tuple[int | None, int | None]:
+    """Return (entry_node_id, exit_node_id) for a sublayer after stub patching.
+
+    entry = first actual node (first AllGather flow if TP collective, else first compute).
+    exit  = last actual node  (last ReduceScatter flow if TP collective, else last compute).
+    """
+    if comm_stubs:
+        first_actual = stub_to_comm_ids.get(comm_stubs[0].node_id, [])
+        entry_id = first_actual[0] if first_actual else (c_nodes[0].node_id if c_nodes else None)
+        last_actual = stub_to_comm_ids.get(comm_stubs[-1].node_id, [])
+        exit_id = last_actual[-1] if last_actual else (c_nodes[-1].node_id if c_nodes else None)
+    elif c_nodes:
+        entry_id = c_nodes[0].node_id
+        exit_id = c_nodes[-1].node_id
+    else:
+        entry_id = exit_id = None
+    return entry_id, exit_id
+
+
 class DAGTracer:
     def __init__(self, config: DAGTracerConfig | None = None):
         self.config = config or DAGTracerConfig()
@@ -92,6 +115,14 @@ class DAGTracer:
 
         def global_rank(dp_rank: int, pp_stage: int, tp_rank: int) -> int:
             return dp_rank * (tp * pp) + pp_stage * tp + tp_rank
+
+        # Sequential-ordering state:
+        #   last_node_per_gpu: tracks the most recent exit node for each GPU across
+        #     all slots/layers/sublayers, so every operation is chained to the previous.
+        #   slot_last_node: records the exit node at the end of each (gpu, mb, direction)
+        #     slot so PP_Send nodes can depend on the right slot's compute.
+        last_node_per_gpu: dict[int, int | None] = {}
+        slot_last_node: dict[tuple[int, int, str], int] = {}
 
         # Iterate over all GPUs
         for dp_rank in range(dp):
@@ -167,6 +198,22 @@ class DAGTracer:
                                             for d in dsts:
                                                 dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
 
+                                    # Sequential ordering: chain this sublayer after the previous
+                                    # operation on this GPU (across sublayers, layers, and slots).
+                                    entry_id, exit_id = _sublayer_entry_exit(
+                                        c_nodes, comm_stubs, stub_to_comm_ids
+                                    )
+                                    prev = last_node_per_gpu.get(gpu)
+                                    if prev is not None and entry_id is not None:
+                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
+                                    if exit_id is not None:
+                                        last_node_per_gpu[gpu] = exit_id
+
+                        # Record slot exit so PP_Send can depend on it
+                        last = last_node_per_gpu.get(gpu)
+                        if last is not None:
+                            slot_last_node[(gpu, mb, direction)] = last
+
                 # PP_Send at stage boundaries
                 if pp > 1:
                     slots = scheduler.schedule_for_stage(pp_stage)
@@ -196,6 +243,14 @@ class DAGTracer:
                         dag.comm_nodes.append(pp_send)
                         node_id_counter += 1
                         flow_id_counter += 1
+
+                        # PP_Send depends on the last compute of that slot on tp_rank=0
+                        slot_key = (src_gpu, mb, slot.direction)
+                        if slot_key in slot_last_node:
+                            dag.edges.append(DAGEdge(
+                                src_node_id=slot_last_node[slot_key],
+                                dst_node_id=pp_send.node_id,
+                            ))
 
         return dag
 

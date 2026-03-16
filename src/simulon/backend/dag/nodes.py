@@ -14,6 +14,8 @@ class ComputeNode:
     pipeline_stage: int
     phase: str  # fwd|bwd_ig|bwd_wg
     duration_ms: Optional[float] = None
+    start_ms: Optional[float] = None
+    finish_ms: Optional[float] = None
 
 
 @dataclass
@@ -27,6 +29,9 @@ class CommNode:
     phase: str
     flow_id: int
     parent_flow_ids: list[int] = field(default_factory=list)
+    duration_ms: Optional[float] = None
+    start_ms: Optional[float] = None
+    finish_ms: Optional[float] = None
 
 
 @dataclass

@@ -192,6 +192,8 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
             duration = node.duration_ms if node.duration_ms is not None else 0.0
             finish = start_time + duration
             finish_time[nid] = finish
+            node.start_ms = start_time
+            node.finish_ms = finish
             per_gpu_compute[node.gpu_rank] += duration
             if finish > per_gpu_finish[node.gpu_rank]:
                 per_gpu_finish[node.gpu_rank] = finish
@@ -201,6 +203,9 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
             duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
             finish = start_time + duration
             finish_time[nid] = finish
+            node.duration_ms = duration
+            node.start_ms = start_time
+            node.finish_ms = finish
             per_gpu_comm[node.src_gpu] += duration
             per_gpu_comm[node.dst_gpu] += duration
             if finish > per_gpu_finish[node.src_gpu]:

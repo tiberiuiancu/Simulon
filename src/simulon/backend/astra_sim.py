@@ -64,10 +64,16 @@ class AstraSimBackend(Backend):
         tracer = DAGTracer(self._tracer_config)
         return tracer.trace(scenario.workload, scenario.datacenter)
 
-    def simulate(self, scenario: ScenarioConfig) -> SimulationResult:
+    def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
+        """Run the full simulation pipeline.
+
+        Returns (dag, result) where dag has start_ms/finish_ms/duration_ms
+        populated on all nodes, ready for chrome trace export.
+        """
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
         dag = self.run_trace(scenario)
         gpu_spec = _resolve_gpu_spec(scenario.datacenter)
         populate_dag(dag, scenario.workload, gpu_spec)
-        return replay(dag, scenario.datacenter)
+        result = replay(dag, scenario.datacenter)
+        return dag, result
