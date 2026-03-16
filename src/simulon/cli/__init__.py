@@ -11,11 +11,29 @@ app.add_typer(profile_app, name="profile")
 
 @app.command()
 def simulate(
-    backend: str = typer.Argument(..., help="Simulation backend: analytical | ns3"),
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
+    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | nvls"),
 ):
-    """Run a simulation scenario."""
-    raise NotImplementedError
+    """Run an analytical simulation of a scenario and print per-GPU timing estimates."""
+    from simulon.backend.astra_sim import AstraSimBackend
+    from simulon.config.scenario import ScenarioConfig
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
+    result = backend_obj.simulate(sc)
+
+    typer.echo(f"Total iteration time: {result.total_time_ms:.3f} ms")
+    typer.echo("")
+    typer.echo("Per-GPU finish times (ms):")
+    for gpu_rank in sorted(result.per_gpu_times_ms):
+        compute = result.compute_time_ms.get(gpu_rank, 0.0)
+        comm = result.comm_time_ms.get(gpu_rank, 0.0)
+        finish = result.per_gpu_times_ms[gpu_rank]
+        typer.echo(f"  GPU {gpu_rank:3d}: finish={finish:.3f}  compute={compute:.3f}  comm={comm:.3f}")
 
 
 @app.command()
