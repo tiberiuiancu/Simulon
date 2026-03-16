@@ -174,6 +174,7 @@ Defines the Megatron-style parallelism strategy.
 | `sp` | bool | `false` | Enable Sequence Parallelism. Distributes LayerNorm and Dropout across the TP group. Requires `tp > 1`. |
 | `vpp` | int | `1` | Virtual pipeline stages per pipeline rank (interleaved 1F1B schedule). `1` means standard non-interleaved schedule. Must satisfy `num_layers % (pp × vpp) == 0`. |
 | `distributed_optimizer` | bool | `false` | Shard optimizer states across the DP group (Megatron distributed optimizer). Reduces per-GPU optimizer memory by `1/dp`. |
+| `num_microbatches` | int | derived | Number of pipeline micro-batches per iteration. If omitted, derived as `global_batch_size / (micro_batch_size × dp)`. Override when the derived value is inconvenient (e.g. for DAG extraction with a fixed schedule). |
 
 ```yaml
 parallelism:
@@ -184,6 +185,7 @@ parallelism:
   sp: true
   vpp: 2
   distributed_optimizer: true
+  num_microbatches: 8   # optional; derived if omitted
 ```
 
 ---
