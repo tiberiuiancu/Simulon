@@ -18,6 +18,37 @@ def simulate(
     raise NotImplementedError
 
 
+@app.command()
+def trace(
+    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for dag.json"),
+    num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
+    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | nvls"),
+):
+    """Extract a GPU-agnostic execution DAG from a scenario."""
+    import json
+    from simulon.backend.astra_sim import AstraSimBackend
+    from simulon.config.scenario import ScenarioConfig
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    backend = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
+    dag = backend.run_trace(sc)
+
+    if output is None:
+        output = Path("dag.json")
+
+    with open(output, "w") as f:
+        f.write(dag.to_json())
+
+    typer.echo(f"DAG written to {output}")
+    typer.echo(f"  compute_nodes: {len(dag.compute_nodes)}")
+    typer.echo(f"  comm_nodes:    {len(dag.comm_nodes)}")
+    typer.echo(f"  edges:         {len(dag.edges)}")
+
+
 @profile_app.command("gpu")
 def profile_gpu(
     name: str = typer.Option(..., "--name", "-n", help="GPU model name (e.g. H100-SXM5-80GB)"),
