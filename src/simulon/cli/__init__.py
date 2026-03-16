@@ -24,7 +24,7 @@ def simulate(
     sc = ScenarioConfig.model_validate(raw)
 
     backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
-    result = backend_obj.simulate(sc)
+    _, result = backend_obj.simulate(sc)
 
     typer.echo(f"Total iteration time: {result.total_time_ms:.3f} ms")
     typer.echo("")
@@ -34,6 +34,49 @@ def simulate(
         comm = result.comm_time_ms.get(gpu_rank, 0.0)
         finish = result.per_gpu_times_ms[gpu_rank]
         typer.echo(f"  GPU {gpu_rank:3d}: finish={finish:.3f}  compute={compute:.3f}  comm={comm:.3f}")
+
+
+@app.command(name="chrome-trace")
+def chrome_trace_cmd(
+    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json"),
+    num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
+    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | nvls"),
+):
+    """Run simulation and export a Chrome/Perfetto trace (chrome://tracing)."""
+    import json
+    from simulon.backend.astra_sim import AstraSimBackend
+    from simulon.backend.dag.chrome_trace import to_chrome_trace
+    from simulon.config.scenario import ScenarioConfig
+    from simulon.config.workload import MegatronWorkload
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    if not isinstance(sc.workload, MegatronWorkload):
+        typer.echo("Error: chrome-trace only supports MegatronWorkload scenarios.", err=True)
+        raise typer.Exit(1)
+
+    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
+    dag, result = backend_obj.simulate(sc)
+
+    p = sc.workload.parallelism
+    t = sc.workload.training
+    tp = p.tp
+    pp_val = p.pp
+    dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val)
+
+    trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp)
+
+    if output is None:
+        output = Path("trace.json")
+    with open(output, "w") as f:
+        json.dump(trace_dict, f)
+
+    typer.echo(f"Chrome trace written to {output}")
+    typer.echo(f"  GPUs: {len(result.per_gpu_times_ms)}  |  Total: {result.total_time_ms:.3f} ms")
+    typer.echo(f"  Load in https://ui.perfetto.dev or chrome://tracing")
 
 
 @app.command()
