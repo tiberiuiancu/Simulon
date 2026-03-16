@@ -251,6 +251,100 @@ class DAGTracer:
                             if last is not None:
                                 slot_last_node[(gpu, mb, direction)] = last
 
+                        # Step phase: DP gradient sync after all slots for this GPU.
+                        # Emitted once per GPU, after the last backward slot.
+                        if dp > 1:
+                            step_params = _params_per_tp_rank(model, tp, ep)
+                            step_ar_bytes = 4 * step_params // pp
+                            dist_opt = p.distributed_optimizer
+
+                            if dist_opt:
+                                step_stubs = [
+                                    CommNode(
+                                        node_id=node_id_counter,
+                                        src_gpu=gpu,
+                                        dst_gpu=gpu,
+                                        bytes=step_ar_bytes,
+                                        collective_type="ReduceScatter",
+                                        layer_id=0,
+                                        phase="step",
+                                        flow_id=-1,
+                                    ),
+                                    CommNode(
+                                        node_id=node_id_counter + 1,
+                                        src_gpu=gpu,
+                                        dst_gpu=gpu,
+                                        bytes=2 * step_params // pp,
+                                        collective_type="AllGather",
+                                        layer_id=0,
+                                        phase="step",
+                                        flow_id=-1,
+                                    ),
+                                ]
+                                node_id_counter += 2
+                            else:
+                                step_stubs = [
+                                    CommNode(
+                                        node_id=node_id_counter,
+                                        src_gpu=gpu,
+                                        dst_gpu=gpu,
+                                        bytes=step_ar_bytes,
+                                        collective_type="AllReduce",
+                                        layer_id=0,
+                                        phase="step",
+                                        flow_id=-1,
+                                    ),
+                                ]
+                                node_id_counter += 1
+
+                            step_stub_to_comm_ids: dict[int, list[int]] = {}
+                            prev_step_stub_ids: list[int] = []
+                            for stub in step_stubs:
+                                result, flow_id_counter, _ = decompose_collective(
+                                    collective_type=stub.collective_type,
+                                    group_ranks=dp_group,
+                                    data_size=stub.bytes,
+                                    num_channels=cfg.num_channels,
+                                    algorithm=cfg.algorithm,
+                                    flow_id_start=flow_id_counter,
+                                )
+                                step_stub_to_comm_ids[stub.node_id] = []
+                                for flow in result.flows:
+                                    comm_node = CommNode(
+                                        node_id=node_id_counter,
+                                        src_gpu=flow.src,
+                                        dst_gpu=flow.dst,
+                                        bytes=flow.flow_size,
+                                        collective_type=stub.collective_type,
+                                        layer_id=0,
+                                        phase="step",
+                                        flow_id=flow.flow_id,
+                                        parent_flow_ids=flow.parent_flow_ids,
+                                    )
+                                    dag.comm_nodes.append(comm_node)
+                                    step_stub_to_comm_ids[stub.node_id].append(node_id_counter)
+                                    node_id_counter += 1
+
+                                # Chain stubs sequentially
+                                cur_ids = step_stub_to_comm_ids[stub.node_id]
+                                if prev_step_stub_ids:
+                                    for s in prev_step_stub_ids:
+                                        for d in cur_ids:
+                                            dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
+                                prev_step_stub_ids = cur_ids
+
+                            # Chain: last bwd node → first step comm node
+                            first_stub = step_stubs[0]
+                            first_step_ids = step_stub_to_comm_ids[first_stub.node_id]
+                            prev = last_node_per_gpu.get(gpu)
+                            if prev is not None and first_step_ids:
+                                for d in first_step_ids:
+                                    dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
+
+                            # Update last_node_per_gpu to the last step comm node
+                            if prev_step_stub_ids:
+                                last_node_per_gpu[gpu] = prev_step_stub_ids[-1]
+
                 # PP_Send at stage boundaries (once per dp_rank, pp_stage pair)
                 if pp > 1:
                     slots = get_slots(pp_stage)
@@ -312,3 +406,29 @@ def _phases_for_direction(direction: str) -> list[str]:
         return ["fwd"]
     else:  # bwd
         return ["bwd_ig", "bwd_wg"]
+
+
+def _params_per_tp_rank(model: "LLMSpec", tp: int, ep: int) -> int:
+    """Total trainable parameters visible on one TP rank (fp32 count).
+
+    Mirrors AICB's _get_total_params() analytically, without the spurious 4×
+    on the word embedding.
+    """
+    hidden = model.hidden_size or 0
+    ffn = model.ffn_hidden_size or (4 * hidden)
+    num_layers = model.num_layers or 0
+    vocab_size = model.vocab_size or 0
+    num_experts = model.num_experts or 1
+
+    attn_per_layer = 4 * hidden * hidden // tp
+    if model.moe:
+        mlp_per_layer = 2 * hidden * ffn * (num_experts // ep) // tp
+    else:
+        mlp_per_layer = 2 * hidden * ffn // tp
+    ln_per_layer = 3 * hidden
+
+    per_layer = attn_per_layer + mlp_per_layer + ln_per_layer
+    embedding = vocab_size * hidden // tp
+    logit = vocab_size * hidden // tp
+
+    return num_layers * per_layer + embedding + logit
