@@ -207,54 +207,7 @@ def test_single_comm_node_includes_latency():
 
 
 # ---------------------------------------------------------------------------
-# Outgoing port serialization: two sends from same src
-# ---------------------------------------------------------------------------
-
-
-def test_two_sends_same_src_serialize_on_outgoing_port():
-    """Two flows from GPU 0 to different destinations must serialize on GPU 0's
-    outgoing port (they cannot use it simultaneously)."""
-    dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
-    bw = _parse_speed("1GBps")
-    bytes_ = 1_000_000  # 1 ms each
-
-    # Both flows from GPU 0, but different dsts — no explicit ordering between them
-    dag = _dag(
-        _comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_),
-        _comm(1, src_gpu=0, dst_gpu=2, bytes=bytes_),
-    )
-    result = replay(dag, dc)
-
-    # Serial: 2 ms total, not parallel 1 ms
-    assert abs(result.total_time_ms - 2.0) < 1e-9
-    # GPU 0 (src) participates in both, finishes at 2 ms
-    assert abs(result.per_gpu_times_ms[0] - 2.0) < 1e-9
-
-
-# ---------------------------------------------------------------------------
-# Incoming port serialization: two sends to same dst
-# ---------------------------------------------------------------------------
-
-
-def test_two_sends_same_dst_serialize_on_incoming_port():
-    """Two flows from different sources to GPU 1 contend on GPU 1's incoming port."""
-    dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
-    bw = _parse_speed("1GBps")
-    bytes_ = 1_000_000  # 1 ms each
-
-    dag = _dag(
-        _comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_),
-        _comm(1, src_gpu=2, dst_gpu=1, bytes=bytes_),
-    )
-    result = replay(dag, dc)
-
-    # Serial at dst: 2 ms
-    assert abs(result.total_time_ms - 2.0) < 1e-9
-    assert abs(result.per_gpu_times_ms[1] - 2.0) < 1e-9
-
-
-# ---------------------------------------------------------------------------
-# Independent flows don't contend
+# Independent flows run in parallel (no port contention modeled)
 # ---------------------------------------------------------------------------
 
 
@@ -270,26 +223,6 @@ def test_independent_flows_run_in_parallel():
     result = replay(dag, dc)
 
     # Parallel: 1 ms total
-    assert abs(result.total_time_ms - 1.0) < 1e-9
-
-
-# ---------------------------------------------------------------------------
-# Full duplex: send and receive on same GPU overlap
-# ---------------------------------------------------------------------------
-
-
-def test_full_duplex_send_and_receive_overlap():
-    """GPU 0→1 and GPU 2→0 can proceed simultaneously (different ports)."""
-    dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
-    bytes_ = 1_000_000  # 1 ms each
-
-    dag = _dag(
-        _comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_),
-        _comm(1, src_gpu=2, dst_gpu=0, bytes=bytes_),
-    )
-    result = replay(dag, dc)
-
-    # GPU 0 sends on ("out", 0) and receives on ("in", 0) — different ports, no contention
     assert abs(result.total_time_ms - 1.0) < 1e-9
 
 

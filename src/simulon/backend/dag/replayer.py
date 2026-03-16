@@ -122,14 +122,11 @@ def _get_link_params(
 def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     """Simulate the DAG and return timing estimates.
 
-    Network model:
-      Each CommNode occupies two half-duplex ports for its duration:
-        ("out", src_gpu) — the source GPU's outgoing port
-        ("in",  dst_gpu) — the destination GPU's incoming port
-      Both ports are serialized independently (full-duplex: a GPU can send and
-      receive at the same time, but two concurrent sends from the same GPU
-      contend on its outgoing port).
-      Duration per flow = latency + bytes / bandwidth  (LogGP model).
+    Matches ASTRA-Sim's analytical backend: pure critical-path scheduling.
+      - ComputeNode: start after all predecessors finish; duration = node.duration_ms.
+      - CommNode: start after all predecessors finish; duration = latency + bytes/bandwidth.
+      - No port/link contention modeled. Sequential ordering within a collective
+        comes from CommNode.parent_flow_ids, not resource serialization.
 
     Routing assumption: single logical hop per flow; no intermediate switch
     congestion modeled. See _get_link_params for details.
@@ -183,9 +180,6 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
 
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}
-    # port_free_at keys: ("out", gpu) for outgoing, ("in", gpu) for incoming
-    port_free_at: dict[tuple[str, int], float] = defaultdict(float)
-
     per_gpu_compute: dict[int, float] = defaultdict(float)
     per_gpu_comm: dict[int, float] = defaultdict(float)
     per_gpu_finish: dict[int, float] = defaultdict(float)
@@ -204,19 +198,9 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
 
         else:  # CommNode
             bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
-            # Both ports must be free before the flow can start
-            start_time = max(
-                start_time,
-                port_free_at[("out", node.src_gpu)],
-                port_free_at[("in", node.dst_gpu)],
-            )
             duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
             finish = start_time + duration
             finish_time[nid] = finish
-            # Reserve both ports until this flow completes
-            port_free_at[("out", node.src_gpu)] = finish
-            port_free_at[("in", node.dst_gpu)] = finish
-            # Both src and dst GPUs participate in this comm
             per_gpu_comm[node.src_gpu] += duration
             per_gpu_comm[node.dst_gpu] += duration
             if finish > per_gpu_finish[node.src_gpu]:
