@@ -123,9 +123,10 @@ class DAGTracer:
                                     )
 
                                     dag.compute_nodes.extend(c_nodes)
-                                    dag.edges.extend(edges)
 
-                                    # Fill comm stubs with flows from decompose_collective
+                                    # Fill comm stubs with flows from decompose_collective,
+                                    # then patch edges: replace stub node_ids with actual CommNode ids.
+                                    stub_to_comm_ids: dict[int, list[int]] = {}
                                     for stub in comm_stubs:
                                         if stub.collective_type in ("AllGather", "ReduceScatter", "AllReduce"):
                                             group = tp_group
@@ -141,7 +142,7 @@ class DAGTracer:
                                             flow_id_start=flow_id_counter,
                                         )
 
-                                        # Create CommNodes for each P2PFlow
+                                        stub_to_comm_ids[stub.node_id] = []
                                         for flow in result.flows:
                                             comm_node = CommNode(
                                                 node_id=node_id_counter,
@@ -155,7 +156,16 @@ class DAGTracer:
                                                 parent_flow_ids=flow.parent_flow_ids,
                                             )
                                             dag.comm_nodes.append(comm_node)
+                                            stub_to_comm_ids[stub.node_id].append(node_id_counter)
                                             node_id_counter += 1
+
+                                    # Patch edges: stub refs → actual CommNode ids
+                                    for edge in edges:
+                                        srcs = stub_to_comm_ids.get(edge.src_node_id, [edge.src_node_id])
+                                        dsts = stub_to_comm_ids.get(edge.dst_node_id, [edge.dst_node_id])
+                                        for s in srcs:
+                                            for d in dsts:
+                                                dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
 
                 # PP_Send at stage boundaries
                 if pp > 1:

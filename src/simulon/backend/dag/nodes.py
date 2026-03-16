@@ -13,6 +13,7 @@ class ComputeNode:
     microbatch_id: int
     pipeline_stage: int
     phase: str  # fwd|bwd_ig|bwd_wg
+    duration_ms: Optional[float] = None
 
 
 @dataclass
