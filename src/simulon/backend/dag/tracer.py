@@ -84,7 +84,8 @@ class DAGTracer:
 
         tp = p.tp
         pp = p.pp
-        dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp)
+        ep = p.ep
+        dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp * ep)
 
         # num_microbatches
         if hasattr(p, "num_microbatches") and p.num_microbatches is not None:
@@ -107,6 +108,14 @@ class DAGTracer:
         # Activation size estimate (bytes): seq_len * micro_bs * hidden_size * dtype_bytes
         activation_bytes = seq_len * micro_bs * hidden_size * cfg.dtype_bytes
 
+        # MoE AllToAll data size: tokens dispatched per TP shard
+        # seq_len * micro_bs * hidden_size * top_k * dtype_bytes // tp
+        top_k = model.top_k or 1
+        moe_data_bytes = seq_len * micro_bs * hidden_size * top_k * cfg.dtype_bytes // tp
+
+        # Sublayer types: use "moe" instead of "mlp" when model has MoE enabled
+        sublayers = ["attn", "moe" if model.moe else "mlp"]
+
         scheduler = PipelineScheduler(pp, num_microbatches)
         expander = LayerExpander()
 
@@ -114,8 +123,8 @@ class DAGTracer:
         node_id_counter = 0
         flow_id_counter = 0
 
-        def global_rank(dp_rank: int, pp_stage: int, tp_rank: int) -> int:
-            return dp_rank * (tp * pp) + pp_stage * tp + tp_rank
+        def global_rank(dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int) -> int:
+            return dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
 
         # Sequential-ordering state:
         #   last_node_per_gpu: tracks the most recent exit node for each GPU across
@@ -142,113 +151,119 @@ class DAGTracer:
         # Iterate over all GPUs
         for dp_rank in range(dp):
             for pp_stage in range(pp):
-                for tp_rank in range(tp):
-                    gpu = global_rank(dp_rank, pp_stage, tp_rank)
-                    tp_group = [global_rank(dp_rank, pp_stage, r) for r in range(tp)]
-                    dp_group = [global_rank(r, pp_stage, tp_rank) for r in range(dp)]
+                for ep_rank in range(ep):
+                    for tp_rank in range(tp):
+                        gpu = global_rank(dp_rank, pp_stage, ep_rank, tp_rank)
+                        tp_group = [global_rank(dp_rank, pp_stage, ep_rank, r) for r in range(tp)]
+                        ep_group = [global_rank(dp_rank, pp_stage, r, tp_rank) for r in range(ep)]
+                        dp_group = [global_rank(r, pp_stage, ep_rank, tp_rank) for r in range(dp)]
 
-                    slots = get_slots(pp_stage)
+                        slots = get_slots(pp_stage)
 
-                    for slot in slots:
-                        mb = slot.microbatch_id
-                        direction = slot.direction
-                        slot_first_entry_set = False
+                        for slot in slots:
+                            mb = slot.microbatch_id
+                            direction = slot.direction
+                            slot_first_entry_set = False
 
-                        for layer_idx in range(num_layers):
-                            for sublayer in ("attn", "mlp"):
-                                for phase in _phases_for_direction(direction):
-                                    c_nodes, comm_stubs, edges, node_id_counter = expander.expand_sublayer(
-                                        sublayer_type=sublayer,
-                                        phase=phase,
-                                        gpu_rank=gpu,
-                                        pipeline_stage=pp_stage,
-                                        microbatch_id=mb,
-                                        layer_idx=layer_idx,
-                                        tp_group_ranks=tp_group,
-                                        activation_bytes=activation_bytes,
-                                        node_id_start=node_id_counter,
-                                    )
-
-                                    dag.compute_nodes.extend(c_nodes)
-
-                                    # Fill comm stubs with flows from decompose_collective,
-                                    # then patch edges: replace stub node_ids with actual CommNode ids.
-                                    stub_to_comm_ids: dict[int, list[int]] = {}
-                                    for stub in comm_stubs:
-                                        if stub.collective_type in ("AllGather", "ReduceScatter", "AllReduce"):
-                                            group = tp_group
-                                        else:
-                                            group = dp_group
-
-                                        result, flow_id_counter, _ = decompose_collective(
-                                            collective_type=stub.collective_type,
-                                            group_ranks=group,
-                                            data_size=stub.bytes,
-                                            num_channels=cfg.num_channels,
-                                            algorithm=cfg.algorithm,
-                                            flow_id_start=flow_id_counter,
+                            for layer_idx in range(num_layers):
+                                for sublayer in sublayers:
+                                    for phase in _phases_for_direction(direction):
+                                        c_nodes, comm_stubs, edges, node_id_counter = expander.expand_sublayer(
+                                            sublayer_type=sublayer,
+                                            phase=phase,
+                                            gpu_rank=gpu,
+                                            pipeline_stage=pp_stage,
+                                            microbatch_id=mb,
+                                            layer_idx=layer_idx,
+                                            tp_group_ranks=tp_group,
+                                            activation_bytes=activation_bytes,
+                                            node_id_start=node_id_counter,
+                                            ep_group_ranks=ep_group,
+                                            moe_data_bytes=moe_data_bytes,
                                         )
 
-                                        stub_to_comm_ids[stub.node_id] = []
-                                        for flow in result.flows:
-                                            comm_node = CommNode(
-                                                node_id=node_id_counter,
-                                                src_gpu=flow.src,
-                                                dst_gpu=flow.dst,
-                                                bytes=flow.flow_size,
+                                        dag.compute_nodes.extend(c_nodes)
+
+                                        # Fill comm stubs with flows from decompose_collective,
+                                        # then patch edges: replace stub node_ids with actual CommNode ids.
+                                        stub_to_comm_ids: dict[int, list[int]] = {}
+                                        for stub in comm_stubs:
+                                            if stub.collective_type in ("AllGather", "ReduceScatter", "AllReduce"):
+                                                group = tp_group
+                                            elif stub.collective_type == "AllToAll":
+                                                group = ep_group
+                                            else:
+                                                group = dp_group
+
+                                            result, flow_id_counter, _ = decompose_collective(
                                                 collective_type=stub.collective_type,
-                                                layer_id=layer_idx,
-                                                phase=phase,
-                                                flow_id=flow.flow_id,
-                                                parent_flow_ids=flow.parent_flow_ids,
+                                                group_ranks=group,
+                                                data_size=stub.bytes,
+                                                num_channels=cfg.num_channels,
+                                                algorithm=cfg.algorithm,
+                                                flow_id_start=flow_id_counter,
                                             )
-                                            dag.comm_nodes.append(comm_node)
-                                            stub_to_comm_ids[stub.node_id].append(node_id_counter)
-                                            node_id_counter += 1
 
-                                    # Patch edges: stub refs → actual CommNode ids
-                                    for edge in edges:
-                                        srcs = stub_to_comm_ids.get(edge.src_node_id, [edge.src_node_id])
-                                        dsts = stub_to_comm_ids.get(edge.dst_node_id, [edge.dst_node_id])
-                                        for s in srcs:
-                                            for d in dsts:
-                                                dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
+                                            stub_to_comm_ids[stub.node_id] = []
+                                            for flow in result.flows:
+                                                comm_node = CommNode(
+                                                    node_id=node_id_counter,
+                                                    src_gpu=flow.src,
+                                                    dst_gpu=flow.dst,
+                                                    bytes=flow.flow_size,
+                                                    collective_type=stub.collective_type,
+                                                    layer_id=layer_idx,
+                                                    phase=phase,
+                                                    flow_id=flow.flow_id,
+                                                    parent_flow_ids=flow.parent_flow_ids,
+                                                )
+                                                dag.comm_nodes.append(comm_node)
+                                                stub_to_comm_ids[stub.node_id].append(node_id_counter)
+                                                node_id_counter += 1
 
-                                    # Sequential ordering: chain this sublayer after the previous
-                                    # operation on this GPU (across sublayers, layers, and slots).
-                                    entry_id, exit_id = _sublayer_entry_exit(
-                                        c_nodes, comm_stubs, stub_to_comm_ids
-                                    )
+                                        # Patch edges: stub refs → actual CommNode ids
+                                        for edge in edges:
+                                            srcs = stub_to_comm_ids.get(edge.src_node_id, [edge.src_node_id])
+                                            dsts = stub_to_comm_ids.get(edge.dst_node_id, [edge.dst_node_id])
+                                            for s in srcs:
+                                                for d in dsts:
+                                                    dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
 
-                                    # Record the first entry node of this slot (for PP_Send recv deps)
-                                    if not slot_first_entry_set and entry_id is not None:
-                                        slot_entry_node[(gpu, mb, direction)] = entry_id
-                                        slot_first_entry_set = True
+                                        # Sequential ordering: chain this sublayer after the previous
+                                        # operation on this GPU (across sublayers, layers, and slots).
+                                        entry_id, exit_id = _sublayer_entry_exit(
+                                            c_nodes, comm_stubs, stub_to_comm_ids
+                                        )
 
-                                    prev = last_node_per_gpu.get(gpu)
-                                    if prev is not None and entry_id is not None:
-                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
-                                    if exit_id is not None:
-                                        last_node_per_gpu[gpu] = exit_id
+                                        # Record the first entry node of this slot (for PP_Send recv deps)
+                                        if not slot_first_entry_set and entry_id is not None:
+                                            slot_entry_node[(gpu, mb, direction)] = entry_id
+                                            slot_first_entry_set = True
 
-                        # Record slot exit so PP_Send can depend on it
-                        last = last_node_per_gpu.get(gpu)
-                        if last is not None:
-                            slot_last_node[(gpu, mb, direction)] = last
+                                        prev = last_node_per_gpu.get(gpu)
+                                        if prev is not None and entry_id is not None:
+                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
+                                        if exit_id is not None:
+                                            last_node_per_gpu[gpu] = exit_id
 
-                # PP_Send at stage boundaries
+                            # Record slot exit so PP_Send can depend on it
+                            last = last_node_per_gpu.get(gpu)
+                            if last is not None:
+                                slot_last_node[(gpu, mb, direction)] = last
+
+                # PP_Send at stage boundaries (once per dp_rank, pp_stage pair)
                 if pp > 1:
                     slots = get_slots(pp_stage)
                     for slot in slots:
                         mb = slot.microbatch_id
                         if slot.direction == "fwd" and pp_stage < pp - 1:
                             dst_stage = pp_stage + 1
-                            src_gpu = global_rank(dp_rank, pp_stage, 0)
-                            dst_gpu = global_rank(dp_rank, dst_stage, 0)
+                            src_gpu = global_rank(dp_rank, pp_stage, 0, 0)
+                            dst_gpu = global_rank(dp_rank, dst_stage, 0, 0)
                         elif slot.direction == "bwd" and pp_stage > 0:
                             dst_stage = pp_stage - 1
-                            src_gpu = global_rank(dp_rank, pp_stage, 0)
-                            dst_gpu = global_rank(dp_rank, dst_stage, 0)
+                            src_gpu = global_rank(dp_rank, pp_stage, 0, 0)
+                            dst_gpu = global_rank(dp_rank, dst_stage, 0, 0)
                         else:
                             continue
 
@@ -266,7 +281,7 @@ class DAGTracer:
                         node_id_counter += 1
                         flow_id_counter += 1
 
-                        # PP_Send depends on the last compute of that slot on tp_rank=0
+                        # PP_Send depends on the last compute of that slot on ep_rank=0, tp_rank=0
                         slot_key = (src_gpu, mb, slot.direction)
                         if slot_key in slot_last_node:
                             dag.edges.append(DAGEdge(
@@ -274,12 +289,12 @@ class DAGTracer:
                                 dst_node_id=pp_send.node_id,
                             ))
 
-                        # Defer the recv-side edges for ALL tp_ranks of the dst stage.
-                        # This ensures every TP rank waits for the activations/gradients,
-                        # not just tp_rank=0 (the PP_Send destination).
-                        for tr in range(tp):
-                            dst_gpu_tr = global_rank(dp_rank, dst_stage, tr)
-                            pending_pp_deps.append((pp_send.node_id, dst_gpu_tr, mb, slot.direction))
+                        # Defer the recv-side edges for ALL (ep_rank, tp_rank) of the dst stage.
+                        # This ensures every EP×TP rank waits for the activations/gradients.
+                        for er in range(ep):
+                            for tr in range(tp):
+                                dst_gpu_tr = global_rank(dp_rank, dst_stage, er, tr)
+                                pending_pp_deps.append((pp_send.node_id, dst_gpu_tr, mb, slot.direction))
 
         # Add cross-stage edges: PP_Send → first node of the receiving stage's slot.
         # This enforces that a downstream stage cannot begin a slot until it has
