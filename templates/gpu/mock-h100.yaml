@@ -31,6 +31,9 @@ kernel_runs:
   - kernel: logit
     params: {hidden_size: 4096, vocab_size: 32000, seq_len: 2048, batch_size: 1, dtype: bf16}
     times_ms: [15.476, 12.435, 12.824]
+  - kernel: moe_norm
+    params: {hidden_size: 4096, seq_len: 2048, batch_size: 1, dtype: bf16}
+    times_ms: [0.084, 0.043, 0.070]
   - kernel: moe_route
     params: {hidden_size: 4096, num_experts: 8, top_k: 2, ep: 2, seq_len: 2048, batch_size: 1, dtype: bf16}
     times_ms: [0.051, 0.049, 0.050]
