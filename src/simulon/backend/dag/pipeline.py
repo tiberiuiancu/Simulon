@@ -49,3 +49,24 @@ class PipelineScheduler:
             slots.append(ScheduleSlot(microbatch_id=mb, pipeline_stage=stage, direction="bwd"))
 
         return slots
+
+    def schedule_steady_state_for_stage(self, stage: int) -> list[ScheduleSlot]:
+        """Return only the steady-state 1F1B slots for this stage (no warmup or cooldown).
+
+        In steady state every stage alternates fwd/bwd. Stage k's steady state
+        starts at fwd microbatch = pp - stage - 1 (the first mb not in warmup).
+        The same number of 1F1B pairs runs as in the full schedule's steady state.
+        """
+        pp = self.pp
+        nm = self.num_microbatches
+        warmup = pp - stage - 1
+        steady = nm - warmup
+        slots: list[ScheduleSlot] = []
+        fwd_mb = warmup
+        bwd_mb = 0
+        for _ in range(steady):
+            slots.append(ScheduleSlot(microbatch_id=fwd_mb, pipeline_stage=stage, direction="fwd"))
+            slots.append(ScheduleSlot(microbatch_id=bwd_mb, pipeline_stage=stage, direction="bwd"))
+            fwd_mb += 1
+            bwd_mb += 1
+        return slots
