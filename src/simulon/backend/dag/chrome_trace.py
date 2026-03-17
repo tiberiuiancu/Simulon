@@ -25,7 +25,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG, NVSwitchNode
+from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
 
 _TID_COMPUTE   = 1000
 _TID_COLL_SEND = 1001   # AllGather / ReduceScatter / AllReduce send
@@ -57,16 +57,13 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
     """
     events: list[dict[str, Any]] = []
 
-    # Collect all GPU ranks present in the DAG (exclude NVSwitch virtual ranks)
-    nvswitch_ranks: set[int] = {n.nvswitch_rank for n in dag.nvswitch_nodes}
+    # Collect all GPU ranks present in the DAG
     all_gpus: set[int] = set()
     for n in dag.compute_nodes:
         all_gpus.add(n.gpu_rank)
     for n in dag.comm_nodes:
-        if n.src_gpu not in nvswitch_ranks:
-            all_gpus.add(n.src_gpu)
-        if n.dst_gpu not in nvswitch_ranks:
-            all_gpus.add(n.dst_gpu)
+        all_gpus.add(n.src_gpu)
+        all_gpus.add(n.dst_gpu)
 
     # Emit process/thread metadata sorted by (dp, pp, tp) = natural gpu_rank order
     for gpu in sorted(all_gpus):
@@ -103,42 +100,6 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
             {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_PP_RECV,
              "args": {"sort_index": 4}},
         ]
-
-    # NVSwitch pseudo-process metadata
-    # pid = 2000 + nvswitch_rank to distinguish from GPU pids (1000 + gpu_rank)
-    _TID_NVSWITCH = 2000
-    for sw_rank in sorted(nvswitch_ranks):
-        pid = 2000 + sw_rank
-        events += [
-            {"name": "process_name",       "ph": "M", "pid": pid, "tid": 0,
-             "args": {"name": f"NVSwitch {sw_rank}"}},
-            {"name": "process_sort_index", "ph": "M", "pid": pid, "tid": 0,
-             "args": {"sort_index": 10000 + sw_rank}},  # sort after all GPUs
-            {"name": "thread_name",       "ph": "M", "pid": pid, "tid": _TID_NVSWITCH,
-             "args": {"name": "Reduce"}},
-            {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_NVSWITCH,
-             "args": {"sort_index": 0}},
-        ]
-
-    # NVSwitch reduce events (zero-duration; marks the synchronization point
-    # between gather and scatter phases, visible in the trace as an instant marker)
-    for n in dag.nvswitch_nodes:
-        if n.start_ms is None:
-            continue
-        pid = 2000 + n.nvswitch_rank
-        events.append({
-            "name": "NVSwitch Reduce",
-            "ph": "X",
-            "pid": pid,
-            "tid": _TID_NVSWITCH,
-            "ts":  n.start_ms * 1_000,
-            "dur": max((n.duration_ms or 0.0) * 1_000, 1.0),  # min 1µs so it's visible
-            "args": {
-                "chunk_id":      n.chunk_id,
-                "nvswitch_rank": n.nvswitch_rank,
-                "flow_id":       n.flow_id,
-            },
-        })
 
     # Compute events
     for n in dag.compute_nodes:

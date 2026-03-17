@@ -8,7 +8,7 @@ from typing import Literal, Optional
 class ComputeNode:
     node_id: int
     gpu_rank: int
-    kernel: str  # layernorm|attn_qkv|attn_flash|attn_proj|mlp_linear1|mlp_act|mlp_linear2|embedding|logit|nvswitch_reduce
+    kernel: str  # layernorm|attn_qkv|attn_flash|attn_proj|mlp_linear1|mlp_act|mlp_linear2|embedding|logit
     layer_id: int
     microbatch_id: int
     pipeline_stage: int
@@ -41,39 +41,15 @@ class DAGEdge:
 
 
 @dataclass
-class NVSwitchNode:
-    """Virtual in-network reduce node for NVLS AllReduce.
-
-    Sits between gather flows (GPU→switch) and scatter flows (switch→GPU).
-    Assigned its own flow_id so scatter CommNodes can reference it in
-    parent_flow_ids, letting the replayer enforce the gather→reduce→scatter
-    ordering without a separate edge type.
-
-    duration_ms is 0: the NVSwitch reduces at wire speed; its latency is
-    captured by the gather/scatter P2PFlow transfer times.
-    """
-    node_id: int
-    nvswitch_rank: int
-    chunk_id: int
-    flow_id: int                                       # virtual flow_id referenced by scatter flows
-    parent_flow_ids: list[int] = field(default_factory=list)  # gather flow_ids
-    duration_ms: Optional[float] = None
-    start_ms: Optional[float] = None
-    finish_ms: Optional[float] = None
-
-
-@dataclass
 class ExecutionDAG:
     compute_nodes: list[ComputeNode] = field(default_factory=list)
     comm_nodes: list[CommNode] = field(default_factory=list)
-    nvswitch_nodes: list[NVSwitchNode] = field(default_factory=list)
     edges: list[DAGEdge] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "compute_nodes": [asdict(n) for n in self.compute_nodes],
             "comm_nodes": [asdict(n) for n in self.comm_nodes],
-            "nvswitch_nodes": [asdict(n) for n in self.nvswitch_nodes],
             "edges": [asdict(e) for e in self.edges],
         }
 
