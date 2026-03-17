@@ -37,7 +37,11 @@ def decompose_collective(
 
     if algorithm == "nvls":
         if collective_type != "AllReduce":
-            raise ValueError(f"NVLS algorithm only supports AllReduce, got {collective_type}")
+            # NVLS only supports AllReduce (intra-node reduction via NVSwitch).
+            # All other collective types fall back to ring.
+            algorithm = "ring"
+
+    if algorithm == "nvls":
         flows, switch_nodes, next_flow_id, next_node_id = nvls_all_reduce(
             group_ranks=group_ranks,
             data_size=data_size,
