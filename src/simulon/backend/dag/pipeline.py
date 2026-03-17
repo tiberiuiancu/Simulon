@@ -55,12 +55,17 @@ class PipelineScheduler:
 
         In steady state every stage alternates fwd/bwd. Stage k's steady state
         starts at fwd microbatch = pp - stage - 1 (the first mb not in warmup).
-        The same number of 1F1B pairs runs as in the full schedule's steady state.
+
+        All stages run the same number of 1F1B pairs, bounded by the stage with
+        the most warmup (stage 0, warmup = pp - 1):
+            steady = nm - (pp - 1)
+        This ensures no stage runs a longer wind-down tail that would show up as
+        a cooldown bubble in the simulation.
         """
         pp = self.pp
         nm = self.num_microbatches
         warmup = pp - stage - 1
-        steady = nm - warmup
+        steady = nm - (pp - 1)  # same for every stage
         slots: list[ScheduleSlot] = []
         fwd_mb = warmup
         bwd_mb = 0
