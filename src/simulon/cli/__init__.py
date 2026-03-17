@@ -12,38 +12,10 @@ app.add_typer(profile_app, name="profile")
 @app.command()
 def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
-    num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
-    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json (default: trace.json)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Print per-GPU timing summary"),
 ):
-    """Run an analytical simulation of a scenario and print per-GPU timing estimates."""
-    from simulon.backend.astra_sim import AstraSimBackend
-    from simulon.config.scenario import ScenarioConfig
-
-    with open(scenario) as f:
-        raw = yaml.safe_load(f)
-    sc = ScenarioConfig.model_validate(raw)
-
-    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
-    _, result = backend_obj.simulate(sc)
-
-    typer.echo(f"Total iteration time: {result.total_time_ms:.3f} ms")
-    typer.echo("")
-    typer.echo("Per-GPU finish times (ms):")
-    for gpu_rank in sorted(result.per_gpu_times_ms):
-        compute = result.compute_time_ms.get(gpu_rank, 0.0)
-        comm = result.comm_time_ms.get(gpu_rank, 0.0)
-        finish = result.per_gpu_times_ms[gpu_rank]
-        typer.echo(f"  GPU {gpu_rank:3d}: finish={finish:.3f}  compute={compute:.3f}  comm={comm:.3f}")
-
-
-@app.command(name="chrome-trace")
-def chrome_trace_cmd(
-    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json"),
-    num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
-    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
-):
-    """Run simulation and export a Chrome/Perfetto trace (chrome://tracing)."""
+    """Run simulation and write a Chrome/Perfetto trace."""
     import json
     from simulon.backend.astra_sim import AstraSimBackend
     from simulon.backend.dag.chrome_trace import to_chrome_trace
@@ -55,11 +27,11 @@ def chrome_trace_cmd(
     sc = ScenarioConfig.model_validate(raw)
 
     if not isinstance(sc.workload, MegatronWorkload):
-        typer.echo("Error: chrome-trace only supports MegatronWorkload scenarios.", err=True)
+        typer.echo("Error: simulate only supports MegatronWorkload scenarios.", err=True)
         raise typer.Exit(1)
 
-    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
-    dag, result = backend_obj.simulate(sc)
+    backend = AstraSimBackend()
+    dag, result = backend.simulate(sc)
 
     p = sc.workload.parallelism
     t = sc.workload.training
@@ -75,40 +47,18 @@ def chrome_trace_cmd(
     with open(output, "w") as f:
         json.dump(trace_dict, f)
 
-    typer.echo(f"Chrome trace written to {output}")
+    typer.echo(f"Trace written to {output}")
     typer.echo(f"  GPUs: {len(result.per_gpu_times_ms)}  |  Total: {result.total_time_ms:.3f} ms")
     typer.echo(f"  Load in https://ui.perfetto.dev or chrome://tracing")
 
-
-@app.command()
-def trace(
-    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for dag.json"),
-    num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
-    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
-):
-    """Extract a GPU-agnostic execution DAG from a scenario."""
-    import json
-    from simulon.backend.astra_sim import AstraSimBackend
-    from simulon.config.scenario import ScenarioConfig
-
-    with open(scenario) as f:
-        raw = yaml.safe_load(f)
-    sc = ScenarioConfig.model_validate(raw)
-
-    backend = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
-    dag = backend.run_trace(sc)
-
-    if output is None:
-        output = Path("dag.json")
-
-    with open(output, "w") as f:
-        f.write(dag.to_json())
-
-    typer.echo(f"DAG written to {output}")
-    typer.echo(f"  compute_nodes: {len(dag.compute_nodes)}")
-    typer.echo(f"  comm_nodes:    {len(dag.comm_nodes)}")
-    typer.echo(f"  edges:         {len(dag.edges)}")
+    if verbose:
+        typer.echo("")
+        typer.echo("Per-GPU finish times (ms):")
+        for gpu_rank in sorted(result.per_gpu_times_ms):
+            compute = result.compute_time_ms.get(gpu_rank, 0.0)
+            comm = result.comm_time_ms.get(gpu_rank, 0.0)
+            finish = result.per_gpu_times_ms[gpu_rank]
+            typer.echo(f"  GPU {gpu_rank:3d}: finish={finish:.3f}  compute={compute:.3f}  comm={comm:.3f}")
 
 
 @profile_app.command("gpu")
@@ -164,14 +114,12 @@ def profile_gpu(
         swiglu=swiglu,
     )
 
-    # Resolve output path
     if output is None:
         safe_name = name.lower().replace(" ", "-")
         output = Path("templates/gpu") / f"{safe_name}.yaml"
 
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load existing YAML or start fresh
     if output.exists():
         with open(output) as f:
             existing = yaml.safe_load(f) or {}
@@ -184,11 +132,9 @@ def profile_gpu(
             "tdp_w": tdp_w,
             "flops_multiplier": flops_multiplier,
         }
-        # Remove None values for cleaner YAML
         existing = {k: v for k, v in existing.items() if v is not None}
         existing_runs = []
 
-    # Append new runs
     new_runs = [kr.model_dump() for kr in kernel_runs]
     existing_runs.extend(new_runs)
     existing["kernel_runs"] = existing_runs
@@ -198,6 +144,5 @@ def profile_gpu(
 
     typer.echo(f"Saved {len(kernel_runs)} kernel runs to {output}")
 
-    # Validate by round-tripping through GPUSpec
     GPUSpec.model_validate(existing)
     typer.echo("Profile validated successfully.")

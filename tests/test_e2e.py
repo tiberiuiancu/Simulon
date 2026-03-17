@@ -235,10 +235,13 @@ def test_astra_sim_backend_rejects_non_megatron():
 
 def test_astra_sim_num_channels():
     """num_channels=2 produces more flows than num_channels=1."""
+    from simulon.config.scenario import NcclConfig
     wl = make_workload(tp=2, pp=1, num_gpus=4, num_layers=1)
     dc = make_datacenter()
-    sc = ScenarioConfig(datacenter=dc, workload=wl)
 
-    dag1 = AstraSimBackend(num_channels=1).run_trace(sc)
-    dag2 = AstraSimBackend(num_channels=2).run_trace(sc)
+    sc1 = ScenarioConfig(datacenter=dc, workload=wl, collective=NcclConfig(num_channels=1))
+    sc2 = ScenarioConfig(datacenter=dc, workload=wl, collective=NcclConfig(num_channels=2))
+
+    dag1 = AstraSimBackend().run_trace(sc1)
+    dag2 = AstraSimBackend().run_trace(sc2)
     assert len(dag2.comm_nodes) > len(dag1.comm_nodes)

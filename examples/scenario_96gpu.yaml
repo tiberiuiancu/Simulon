@@ -21,6 +21,11 @@ datacenter:
         params:
           k: 4
 
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
 workload:
   framework: megatron
   model:
