@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from simulon.backend.dag.nodes import ComputeNode, CommNode, DAGEdge, ExecutionDAG
-from simulon.backend.dag.pipeline import PipelineScheduler
+from simulon.backend.dag.pipeline import make_scheduler
 from simulon.backend.dag.layer_expander import LayerExpander
 from simulon.collective import decompose_collective
 from simulon.config.dc import DatacenterConfig
@@ -115,7 +115,7 @@ class DAGTracer:
         # Sublayer types: use "moe" instead of "mlp" when model has MoE enabled
         sublayers = ["attn", "moe" if model.moe else "mlp"]
 
-        scheduler = PipelineScheduler(pp, num_microbatches)
+        scheduler = make_scheduler(p.pipeline_schedule, pp, num_microbatches)
         expander = LayerExpander()
 
         dag = ExecutionDAG()
