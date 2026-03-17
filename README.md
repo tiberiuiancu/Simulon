@@ -14,17 +14,16 @@ by injecting profiling data.
    graph of `ComputeNode` (kernel ops) and `CommNode` (P2P flows) records representing
    one training iteration across all GPUs, including 1F1B pipeline scheduling.
 
-2. **Collective decomposition** — ring AllGather, ReduceScatter, AllReduce, AllToAll
-   and NVLS AllReduce are decomposed into individual `P2PFlow` records with explicit
-   `parent_flow_ids` / `child_flow_ids` dependency chains, matching MockNccl semantics.
+2. **Collective decomposition** — ring AllGather, ReduceScatter, AllReduce, and AllToAll
+   are decomposed into individual `P2PFlow` records with explicit `parent_flow_ids` /
+   `child_flow_ids` dependency chains, matching MockNccl semantics.
 
 3. **GPU profiling** — the `simulon profile gpu` CLI benchmarks transformer kernels
    on the local GPU and writes a hardware template YAML with per-kernel timing data.
-   This data can be injected into a DAG replay to produce GPU-specific timing estimates.
+   This data is injected into a DAG replay to produce GPU-specific timing estimates.
 
-4. **Workload trace generation** — the legacy `generate_megatron_trace()` API produces
-   a per-representative-GPU `WorkloadTrace` (ordered `CommOp`/`ComputeOp` sequence).
-   Useful for analytical modelling; the DAG is the preferred output for new work.
+4. **Chrome/Perfetto trace export** — `simulon simulate` replays the DAG and writes a
+   Chrome trace JSON readable in [Perfetto](https://ui.perfetto.dev) or `chrome://tracing`.
 
 ---
 
@@ -37,27 +36,32 @@ simulon/
 │   │   ├── common.py        # DType, Cost
 │   │   ├── dc.py            # DatacenterConfig, GPUSpec, KernelRun, ...
 │   │   ├── workload.py      # MegatronWorkload, InferenceWorkload, LLMSpec
-│   │   └── scenario.py      # ScenarioConfig (datacenter + workload)
+│   │   └── scenario.py      # ScenarioConfig (datacenter + workload + collective)
 │   ├── collective/
 │   │   ├── common.py        # P2PFlow dataclass
 │   │   ├── ring.py          # ring_reduce_scatter / all_gather / all_reduce / all_to_all
-│   │   ├── nvls.py          # nvls_all_reduce (intra-node NVLink Switch)
+│   │   ├── tree.py          # tree_all_reduce (stub)
+│   │   ├── collnet.py       # collnet_direct / collnet_chain (stubs)
+│   │   ├── nvls.py          # nvls_all_reduce (stub — intra-node NVLink Switch)
 │   │   └── decompose.py     # decompose_collective() top-level dispatcher
 │   ├── backend/
 │   │   ├── base.py          # Backend ABC
 │   │   ├── astra_sim.py     # AstraSimBackend → DAGTracer wrapper
 │   │   └── dag/
-│   │       ├── nodes.py     # ComputeNode, CommNode, DAGEdge, ExecutionDAG
-│   │       ├── pipeline.py  # PipelineScheduler (1F1B)
-│   │       ├── layer_expander.py  # per-sublayer kernel + comm stub expansion
-│   │       └── tracer.py    # DAGTracer — assembles full multi-GPU DAG
+│   │       ├── nodes.py          # ComputeNode, CommNode, DAGEdge, ExecutionDAG
+│   │       ├── pipeline.py       # PipelineScheduler ABC, OneFOneBScheduler, make_scheduler
+│   │       ├── layer_expander.py # per-sublayer kernel + comm stub expansion
+│   │       ├── tracer.py         # DAGTracer — assembles full multi-GPU DAG
+│   │       ├── populate.py       # injects GPU kernel timing into DAG nodes
+│   │       ├── replayer.py       # critical-path replay → SimulationResult
+│   │       └── chrome_trace.py   # Chrome/Perfetto trace export
 │   ├── workload/
 │   │   ├── trace.py         # WorkloadTrace, CommOp, ComputeOp (legacy)
 │   │   └── megatron.py      # generate_megatron_trace() (legacy)
 │   ├── profiling/
 │   │   └── kernels.py       # benchmark_kernels() — CUDA event timing
 │   └── cli/
-│       └── __init__.py      # `simulon trace`, `simulon simulate`, `simulon profile gpu`
+│       └── __init__.py      # `simulon simulate`, `simulon profile gpu`
 ├── templates/
 │   ├── gpu/                 # GPU hardware profiles (YAML)
 │   ├── cpu/                 # CPU profiles
@@ -65,12 +69,14 @@ simulon/
 │   ├── switch/              # Switch profiles
 │   └── model/               # LLM architecture profiles
 ├── examples/
-│   └── scenario.yaml        # Example scenario config
+│   └── scenario_96gpu.yaml  # Example 96-GPU scenario config
 ├── docs/spec/               # Config format specifications
 └── tests/
-    ├── test_collective.py   # Collective decomposition (ring + NVLS)
-    ├── test_dag.py          # DAG nodes, PipelineScheduler, LayerExpander
+    ├── test_collective.py   # Collective decomposition unit tests
+    ├── test_dag.py          # DAG nodes, pipeline scheduler, LayerExpander
     ├── test_e2e.py          # DAGTracer + AstraSimBackend integration
+    ├── test_moe.py          # MoE/EP layer expansion and DAG tracing
+    ├── test_step.py         # DP gradient sync step phase
     ├── test_megatron.py     # Legacy workload trace generation
     └── test_scenario.py     # Config serialisation round-trip
 ```
@@ -90,21 +96,7 @@ uv sync
 
 ## Quick start
 
-### 1. Extract an execution DAG from a scenario file
-
-```bash
-simulon trace examples/scenario.yaml --output dag.json
-```
-
-Output:
-```
-DAG written to dag.json
-  compute_nodes: 1280
-  comm_nodes:    1032
-  edges:         1408
-```
-
-### 2. Write a scenario YAML
+### 1. Write a scenario YAML
 
 ```yaml
 # scenario.yaml
@@ -127,10 +119,11 @@ datacenter:
       nic:
         speed: 400Gbps
         latency: 0.005ms
-      topology:
-        type: fat_tree
-        params:
-          k: 4
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
 
 workload:
   framework: megatron
@@ -145,6 +138,7 @@ workload:
     tp: 2
     pp: 2
     num_microbatches: 4
+    pipeline_schedule: 1f1b
   training:
     num_gpus: 4
     global_batch_size: 4
@@ -152,57 +146,44 @@ workload:
     sequence_length: 2048
 ```
 
+### 2. Run the simulation
+
+```bash
+simulon simulate scenario.yaml -o trace.json
+```
+
+Output:
+```
+Trace written to trace.json
+  GPUs: 4  |  Total: 612.4 ms
+  Load in https://ui.perfetto.dev or chrome://tracing
+```
+
+Add `-v` to also print per-GPU timing breakdown:
+
+```bash
+simulon simulate scenario.yaml -v
+```
+
 ### 3. Use the Python API directly
 
 ```python
-from simulon.backend.dag import DAGTracer, DAGTracerConfig
+from simulon.backend.astra_sim import AstraSimBackend
 from simulon.config.scenario import ScenarioConfig
 import yaml, json
 
 with open("scenario.yaml") as f:
     sc = ScenarioConfig.model_validate(yaml.safe_load(f))
 
-dag = DAGTracer(DAGTracerConfig(num_channels=1, algorithm="ring")).trace(
-    sc.workload, sc.datacenter
-)
+backend = AstraSimBackend()
+dag, result = backend.simulate(sc)
 
+print(f"Total: {result.total_time_ms:.1f} ms")
 print(f"compute_nodes: {len(dag.compute_nodes)}")
 print(f"comm_nodes:    {len(dag.comm_nodes)}")
-print(f"edges:         {len(dag.edges)}")
-
-with open("dag.json", "w") as f:
-    f.write(dag.to_json())
 ```
 
-### 4. Inspect the DAG JSON
-
-The output has three flat arrays:
-
-```json
-{
-  "compute_nodes": [
-    {
-      "node_id": 1, "gpu_rank": 0, "kernel": "layernorm",
-      "layer_id": 0, "microbatch_id": 0, "pipeline_stage": 0, "phase": "fwd"
-    }
-  ],
-  "comm_nodes": [
-    {
-      "node_id": 6, "src_gpu": 0, "dst_gpu": 1, "bytes": 8388608,
-      "collective_type": "AllGather", "layer_id": 0, "phase": "fwd",
-      "flow_id": 0, "parent_flow_ids": []
-    }
-  ],
-  "edges": [
-    { "src_node_id": 0, "dst_node_id": 1 }
-  ]
-}
-```
-
-`compute_nodes` carry no duration — inject kernel timing from a GPU profile to replay
-on a specific target.
-
-### 5. Profile a GPU
+### 4. Profile a GPU
 
 ```bash
 simulon profile gpu \
@@ -221,13 +202,13 @@ profile. The command appends new `kernel_runs` entries to the existing file.
 
 ## DAG node types
 
-**`ComputeNode`** — a single kernel invocation on one GPU, no duration:
+**`ComputeNode`** — a single kernel invocation on one GPU:
 
 | Field | Description |
 |---|---|
 | `node_id` | Unique node ID across the DAG |
 | `gpu_rank` | Global GPU rank |
-| `kernel` | `layernorm` \| `attn_qkv` \| `attn_flash` \| `attn_proj` \| `mlp_linear1` \| `mlp_act` \| `mlp_linear2` |
+| `kernel` | `layernorm` \| `attn_qkv` \| `attn_flash` \| `attn_proj` \| `mlp_linear1` \| `mlp_act` \| `mlp_linear2` \| `moe_norm` \| `moe_route` \| `moe_expert` |
 | `layer_id` | Transformer layer index |
 | `microbatch_id` | Pipeline micro-batch index |
 | `pipeline_stage` | PP stage |
@@ -240,7 +221,7 @@ profile. The command appends new `kernel_runs` entries to the existing file.
 | `node_id` | Unique node ID |
 | `src_gpu`, `dst_gpu` | Sender and receiver global ranks |
 | `bytes` | Transfer size in bytes |
-| `collective_type` | `AllGather` \| `ReduceScatter` \| `AllReduce` \| `PP_Send` |
+| `collective_type` | `AllGather` \| `ReduceScatter` \| `AllReduce` \| `AllToAll` \| `PP_Send` |
 | `flow_id` | Unique flow ID within the DAG |
 | `parent_flow_ids` | Flow IDs that must complete before this flow starts |
 
@@ -255,7 +236,7 @@ profile. The command appends new `kernel_runs` entries to the existing file.
 ## Collective decomposition
 
 The `simulon.collective` package decomposes collectives into P2P flows independently
-of the DAG tracer:
+of the DAG tracer. The algorithm is taken from the scenario's `collective` block.
 
 ```python
 from simulon.collective import decompose_collective
@@ -265,7 +246,7 @@ result, next_flow_id, next_node_id = decompose_collective(
     group_ranks=[0, 1, 2, 3],
     data_size=1024 * 1024,         # bytes
     num_channels=2,
-    algorithm="ring",              # ring | nvls
+    algorithm="ring",              # ring (tree | collnet_direct | collnet_chain | nvls are stubs)
 )
 
 print(f"{len(result.flows)} flows")
@@ -284,8 +265,10 @@ specification. Key `parallelism` fields for DAG tracing:
 parallelism:
   tp: 4                    # tensor parallel degree
   pp: 4                    # pipeline parallel degree
+  ep: 2                    # expert parallel degree (MoE only)
   dp: 4                    # data parallel (derived if omitted)
   num_microbatches: 8      # override pipeline micro-batch count (derived if omitted)
+  pipeline_schedule: 1f1b  # pipeline schedule (default: 1f1b)
 ```
 
 ---
