@@ -425,7 +425,10 @@ def _params_per_tp_rank(model: "LLMSpec", tp: int, ep: int) -> int:
         mlp_per_layer = 2 * hidden * ffn * (num_experts // ep) // tp
     else:
         mlp_per_layer = 2 * hidden * ffn // tp
-    ln_per_layer = 3 * hidden
+    # 2 layernorms per layer: pre-attention LN + pre-MLP LN (standard pre-norm).
+    # 3 would only apply to a post-norm variant with an extra output LN, which
+    # Megatron-LM's default architecture does not use.
+    ln_per_layer = 2 * hidden
 
     per_layer = attn_per_layer + mlp_per_layer + ln_per_layer
     embedding = vocab_size * hidden // tp
