@@ -80,6 +80,11 @@ def nvls_all_reduce(
         nid += 1
 
         # Phase 2: scatter (NVSwitch -> each GPU)
+        # parent_flow_ids = all gather flows for this chunk: the NVSwitch must have
+        # received data from every GPU before it can send the reduced result to any GPU.
+        # The replayer only uses parent_flow_ids to build the dependency graph;
+        # child_flow_ids is ignored. Without this, scatter flows start at t=0,
+        # bypassing the gather+reduce phases entirely.
         chunk_scatter_fids: list[int] = []
         for gpu_rank in group_ranks:
             flow = P2PFlow(
@@ -87,7 +92,7 @@ def nvls_all_reduce(
                 src=nvswitch_id,
                 dst=gpu_rank,
                 flow_size=chunk_size,
-                parent_flow_ids=[],
+                parent_flow_ids=list(chunk_gather_fids),
                 child_flow_ids=[],
                 channel_id=0,
                 chunk_id=ck,
