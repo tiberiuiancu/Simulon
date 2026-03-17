@@ -205,7 +205,8 @@ def generate_megatron_trace(
                     _prof(),
                 )
             )
-            # SP: AllGather sequence before attention
+            # SP: AllGather for attention ColumnLinear (qkv) — MegatronColumnLinear.forward()
+            # emits AllGather(tp) when sequence_parallel_enabled. AICB: MockedMegatron.py:173-181.
             if sp:
                 mb.append(
                     comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "forward", additional="overlap")
@@ -243,6 +244,11 @@ def generate_megatron_trace(
                     _prof(),
                 )
             )
+            # SP: AllGather for MLP ColumnLinear (dense_h_to_4h) — same pattern as attn qkv.
+            # AICB: MegatronColumnLinear.forward() always emits AllGather when sp=True.
+            # Previous code only had one AllGather (attn), missing this one for MLP.
+            if sp:
+                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "forward"))
             # MLP linear1
             mb.append(
                 compute(
@@ -316,22 +322,47 @@ def generate_megatron_trace(
         return mb
 
     # -----------------------------------------------------------------------
-    # Per-microbatch backward (mirror of forward comm ops)
+    # Per-microbatch backward
     # -----------------------------------------------------------------------
+    # AICB (utils/utils.py extract_averages): backward compute time = forward
+    # compute time (1:1 ratio). No separate backward kernels are benchmarked;
+    # the same profiled forward times are reused for input-grad computation.
+    # We therefore call compute() with the same kernel names as forward —
+    # _lookup_kernel_time returns the forward-measured time for all of them.
     def bwd_mb() -> list[TraceOp]:
         mb: list[TraceOp] = []
 
         for _ in range(layers_per_stage):
+            # Input-grad compute: reversed kernel order matches backward data flow.
+            # Timing reuses forward kernel entries (AICB 1:1 ratio).
+            mb.append(compute("mlp_linear2", [(seq_len * micro_batch, ffn_hidden // tp)], "backward", _prof({"ffn_hidden_size": ffn_hidden})))
+            mb.append(compute("mlp_act",     [(seq_len * micro_batch, ffn_hidden // tp)], "backward", {"ffn_hidden_size": ffn_hidden, "seq_len": seq_len, "batch_size": micro_batch, "dtype": "bf16"}))
+            mb.append(compute("mlp_linear1", [(seq_len * micro_batch, hidden)],           "backward", _prof({"ffn_hidden_size": ffn_hidden})))
+            mb.append(compute("layernorm",   [(seq_len * micro_batch, hidden)],           "backward", _prof()))
+            mb.append(compute("attn_proj",   [(seq_len * micro_batch, hidden // tp)],     "backward", _prof()))
+            mb.append(compute("attn_flash",  [(micro_batch, num_heads // tp, seq_len, hidden // num_heads)], "backward", _prof({"num_heads": num_heads})))
+            mb.append(compute("attn_qkv",    [(seq_len * micro_batch, hidden)],           "backward", _prof()))
+            mb.append(compute("layernorm",   [(seq_len * micro_batch, hidden)],           "backward", _prof()))
+
             if sp:
-                # Forward ReduceScatter → backward AllGather (×2: attn + MLP)
-                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "backward"))
-                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "backward"))
-                # Forward AllGather → backward ReduceScatter (×1: ColumnLinear)
-                mb.append(
-                    comm(CommOpType.reduce_scatter, ParallelGroup.tp, tp, tp_comm, "backward", additional="overlap")
-                )
+                # Per AICB MockedMegatron.py, per transformer layer backward with SP:
+                #   MegatronAttention.backward():
+                #     qkv ColumnLinear.backward()       → AllGather(tp) + ReduceScatter(tp)
+                #     attn_proj RowLinear.backward()    → AllGather(tp)
+                #   MegatronMlp.backward():
+                #     dense_h_to_4h ColumnLinear.backward() → AllGather(tp) + ReduceScatter(tp)
+                #     dense_4h_to_h RowLinear.backward()    → AllGather(tp)
+                # Total per layer: 4× AllGather + 2× ReduceScatter.
+                # Previous code had 2 AG + 1 RS (off by 2 AG + 1 RS per layer).
+                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "backward"))     # attn qkv col bwd
+                mb.append(comm(CommOpType.reduce_scatter, ParallelGroup.tp, tp, tp_comm, "backward")) # attn qkv col bwd
+                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "backward"))     # attn proj row bwd
+                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "backward"))     # mlp linear1 col bwd
+                mb.append(comm(CommOpType.reduce_scatter, ParallelGroup.tp, tp, tp_comm, "backward")) # mlp linear1 col bwd
+                mb.append(comm(CommOpType.all_gather, ParallelGroup.tp, tp, tp_comm, "backward"))     # mlp linear2 row bwd
             else:
-                # AllReduce is self-mirrored
+                # Without SP: ColumnLinear.backward() emits AllReduce(tp); RowLinear.backward()
+                # emits nothing. One AllReduce per sublayer × 2 sublayers = 2 per layer. Unchanged.
                 mb.append(comm(CommOpType.all_reduce, ParallelGroup.tp, tp, tp_comm, "backward"))
                 mb.append(comm(CommOpType.all_reduce, ParallelGroup.tp, tp, tp_comm, "backward"))
 
