@@ -112,6 +112,23 @@ class LayerExpander:
                 edges.append(DAGEdge(src_node_id=prev_node_id, dst_node_id=nid))
             nid += 1
 
+        if phase == "bwd_ig" and tp > 1:
+            # Second AllGather: backward of the forward ReduceScatter (RowLinear backward).
+            # Matches AICB MockedMegatron: RowLinear.backward() emits AllGather(tp).
+            ag2_node = CommNode(
+                node_id=nid,
+                src_gpu=gpu_rank,
+                dst_gpu=gpu_rank,  # placeholder
+                bytes=activation_bytes,
+                collective_type="AllGather",
+                layer_id=layer_idx,
+                phase=phase,
+                flow_id=-1,
+            )
+            comm_nodes.append(ag2_node)
+            edges.append(DAGEdge(src_node_id=nid - 1, dst_node_id=nid))
+            nid += 1
+
         return compute_nodes, comm_nodes, edges, nid
 
     def _expand_moe(
@@ -129,7 +146,7 @@ class LayerExpander:
     ) -> tuple[list[ComputeNode], list[CommNode], list[DAGEdge], int]:
         """Expand a MoE sublayer.
 
-        fwd:    [AG(tp)] -> moe_norm -> moe_route -> [A2A(ep)] -> moe_expert -> [A2A(ep)] -> [RS(tp)]
+        fwd:    [A2A(ep)] -> [AG(tp)] -> moe_norm -> moe_route -> moe_expert -> [RS(tp)] -> [A2A(ep)]
         bwd_ig: [AG(tp)] -> moe_expert -> [A2A(ep)] -> moe_route -> moe_norm -> [RS(tp)]
         bwd_wg: moe_route -> moe_expert
         """
@@ -177,17 +194,18 @@ class LayerExpander:
             nid += 1
 
         if phase == "fwd":
+            # Order matches AICB MOEMLP: permutation (A2A→AG) then unpermutation (RS→A2A).
+            if ep > 1:
+                add_comm("AllToAll", moe_data_bytes)   # dispatch
             if tp > 1:
                 add_comm("AllGather", activation_bytes)
             add_compute("moe_norm")
             add_compute("moe_route")
-            if ep > 1:
-                add_comm("AllToAll", moe_data_bytes)
             add_compute("moe_expert")
-            if ep > 1:
-                add_comm("AllToAll", moe_data_bytes)
             if tp > 1:
                 add_comm("ReduceScatter", activation_bytes)
+            if ep > 1:
+                add_comm("AllToAll", moe_data_bytes)   # combine
         elif phase == "bwd_ig":
             if tp > 1:
                 add_comm("AllGather", activation_bytes)
