@@ -113,15 +113,19 @@ def test_moe_fwd_ep1_tp2_ag_rs_no_alltoall():
 
 
 def test_moe_fwd_ep2_tp2_all_comm_types():
-    """ep=2, tp=2: AG → compute → A2A → compute → A2A → RS."""
+    """ep=2, tp=2: A2A(dispatch) → AG → compute → RS → A2A(combine).
+    Order matches AICB MOEMLP: permutation (A2A→AG) then unpermutation (RS→A2A).
+    """
     c, comm, edges, nid = _moe_expander(
         ep_group_ranks=[0, 1], tp_group_ranks=[0, 1],
     )
     types = [n.collective_type for n in comm]
-    assert types[0] == "AllGather"
-    assert types[-1] == "ReduceScatter"
+    assert types[0] == "AllToAll"   # dispatch
+    assert types[1] == "AllGather"
+    assert types[-2] == "ReduceScatter"
+    assert types[-1] == "AllToAll"  # combine
     assert types.count("AllToAll") == 2
-    # nid = 1 AG + 3 compute + 2 A2A + 1 RS = 7
+    # nid = 1 A2A + 1 AG + 3 compute + 1 RS + 1 A2A = 7
     assert nid == 7
 
 
@@ -219,9 +223,9 @@ def test_moe_node_id_start_respected():
     c, comm, _, nid = _moe_expander(
         ep_group_ranks=[0, 1], tp_group_ranks=[0], node_id_start=100,
     )
-    # tp=1 → no AG; sequence: moe_norm=100, moe_route=101, A2A=102, moe_expert=103, A2A=104
-    assert c[0].node_id == 100
-    assert comm[0].node_id == 102
+    # tp=1, ep=2: A2A(dispatch)=100, moe_norm=101, moe_route=102, moe_expert=103, A2A(combine)=104
+    assert comm[0].node_id == 100  # dispatch A2A is first
+    assert c[0].node_id == 101    # moe_norm follows
     # 3 compute + 2 A2A = 5 nodes → nid = 105
     assert nid == 105
 
