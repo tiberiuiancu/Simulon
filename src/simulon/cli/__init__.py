@@ -13,7 +13,7 @@ app.add_typer(profile_app, name="profile")
 def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
-    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain"),
+    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
     steady_state: bool = typer.Option(False, "--steady-state", help="Simulate steady-state only (exclude warmup/cooldown)"),
 ):
     """Run an analytical simulation of a scenario and print per-GPU timing estimates."""
@@ -42,7 +42,7 @@ def chrome_trace_cmd(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json"),
     num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
-    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain"),
+    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
     steady_state: bool = typer.Option(False, "--steady-state", help="Simulate steady-state only (exclude warmup/cooldown)"),
 ):
     """Run simulation and export a Chrome/Perfetto trace (chrome://tracing)."""
@@ -87,7 +87,7 @@ def trace(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for dag.json"),
     num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
-    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain"),
+    algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
 ):
     """Extract a GPU-agnostic execution DAG from a scenario."""
     import json

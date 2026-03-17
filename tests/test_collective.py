@@ -9,7 +9,7 @@ from simulon.collective.ring import (
     ring_all_to_all,
     ring_reduce_scatter,
 )
-from simulon.collective.nvls import nvls_all_reduce, NVSwitchReduceNode
+from simulon.collective.nvls import nvls_all_reduce
 from simulon.collective.decompose import decompose_collective, CollectiveResult
 
 
@@ -173,43 +173,13 @@ def test_ring_all_to_all_chunk_size():
 
 
 # ---------------------------------------------------------------------------
-# NVLS AllReduce
+# NVLS AllReduce (stub — not yet implemented)
 # ---------------------------------------------------------------------------
 
 
-def test_nvls_all_reduce_flow_count():
-    """N=8, 4 chunks: 4*(8 gather + 8 scatter) = 64 flows."""
-    flows, switch_nodes, nfid, nnid = nvls_all_reduce(list(range(8)), data_size=4096)
-    assert len(flows) == 64
-    assert len(switch_nodes) == 4
-    assert nfid == 64
-    assert nnid == 4
-
-
-def test_nvls_all_reduce_conn_type():
-    flows, _, _, _ = nvls_all_reduce([0, 1, 2, 3], data_size=1024)
-    for f in flows:
-        assert f.conn_type == "NVLS"
-
-
-def test_nvls_auto_nvswitch_id():
-    """nvswitch_id defaults to max(group_ranks)+1."""
-    flows, _, _, _ = nvls_all_reduce([0, 1, 2, 3], data_size=1024)
-    # gather flows: src=gpu, dst=nvswitch(4)
-    gather = [f for f in flows if f.dst == 4]
-    assert len(gather) == 4 * 4  # 4 chunks * 4 GPUs
-
-
-def test_nvls_custom_nvswitch_id():
-    flows, _, _, _ = nvls_all_reduce([0, 1, 2, 3], data_size=1024, nvswitch_id=100)
-    gather = [f for f in flows if f.dst == 100]
-    assert len(gather) == 4 * 4
-
-
-def test_nvls_switch_nodes_chunk_ids():
-    _, switch_nodes, _, _ = nvls_all_reduce([0, 1, 2, 3], data_size=1024)
-    chunk_ids = [sn.chunk_id for sn in switch_nodes]
-    assert sorted(chunk_ids) == [0, 1, 2, 3]
+def test_nvls_all_reduce_not_implemented():
+    with pytest.raises(NotImplementedError):
+        nvls_all_reduce([0, 1, 2, 3], data_size=1024)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +193,6 @@ def test_decompose_ring_all_reduce():
     )
     assert isinstance(result, CollectiveResult)
     assert len(result.flows) == 24
-    assert result.switch_nodes == []
     assert nnid == 0
 
 
@@ -248,17 +217,15 @@ def test_decompose_ring_all_to_all():
     assert len(result.flows) == 12
 
 
-def test_decompose_nvls_all_reduce():
-    result, nfid, nnid = decompose_collective(
-        "AllReduce", list(range(8)), data_size=4096, algorithm="nvls"
-    )
-    assert len(result.flows) == 64
-    assert len(result.switch_nodes) == 4
+def test_decompose_nvls_not_implemented():
+    with pytest.raises(NotImplementedError):
+        decompose_collective("AllReduce", list(range(8)), data_size=4096, algorithm="nvls")
 
 
-def test_decompose_nvls_unsupported_collective():
-    with pytest.raises(ValueError, match="NVLS algorithm only supports AllReduce"):
-        decompose_collective("AllGather", [0, 1, 2, 3], data_size=1024, algorithm="nvls")
+def test_decompose_nvls_non_allreduce_falls_back_to_ring():
+    """Non-AllReduce collectives with nvls algorithm fall back to ring."""
+    result, _, _ = decompose_collective("AllGather", [0, 1, 2, 3], data_size=1024, algorithm="nvls")
+    assert len(result.flows) == 12  # same as ring AllGather
 
 
 def test_decompose_unknown_algorithm():
