@@ -1,8 +1,8 @@
 # Scenario Configuration Specification
 
 This document specifies the format of the scenario configuration file (`scenario.yaml`).
-A scenario is the top-level entry point for the simulator — it binds a datacenter config
-and a workload config together into a single simulatable unit.
+A scenario is the top-level entry point for the simulator — it binds a datacenter config,
+a workload config, and a collective communication config together into a single simulatable unit.
 
 ---
 
@@ -10,21 +10,23 @@ and a workload config together into a single simulatable unit.
 
 1. [Overview](#overview)
 2. [Component References](#component-references)
-3. [Full Examples](#full-examples)
+3. [Collective Config](#collective-config)
+4. [Full Examples](#full-examples)
 
 ---
 
 ## Overview
 
-A scenario config has two required top-level keys:
+A scenario config has the following top-level keys:
 
-| Field | Type | Description |
-|---|---|---|
-| `datacenter` | path or inline | The datacenter configuration. See `config-dc.md` for the full field reference. |
-| `workload` | path or inline | The workload configuration. See `config-workload.md` for the full field reference. |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `datacenter` | path or inline | yes | The datacenter configuration. See `config-dc.md` for the full field reference. |
+| `workload` | path or inline | yes | The workload configuration. See `config-workload.md` for the full field reference. |
+| `collective` | inline | no | Collective communication library and algorithm settings. Defaults to `library: nccl, algorithm: ring, num_channels: 1`. |
 
-Each key accepts either a **file path** (string) pointing to a standalone config file,
-or an **inline mapping** that embeds the config directly.
+Each of `datacenter` and `workload` accepts either a **file path** (string) pointing to a
+standalone config file, or an **inline mapping** that embeds the config directly.
 
 ---
 
@@ -36,8 +38,6 @@ or an **inline mapping** that embeds the config directly.
 datacenter: ./dc.yaml
 workload: ./workload.yaml
 ```
-
-Paths are resolved relative to the scenario file's directory. Absolute paths are also accepted.
 
 **Inline spec** (mapping):
 
@@ -55,8 +55,46 @@ workload:
 datacenter: ./dc.yaml
 
 workload:
-  framework: inference
+  framework: megatron
   # ...
+```
+
+---
+
+## Collective Config
+
+The `collective` block selects the CCL library and algorithm used to decompose
+collectives into P2P flows. It is optional — if omitted, NCCL with ring allreduce
+and 1 channel is used.
+
+### `library: nccl`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `library` | string | `nccl` | CCL library identifier |
+| `algorithm` | string | `ring` | Collective algorithm: `ring` \| `tree` \| `collnet_direct` \| `collnet_chain` \| `nvls` \| `nvls_tree` |
+| `num_channels` | int | `1` | Number of parallel ring channels |
+
+> **Note:** Only `ring` is fully implemented. `tree`, `collnet_direct`, `collnet_chain`,
+> `nvls`, and `nvls_tree` raise `NotImplementedError`.
+
+```yaml
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 2
+```
+
+### `library: rccl`
+
+AMD ROCm CCL library. Has the same fields as `nccl`. **Not yet implemented** — raises
+`NotImplementedError` when used.
+
+```yaml
+collective:
+  library: rccl
+  algorithm: ring
+  num_channels: 1
 ```
 
 ---
@@ -75,6 +113,11 @@ workload: ./workload.yaml
 ```yaml
 datacenter: ./h100-cluster.yaml
 
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
 workload:
   framework: megatron
 
@@ -86,6 +129,7 @@ workload:
     pp: 4
     sp: true
     distributed_optimizer: true
+    pipeline_schedule: 1f1b
 
   training:
     num_gpus: 64
