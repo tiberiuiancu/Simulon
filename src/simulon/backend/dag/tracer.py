@@ -347,8 +347,11 @@ class DAGTracer:
                             if prev_step_stub_ids:
                                 last_node_per_gpu[gpu] = prev_step_stub_ids[-1]
 
-                # PP_Send at stage boundaries (once per dp_rank, pp_stage pair)
-                if pp > 1:
+                # PP_Send at stage boundaries (once per dp_rank, pp_stage pair).
+                # In steady-state-only mode we skip PP_Send nodes: the pipeline is
+                # assumed to already be fully loaded, so activations/gradients arrive
+                # just-in-time and there is no startup bubble.
+                if pp > 1 and not cfg.steady_state_only:
                     slots = get_slots(pp_stage)
                     for slot in slots:
                         mb = slot.microbatch_id
@@ -393,12 +396,12 @@ class DAGTracer:
                                 pending_pp_deps.append((pp_send.node_id, dst_gpu_tr, mb, slot.direction))
 
         # Add cross-stage edges: PP_Send → first node of the receiving stage's slot.
-        # This enforces that a downstream stage cannot begin a slot until it has
-        # received the activations (fwd) or gradients (bwd) from its neighbour.
-        for pp_send_id, dst_gpu, mb, direction in pending_pp_deps:
-            key = (dst_gpu, mb, direction)
-            if key in slot_entry_node:
-                dag.edges.append(DAGEdge(src_node_id=pp_send_id, dst_node_id=slot_entry_node[key]))
+        # Skipped in steady-state-only mode (no PP_Send nodes are emitted there).
+        if not cfg.steady_state_only:
+            for pp_send_id, dst_gpu, mb, direction in pending_pp_deps:
+                key = (dst_gpu, mb, direction)
+                if key in slot_entry_node:
+                    dag.edges.append(DAGEdge(src_node_id=pp_send_id, dst_node_id=slot_entry_node[key]))
 
         return dag
 
