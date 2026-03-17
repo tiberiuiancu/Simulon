@@ -8,7 +8,7 @@ from simulon.backend.dag.nodes import (
     DAGEdge,
     ExecutionDAG,
 )
-from simulon.backend.dag.pipeline import PipelineScheduler, ScheduleSlot
+from simulon.backend.dag.pipeline import OneFOneBScheduler, ScheduleSlot
 from simulon.backend.dag.layer_expander import LayerExpander
 
 
@@ -19,7 +19,7 @@ from simulon.backend.dag.layer_expander import LayerExpander
 
 def test_pipeline_scheduler_pp1_all_fwd_then_bwd():
     """pp=1, nm=4: warmup=0, steady=4 fwd+bwd pairs → 8 slots."""
-    sched = PipelineScheduler(pp=1, num_microbatches=4)
+    sched = OneFOneBScheduler(pp=1, num_microbatches=4)
     slots = sched.schedule_for_stage(0)
     assert len(slots) == 8
     directions = [s.direction for s in slots]
@@ -30,7 +30,7 @@ def test_pipeline_scheduler_pp1_all_fwd_then_bwd():
 
 def test_pipeline_scheduler_pp4_stage0_warmup():
     """Stage 0 in pp=4 has warmup = pp-0-1 = 3 forward slots."""
-    sched = PipelineScheduler(pp=4, num_microbatches=8)
+    sched = OneFOneBScheduler(pp=4, num_microbatches=8)
     slots = sched.schedule_for_stage(0)
     fwd_mb = [s for s in slots if s.direction == "fwd"]
     bwd_mb = [s for s in slots if s.direction == "bwd"]
@@ -40,7 +40,7 @@ def test_pipeline_scheduler_pp4_stage0_warmup():
 
 def test_pipeline_scheduler_pp4_last_stage_no_warmup():
     """Last stage (stage=pp-1=3) has warmup=0."""
-    sched = PipelineScheduler(pp=4, num_microbatches=4)
+    sched = OneFOneBScheduler(pp=4, num_microbatches=4)
     slots = sched.schedule_for_stage(3)
     # warmup=0, steady=4 pairs: fwd, bwd, fwd, bwd, fwd, bwd, fwd, bwd
     assert slots[0].direction == "fwd"
@@ -50,7 +50,7 @@ def test_pipeline_scheduler_pp4_last_stage_no_warmup():
 def test_pipeline_scheduler_all_microbatches_covered():
     """All microbatches appear in both fwd and bwd slots."""
     nm = 6
-    sched = PipelineScheduler(pp=3, num_microbatches=nm)
+    sched = OneFOneBScheduler(pp=3, num_microbatches=nm)
     for stage in range(3):
         slots = sched.schedule_for_stage(stage)
         fwd_mbs = sorted(s.microbatch_id for s in slots if s.direction == "fwd")
@@ -61,7 +61,7 @@ def test_pipeline_scheduler_all_microbatches_covered():
 
 def test_pipeline_scheduler_slot_pipeline_stage():
     """Each slot's pipeline_stage matches the requested stage."""
-    sched = PipelineScheduler(pp=2, num_microbatches=4)
+    sched = OneFOneBScheduler(pp=2, num_microbatches=4)
     for stage in range(2):
         for slot in sched.schedule_for_stage(stage):
             assert slot.pipeline_stage == stage
