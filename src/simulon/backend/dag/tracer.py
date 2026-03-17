@@ -13,6 +13,7 @@ from simulon.config.workload import LLMSpec, MegatronWorkload
 @dataclass
 class DAGTracerConfig:
     num_channels: int = 1
+    algorithm: str = "ring"   # ring | tree | collnet_direct | collnet_chain
     dtype_bytes: int = 2  # bf16
     steady_state_only: bool = False
 
@@ -199,6 +200,7 @@ class DAGTracer:
                                                 group_ranks=group,
                                                 data_size=stub.bytes,
                                                 num_channels=cfg.num_channels,
+                                                algorithm=cfg.algorithm,
                                                 flow_id_start=flow_id_counter,
                                                 node_id_start=node_id_counter,
                                             )
@@ -304,6 +306,7 @@ class DAGTracer:
                                     group_ranks=dp_group,
                                     data_size=stub.bytes,
                                     num_channels=cfg.num_channels,
+                                    algorithm=cfg.algorithm,
                                     flow_id_start=flow_id_counter,
                                     node_id_start=node_id_counter,
                                 )

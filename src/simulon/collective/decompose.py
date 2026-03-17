@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field
 
 from simulon.collective.common import P2PFlow
+from simulon.collective.collnet import collnet_chain_all_reduce, collnet_direct_all_reduce
 from simulon.collective.ring import (
     ring_all_gather,
     ring_all_reduce,
     ring_all_to_all,
     ring_reduce_scatter,
 )
+from simulon.collective.tree import tree_all_reduce
 
 
 @dataclass
@@ -19,9 +21,9 @@ def decompose_collective(
     group_ranks: list[int],
     data_size: int,
     num_channels: int = 1,
+    algorithm: str = "ring",
     flow_id_start: int = 0,
     node_id_start: int = 0,
-    **_kwargs,
 ) -> tuple[CollectiveResult, int, int]:
     """Decompose a collective into P2PFlows.
 
@@ -29,7 +31,30 @@ def decompose_collective(
     """
     flows: list[P2PFlow] = []
 
-    if collective_type == "AllReduce":
+    if algorithm == "tree" and collective_type == "AllReduce":
+        flows, next_flow_id = tree_all_reduce(
+            group_ranks=group_ranks,
+            data_size=data_size,
+            num_channels=num_channels,
+            flow_id_start=flow_id_start,
+        )
+    elif algorithm == "collnet_direct" and collective_type == "AllReduce":
+        flows, next_flow_id = collnet_direct_all_reduce(
+            group_ranks=group_ranks,
+            data_size=data_size,
+            num_channels=num_channels,
+            flow_id_start=flow_id_start,
+        )
+    elif algorithm == "collnet_chain" and collective_type == "AllReduce":
+        flows, next_flow_id = collnet_chain_all_reduce(
+            group_ranks=group_ranks,
+            data_size=data_size,
+            num_channels=num_channels,
+            flow_id_start=flow_id_start,
+        )
+    elif algorithm not in ("ring", "tree", "collnet_direct", "collnet_chain"):
+        raise ValueError(f"Unknown algorithm: {algorithm!r}. Choose from: ring, tree, collnet_direct, collnet_chain")
+    elif collective_type == "AllReduce":
         flows, next_flow_id = ring_all_reduce(
             group_ranks=group_ranks,
             data_size=data_size,
