@@ -14,7 +14,6 @@ def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
     algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
-    steady_state: bool = typer.Option(False, "--steady-state", help="Simulate steady-state only (exclude warmup/cooldown)"),
 ):
     """Run an analytical simulation of a scenario and print per-GPU timing estimates."""
     from simulon.backend.astra_sim import AstraSimBackend
@@ -24,7 +23,7 @@ def simulate(
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.model_validate(raw)
 
-    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm, steady_state_only=steady_state)
+    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
     _, result = backend_obj.simulate(sc)
 
     typer.echo(f"Total iteration time: {result.total_time_ms:.3f} ms")
@@ -43,7 +42,6 @@ def chrome_trace_cmd(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json"),
     num_channels: int = typer.Option(1, "--num-channels", help="Number of ring channels"),
     algorithm: str = typer.Option("ring", "--algorithm", help="Collective algorithm: ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree"),
-    steady_state: bool = typer.Option(False, "--steady-state", help="Simulate steady-state only (exclude warmup/cooldown)"),
 ):
     """Run simulation and export a Chrome/Perfetto trace (chrome://tracing)."""
     import json
@@ -60,7 +58,7 @@ def chrome_trace_cmd(
         typer.echo("Error: chrome-trace only supports MegatronWorkload scenarios.", err=True)
         raise typer.Exit(1)
 
-    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm, steady_state_only=steady_state)
+    backend_obj = AstraSimBackend(num_channels=num_channels, algorithm=algorithm)
     dag, result = backend_obj.simulate(sc)
 
     p = sc.workload.parallelism

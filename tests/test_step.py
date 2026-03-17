@@ -62,7 +62,7 @@ def make_dc(gpus: int = 8) -> DatacenterConfig:
 def trace(wl: MegatronWorkload, dc: DatacenterConfig | None = None):
     if dc is None:
         dc = make_dc()
-    return DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    return DAGTracer(DAGTracerConfig()).trace(wl, dc)
 
 
 # ---------------------------------------------------------------------------

@@ -279,7 +279,7 @@ def test_tracer_moe_ep1_no_alltoall():
     """moe=True, ep=1: no AllToAll nodes (single-rank EP is a no-op)."""
     wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=2, num_layers=1, global_batch_size=4, num_microbatches=4)
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert a2a == []
 
@@ -289,7 +289,7 @@ def test_tracer_moe_ep2_generates_alltoall():
     # tp=1, pp=1, ep=2, dp=1 → 2 GPUs
     wl = make_moe_workload(tp=1, pp=1, ep=2, num_gpus=2, num_layers=1, global_batch_size=4, num_microbatches=4)
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert len(a2a) > 0
 
@@ -298,7 +298,7 @@ def test_tracer_moe_kernels_in_dag():
     """DAG contains moe_route and moe_expert compute nodes when moe=True."""
     wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=1, num_layers=1, global_batch_size=1, num_microbatches=1)
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
     kernels = {n.kernel for n in dag.compute_nodes}
     assert "moe_route" in kernels
     assert "moe_expert" in kernels
@@ -308,7 +308,7 @@ def test_tracer_moe_no_mlp_kernels():
     """When moe=True, mlp_linear1/mlp_linear2 are absent."""
     wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=1, num_layers=1, global_batch_size=1, num_microbatches=1)
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
     kernels = {n.kernel for n in dag.compute_nodes}
     assert "mlp_linear1" not in kernels
     assert "mlp_linear2" not in kernels
@@ -321,7 +321,7 @@ def test_tracer_moe_ep2_alltoall_on_ep_group():
     # EP group for ep_rank∈{0,1} with tp_rank=1: GPUs 1 and 3
     wl = make_moe_workload(tp=2, pp=1, ep=2, num_gpus=4, num_layers=1, global_batch_size=4, num_microbatches=4)
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
 
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert len(a2a) > 0
@@ -335,7 +335,7 @@ def test_tracer_moe_tp2_still_generates_ag_rs():
     """With moe=True and tp=2, AllGather/ReduceScatter are still present."""
     wl = make_moe_workload(tp=2, pp=1, ep=1, num_gpus=2, num_layers=1, global_batch_size=2, num_microbatches=2)
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
     ag = [n for n in dag.comm_nodes if n.collective_type == "AllGather"]
     rs = [n for n in dag.comm_nodes if n.collective_type == "ReduceScatter"]
     assert len(ag) > 0
@@ -353,6 +353,6 @@ def test_tracer_dense_ep1_unchanged():
         training=MegatronTraining(num_gpus=4, global_batch_size=4, micro_batch_size=1, sequence_length=64),
     )
     dc = make_dc()
-    dag = DAGTracer(DAGTracerConfig(steady_state_only=True)).trace(wl, dc)
+    dag = DAGTracer(DAGTracerConfig()).trace(wl, dc)
     gpu_ids = {n.gpu_rank for n in dag.compute_nodes}
     assert gpu_ids == {0, 1, 2, 3}  # dp=2, tp=2 → 4 GPUs
