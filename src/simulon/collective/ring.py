@@ -180,7 +180,13 @@ def ring_all_reduce(
     for c in range(num_channels):
         for i in range(N):
             ag_flow = ag_step0_flows[idx]
-            rs_parent_fid = rs_final_by_rank_channel.get((c, i))
+            # At AG step 0, rank i receives from rank (i-1)%N, so it depends on
+            # the RS final-step flow that *arrived at* rank i — i.e. the flow
+            # sent by rank (i-1)%N, stored as (c, (i-1)%N). Using (c, i) would
+            # link AG step-0 to the flow that rank i *sent* in the RS final step
+            # (which goes to rank (i+1)%N, not to rank i). Same class of bug as
+            # the RS parent tracking issue above.
+            rs_parent_fid = rs_final_by_rank_channel.get((c, (i - 1) % N))
             if rs_parent_fid is not None:
                 ag_flow.parent_flow_ids = [rs_parent_fid]
                 # Update RS final flow's child_flow_ids
