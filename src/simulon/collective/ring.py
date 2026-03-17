@@ -38,7 +38,14 @@ def ring_reduce_scatter(
 
                 parent_flow_ids: list[int] = []
                 if s > 0:
-                    parent_fid = flow_table.get((s - 1, c, i))
+                    # At step s, rank i *receives* data from rank (i-1)%N.
+                    # The parent dependency is therefore the step-(s-1) send from
+                    # rank (i-1)%N — stored as (s-1, c, (i-1)%N) — not (s-1, c, i)
+                    # which is rank i's own previous send. Using (s-1, c, i) creates
+                    # N independent chains instead of a real ring, giving structurally
+                    # incorrect DAGs (though timing is coincidentally correct on
+                    # symmetric topologies because all steps take the same time).
+                    parent_fid = flow_table.get((s - 1, c, (i - 1) % N))
                     if parent_fid is not None:
                         parent_flow_ids = [parent_fid]
 
