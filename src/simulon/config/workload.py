@@ -55,6 +55,8 @@ class MegatronParallelism(BaseModel):
     sp: bool = False
     vpp: int = 1
     distributed_optimizer: bool = False
+    num_microbatches: Optional[int] = None
+    pipeline_schedule: str = "1f1b"
 
 
 class MegatronTraining(BaseModel):

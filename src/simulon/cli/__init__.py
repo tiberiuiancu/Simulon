@@ -11,11 +11,54 @@ app.add_typer(profile_app, name="profile")
 
 @app.command()
 def simulate(
-    backend: str = typer.Argument(..., help="Simulation backend: analytical | ns3"),
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json (default: trace.json)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Print per-GPU timing summary"),
 ):
-    """Run a simulation scenario."""
-    raise NotImplementedError
+    """Run simulation and write a Chrome/Perfetto trace."""
+    import json
+    from simulon.backend.astra_sim import AstraSimBackend
+    from simulon.backend.dag.chrome_trace import to_chrome_trace
+    from simulon.config.scenario import ScenarioConfig
+    from simulon.config.workload import MegatronWorkload
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    if not isinstance(sc.workload, MegatronWorkload):
+        typer.echo("Error: simulate only supports MegatronWorkload scenarios.", err=True)
+        raise typer.Exit(1)
+
+    backend = AstraSimBackend()
+    dag, result = backend.simulate(sc)
+
+    p = sc.workload.parallelism
+    t = sc.workload.training
+    tp = p.tp
+    pp_val = p.pp
+    ep = p.ep
+    dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
+
+    trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+
+    if output is None:
+        output = Path("trace.json")
+    with open(output, "w") as f:
+        json.dump(trace_dict, f)
+
+    typer.echo(f"Trace written to {output}")
+    typer.echo(f"  GPUs: {len(result.per_gpu_times_ms)}  |  Total: {result.total_time_ms:.3f} ms")
+    typer.echo(f"  Load in https://ui.perfetto.dev or chrome://tracing")
+
+    if verbose:
+        typer.echo("")
+        typer.echo("Per-GPU finish times (ms):")
+        for gpu_rank in sorted(result.per_gpu_times_ms):
+            compute = result.compute_time_ms.get(gpu_rank, 0.0)
+            comm = result.comm_time_ms.get(gpu_rank, 0.0)
+            finish = result.per_gpu_times_ms[gpu_rank]
+            typer.echo(f"  GPU {gpu_rank:3d}: finish={finish:.3f}  compute={compute:.3f}  comm={comm:.3f}")
 
 
 @profile_app.command("gpu")
@@ -71,14 +114,12 @@ def profile_gpu(
         swiglu=swiglu,
     )
 
-    # Resolve output path
     if output is None:
         safe_name = name.lower().replace(" ", "-")
         output = Path("templates/gpu") / f"{safe_name}.yaml"
 
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load existing YAML or start fresh
     if output.exists():
         with open(output) as f:
             existing = yaml.safe_load(f) or {}
@@ -91,11 +132,9 @@ def profile_gpu(
             "tdp_w": tdp_w,
             "flops_multiplier": flops_multiplier,
         }
-        # Remove None values for cleaner YAML
         existing = {k: v for k, v in existing.items() if v is not None}
         existing_runs = []
 
-    # Append new runs
     new_runs = [kr.model_dump() for kr in kernel_runs]
     existing_runs.extend(new_runs)
     existing["kernel_runs"] = existing_runs
@@ -105,6 +144,5 @@ def profile_gpu(
 
     typer.echo(f"Saved {len(kernel_runs)} kernel runs to {output}")
 
-    # Validate by round-tripping through GPUSpec
     GPUSpec.model_validate(existing)
     typer.echo("Profile validated successfully.")

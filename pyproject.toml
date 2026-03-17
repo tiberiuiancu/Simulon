@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "pybind11>=2.12", "cmake", "ninja"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
@@ -20,9 +20,6 @@ simulon = "simulon.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/simulon"]
-
-[tool.hatch.build.hooks.custom]
-path = "hatch_build.py"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
