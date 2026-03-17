@@ -271,19 +271,38 @@ def _bench_moe_expert(
     num_local_experts = max(1, num_experts // ep)
     # tokens dispatched to this rank: seq_len * batch_size * top_k / ep (approx)
     local_tokens = max(1, batch_size * seq_len * top_k // ep)
-    x = torch.randn(num_local_experts * local_tokens, hidden_size, dtype=dtype, device="cuda")
-    w1 = torch.randn(num_local_experts, ffn_hidden_size, hidden_size, dtype=dtype, device="cuda")
-    w2 = torch.randn(num_local_experts, hidden_size, ffn_hidden_size, dtype=dtype, device="cuda")
 
-    def fn():
-        # Grouped GEMM: one expert at a time (sequential; real impl uses grouped GEMM)
-        out = torch.zeros_like(x)
-        tokens_per_expert = local_tokens
-        for i in range(num_local_experts):
-            t = x[i * tokens_per_expert:(i + 1) * tokens_per_expert]
-            h = torch.matmul(t, w1[i].t())
-            out[i * tokens_per_expert:(i + 1) * tokens_per_expert] = torch.matmul(h, w2[i].t())
-        return out
+    # AICB uses grouped_gemm (CUTLASS, https://github.com/fanshiqing/grouped_gemm@v1.0)
+    # for Megatron MoE and deep_gemm (DeepSeek FP8, SM90+) for DeepSeek variants.
+    # Try CUTLASS grouped GEMM first; fall back to sequential torch.matmul otherwise.
+    try:
+        from grouped_gemm import ops as gg_ops  # type: ignore
+
+        # grouped_gemm expects: x (total_tokens, hidden), w (num_experts, out, in)
+        x = torch.randn(num_local_experts * local_tokens, hidden_size, dtype=dtype, device="cuda")
+        w1 = torch.randn(num_local_experts, ffn_hidden_size, hidden_size, dtype=dtype, device="cuda")
+        w2 = torch.randn(num_local_experts, hidden_size, ffn_hidden_size, dtype=dtype, device="cuda")
+        # batch_sizes: how many tokens each expert receives
+        batch_sizes = torch.full((num_local_experts,), local_tokens, dtype=torch.long, device="cuda")
+
+        def fn():
+            h = gg_ops.gmm(x, w1, batch_sizes, trans_b=True)
+            return gg_ops.gmm(h, w2, batch_sizes, trans_b=True)
+
+    except (ImportError, AttributeError):
+        # Fallback: sequential matmul per expert. This is pessimistic vs. real
+        # grouped GEMM (which fuses all experts) but produces the right shape.
+        x = torch.randn(num_local_experts * local_tokens, hidden_size, dtype=dtype, device="cuda")
+        w1 = torch.randn(num_local_experts, ffn_hidden_size, hidden_size, dtype=dtype, device="cuda")
+        w2 = torch.randn(num_local_experts, hidden_size, ffn_hidden_size, dtype=dtype, device="cuda")
+
+        def fn():  # type: ignore[misc]
+            out = torch.zeros_like(x)
+            for i in range(num_local_experts):
+                t = x[i * local_tokens:(i + 1) * local_tokens]
+                h = torch.matmul(t, w1[i].t())
+                out[i * local_tokens:(i + 1) * local_tokens] = torch.matmul(h, w2[i].t())
+            return out
 
     return _cuda_time(fn)
 
