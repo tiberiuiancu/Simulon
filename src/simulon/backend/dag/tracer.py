@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from simulon.backend.dag.nodes import ComputeNode, CommNode, DAGEdge, ExecutionDAG
+from simulon.backend.dag.nodes import ComputeNode, CommNode, DAGEdge, ExecutionDAG, NVSwitchNode
 from simulon.backend.dag.pipeline import PipelineScheduler
 from simulon.backend.dag.layer_expander import LayerExpander
 from simulon.collective import decompose_collective
@@ -195,14 +195,25 @@ class DAGTracer:
                                             else:
                                                 group = dp_group
 
-                                            result, flow_id_counter, _ = decompose_collective(
+                                            result, flow_id_counter, node_id_counter = decompose_collective(
                                                 collective_type=stub.collective_type,
                                                 group_ranks=group,
                                                 data_size=stub.bytes,
                                                 num_channels=cfg.num_channels,
                                                 algorithm=cfg.algorithm,
                                                 flow_id_start=flow_id_counter,
+                                                node_id_start=node_id_counter,
                                             )
+
+                                            # Convert NVSwitchReduceNodes to NVSwitchNodes in the DAG
+                                            for sw in result.switch_nodes:
+                                                dag.nvswitch_nodes.append(NVSwitchNode(
+                                                    node_id=sw.node_id,
+                                                    nvswitch_rank=sw.nvswitch_rank,
+                                                    chunk_id=sw.chunk_id,
+                                                    flow_id=sw.flow_id,
+                                                    parent_flow_ids=list(sw.parent_flow_ids),
+                                                ))
 
                                             stub_to_comm_ids[stub.node_id] = []
                                             for flow in result.flows:
@@ -300,14 +311,23 @@ class DAGTracer:
                             step_stub_to_comm_ids: dict[int, list[int]] = {}
                             prev_step_stub_ids: list[int] = []
                             for stub in step_stubs:
-                                result, flow_id_counter, _ = decompose_collective(
+                                result, flow_id_counter, node_id_counter = decompose_collective(
                                     collective_type=stub.collective_type,
                                     group_ranks=dp_group,
                                     data_size=stub.bytes,
                                     num_channels=cfg.num_channels,
                                     algorithm=cfg.algorithm,
                                     flow_id_start=flow_id_counter,
+                                    node_id_start=node_id_counter,
                                 )
+                                for sw in result.switch_nodes:
+                                    dag.nvswitch_nodes.append(NVSwitchNode(
+                                        node_id=sw.node_id,
+                                        nvswitch_rank=sw.nvswitch_rank,
+                                        chunk_id=sw.chunk_id,
+                                        flow_id=sw.flow_id,
+                                        parent_flow_ids=list(sw.parent_flow_ids),
+                                    ))
                                 step_stub_to_comm_ids[stub.node_id] = []
                                 for flow in result.flows:
                                     comm_node = CommNode(

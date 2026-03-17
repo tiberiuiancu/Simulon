@@ -4,7 +4,7 @@ import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
-from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
+from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG, NVSwitchNode
 from simulon.config.dc import DatacenterConfig, NICSpec, SwitchSpec
 
 
@@ -131,15 +131,23 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     Routing assumption: single logical hop per flow; no intermediate switch
     congestion modeled. See _get_link_params for details.
     """
+    # NVSwitch virtual ranks — excluded from per-GPU timing stats
+    nvswitch_ranks: set[int] = {n.nvswitch_rank for n in dag.nvswitch_nodes}
+
     # Build unified node map
-    all_nodes: dict[int, ComputeNode | CommNode] = {}
+    all_nodes: dict[int, ComputeNode | CommNode | NVSwitchNode] = {}
     for n in dag.compute_nodes:
         all_nodes[n.node_id] = n
     for n in dag.comm_nodes:
         all_nodes[n.node_id] = n
+    for n in dag.nvswitch_nodes:
+        all_nodes[n.node_id] = n
 
-    # flow_id → node_id (CommNode.parent_flow_ids uses flow_ids, not node_ids)
+    # flow_id → node_id: CommNode and NVSwitchNode both expose flow_id so that
+    # scatter flows can list the NVSwitchNode's flow_id in parent_flow_ids.
     flow_to_node: dict[int, int] = {n.flow_id: n.node_id for n in dag.comm_nodes}
+    for n in dag.nvswitch_nodes:
+        flow_to_node[n.flow_id] = n.node_id
 
     # Build predecessors dict and in-degrees
     predecessors: dict[int, set[int]] = {nid: set() for nid in all_nodes}
@@ -149,7 +157,9 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
         predecessors[edge.dst_node_id].add(edge.src_node_id)
         in_degree[edge.dst_node_id] += 1
 
-    for cn in dag.comm_nodes:
+    # Resolve parent_flow_ids for both CommNodes and NVSwitchNodes
+    nodes_with_flow_parents: list[CommNode | NVSwitchNode] = list(dag.comm_nodes) + list(dag.nvswitch_nodes)
+    for cn in nodes_with_flow_parents:
         for fid in cn.parent_flow_ids:
             if fid in flow_to_node:
                 parent_nid = flow_to_node[fid]
@@ -161,7 +171,7 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     successors: dict[int, list[int]] = defaultdict(list)
     for edge in dag.edges:
         successors[edge.src_node_id].append(edge.dst_node_id)
-    for cn in dag.comm_nodes:
+    for cn in nodes_with_flow_parents:
         for fid in cn.parent_flow_ids:
             if fid in flow_to_node:
                 successors[flow_to_node[fid]].append(cn.node_id)
@@ -198,6 +208,18 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
             if finish > per_gpu_finish[node.gpu_rank]:
                 per_gpu_finish[node.gpu_rank] = finish
 
+        elif isinstance(node, NVSwitchNode):
+            # NVSwitch reduces at wire speed; its latency is captured by the
+            # gather/scatter P2PFlow transfer times. Duration = 0.
+            duration = 0.0
+            finish = start_time + duration
+            finish_time[nid] = finish
+            node.duration_ms = duration
+            node.start_ms = start_time
+            node.finish_ms = finish
+            # NVSwitch rank intentionally excluded from per_gpu_finish so it
+            # doesn't inflate the GPU count in SimulationResult.
+
         else:  # CommNode
             bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
             duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
@@ -206,12 +228,14 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
             node.duration_ms = duration
             node.start_ms = start_time
             node.finish_ms = finish
-            per_gpu_comm[node.src_gpu] += duration
-            per_gpu_comm[node.dst_gpu] += duration
-            if finish > per_gpu_finish[node.src_gpu]:
-                per_gpu_finish[node.src_gpu] = finish
-            if finish > per_gpu_finish[node.dst_gpu]:
-                per_gpu_finish[node.dst_gpu] = finish
+            if node.src_gpu not in nvswitch_ranks:
+                per_gpu_comm[node.src_gpu] += duration
+                if finish > per_gpu_finish[node.src_gpu]:
+                    per_gpu_finish[node.src_gpu] = finish
+            if node.dst_gpu not in nvswitch_ranks:
+                per_gpu_comm[node.dst_gpu] += duration
+                if finish > per_gpu_finish[node.dst_gpu]:
+                    per_gpu_finish[node.dst_gpu] = finish
 
     total = max(per_gpu_finish.values(), default=0.0)
 
