@@ -4,15 +4,28 @@ from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import MegatronWorkload
 
+_SUPPORTED_LIBRARIES = {"nccl"}
+
+
+def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
+    c = scenario.collective
+    if c.library not in _SUPPORTED_LIBRARIES:
+        raise NotImplementedError(
+            f"CCL library {c.library!r} is not yet implemented. "
+            f"Supported: {sorted(_SUPPORTED_LIBRARIES)}"
+        )
+    return DAGTracerConfig(
+        num_channels=c.num_channels,
+        algorithm=c.algorithm,
+    )
+
 
 def _resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
-    """Return a GPUSpec, loading from template if node.gpu is a string or has from_."""
     gpu = dc.node.gpu
     if isinstance(gpu, str):
         return _load_gpu_template(gpu)
     if isinstance(gpu, GPUSpec) and gpu.from_:
         base = _load_gpu_template(gpu.from_)
-        # Inline fields override template (except kernel_runs which come from template)
         if gpu.name:
             base.name = gpu.name
         if gpu.flops_multiplier != 1.0:
@@ -44,12 +57,6 @@ def _load_gpu_template(name: str) -> GPUSpec:
 class AstraSimBackend(Backend):
     """Backend that produces a GPU-agnostic execution DAG."""
 
-    def __init__(self, num_channels: int = 1, algorithm: str = "ring"):
-        self._tracer_config = DAGTracerConfig(
-            num_channels=num_channels,
-            algorithm=algorithm,
-        )
-
     def run(self, scenario: ScenarioConfig) -> dict:
         dag = self.run_trace(scenario)
         d = dag.to_dict()
@@ -64,15 +71,10 @@ class AstraSimBackend(Backend):
     def run_trace(self, scenario: ScenarioConfig) -> ExecutionDAG:
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
-        tracer = DAGTracer(self._tracer_config)
+        tracer = DAGTracer(_tracer_config_from_scenario(scenario))
         return tracer.trace(scenario.workload, scenario.datacenter)
 
     def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
-        """Run the full simulation pipeline.
-
-        Returns (dag, result) where dag has start_ms/finish_ms/duration_ms
-        populated on all nodes, ready for chrome trace export.
-        """
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
         dag = self.run_trace(scenario)
