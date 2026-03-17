@@ -44,9 +44,10 @@ def _load_gpu_template(name: str) -> GPUSpec:
 class AstraSimBackend(Backend):
     """Backend that produces a GPU-agnostic execution DAG."""
 
-    def __init__(self, num_channels: int = 1, steady_state_only: bool = False):
+    def __init__(self, num_channels: int = 1, algorithm: str = "ring", steady_state_only: bool = False):
         self._tracer_config = DAGTracerConfig(
             num_channels=num_channels,
+            algorithm=algorithm,
             steady_state_only=steady_state_only,
         )
 
