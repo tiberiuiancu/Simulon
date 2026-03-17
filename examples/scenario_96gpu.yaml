@@ -1,0 +1,50 @@
+datacenter:
+  datacenter:
+    name: 24x4-h100-cluster
+  cluster:
+    num_nodes: 24
+  node:
+    gpus_per_node: 4
+    gpu:
+      from: mock-h100
+  network:
+    scale_up:
+      switch:
+        port_speed: 7200Gbps   # H100 NVSwitch ~900 GB/s per GPU
+        latency: 0.000025ms
+    scale_out:
+      nic:
+        speed: 400Gbps
+        latency: 0.005ms
+      topology:
+        type: fat_tree
+        params:
+          k: 4
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workload:
+  framework: megatron
+  model:
+    name: llama-7b-moe
+    hidden_size: 4096
+    num_layers: 4
+    num_heads: 32
+    ffn_hidden_size: 11008
+    vocab_size: 32000
+    moe: true
+    num_experts: 8
+    top_k: 2
+  parallelism:
+    tp: 4
+    pp: 6
+    ep: 2
+    num_microbatches: 10
+  training:
+    num_gpus: 96
+    global_batch_size: 20   # dp=2 * micro_bs=1 * num_microbatches=10
+    micro_batch_size: 1
+    sequence_length: 2048
