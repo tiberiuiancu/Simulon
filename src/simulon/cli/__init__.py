@@ -1,3 +1,4 @@
+from itertools import product
 from pathlib import Path
 from typing import Optional
 
@@ -7,6 +8,9 @@ import yaml
 app = typer.Typer(name="simulon", help="AI cluster simulator")
 profile_app = typer.Typer(help="Profile local hardware and save templates.")
 app.add_typer(profile_app, name="profile")
+
+from simulon.cli.install import app as install_app  # noqa: E402
+app.add_typer(install_app, name="install", help="Install third-party components (apex, deepgemm, m4).")
 
 
 @app.command()
@@ -68,16 +72,21 @@ def profile_gpu(
     memory_capacity_gb: Optional[float] = typer.Option(None, help="HBM capacity in GB"),
     tdp_w: Optional[float] = typer.Option(None, help="TDP in watts"),
     flops_multiplier: float = typer.Option(1.0, help="Scalar multiplier applied to all profiled FLOP rates"),
-    hidden_size: int = typer.Option(..., help="Transformer hidden dimension"),
-    num_heads: int = typer.Option(..., help="Number of attention heads"),
-    ffn_hidden_size: int = typer.Option(..., help="FFN intermediate dimension"),
-    seq_len: int = typer.Option(..., help="Sequence length"),
-    batch_size: int = typer.Option(1, help="Micro-batch size"),
-    vocab_size: int = typer.Option(..., help="Vocabulary size"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Load arch from templates/model/<name>.yaml"),
+    hidden_size: Optional[int] = typer.Option(None, help="Transformer hidden dimension"),
+    num_heads: Optional[int] = typer.Option(None, help="Number of attention heads"),
+    ffn_hidden_size: Optional[int] = typer.Option(None, help="FFN intermediate dimension"),
+    vocab_size: Optional[int] = typer.Option(None, help="Vocabulary size"),
+    num_experts: Optional[int] = typer.Option(None, help="Number of MoE experts (0 = dense)"),
+    top_k: Optional[int] = typer.Option(None, help="Top-k routing for MoE"),
     dtype: str = typer.Option("bf16", help="Compute dtype: fp32 | fp16 | bf16 | fp8"),
-    tp: int = typer.Option(1, help="Tensor Parallelism degree"),
-    epoch_num: int = typer.Option(10, help="Number of timed iterations per kernel"),
+    tp: str = typer.Option("1", help="TP degree(s), comma-separated (e.g. 1,2,4,8)"),
+    ep: str = typer.Option("1", help="EP degree(s), comma-separated"),
+    batch_size: str = typer.Option("1", help="Micro-batch size(s), comma-separated"),
+    seq_len: str = typer.Option("2048", help="Sequence length(s), comma-separated"),
     swiglu: bool = typer.Option(False, help="Use SwiGLU activation shape for mlp_act"),
+    epoch_num: int = typer.Option(10, help="Number of timed iterations per kernel"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print sweep configurations without running"),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o",
         help="Output path for the template YAML. Defaults to templates/gpu/<name>.yaml",
@@ -86,34 +95,108 @@ def profile_gpu(
     """Profile the local GPU and save a hardware template.
 
     Appends new kernel_runs to an existing YAML file (or creates it).
-    Run multiple times with different configs to build a rich profile.
+    Use --model to load arch from a template, and --tp/--ep/--batch-size/--seq-len
+    to sweep over multiple configurations in one invocation.
     """
     from simulon.config.common import DType
-    from simulon.config.dc import GPUSpec, KernelRun
-    from simulon.profiling.kernels import benchmark_kernels
+    from simulon.config.dc import GPUSpec
+    from simulon.profiling.sweep import SweepResult, parse_sweep, run_sweep
 
     dtype_enum = DType(dtype)
+    tp_values = parse_sweep(tp)
+    ep_values = parse_sweep(ep)
+    batch_sizes = parse_sweep(batch_size)
+    seq_lens = parse_sweep(seq_len)
 
-    typer.echo(f"Benchmarking kernels on GPU: {name}")
-    typer.echo(
-        f"  hidden={hidden_size}, heads={num_heads}, ffn={ffn_hidden_size}, "
-        f"seq={seq_len}, batch={batch_size}, vocab={vocab_size}, "
-        f"dtype={dtype}, tp={tp}, epochs={epoch_num}"
-    )
+    # Build kernel_params: start from model template, then apply manual overrides.
+    kernel_params: dict = {}
 
-    kernel_runs: list[KernelRun] = benchmark_kernels(
-        hidden_size=hidden_size,
-        num_heads=num_heads,
-        ffn_hidden_size=ffn_hidden_size,
-        seq_len=seq_len,
-        batch_size=batch_size,
-        vocab_size=vocab_size,
-        tp=tp,
-        dtype=dtype_enum,
-        epoch_num=epoch_num,
-        swiglu=swiglu,
-    )
+    if model is not None:
+        from simulon.profiling.models import load_model_template, model_to_kernel_params
+        try:
+            tmpl = load_model_template(model)
+        except FileNotFoundError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(1)
+        kernel_params = model_to_kernel_params(tmpl)
 
+    if hidden_size is not None:
+        kernel_params["hidden_size"] = hidden_size
+    if num_heads is not None:
+        kernel_params["num_heads"] = num_heads
+    if ffn_hidden_size is not None:
+        kernel_params["ffn_hidden_size"] = ffn_hidden_size
+    if vocab_size is not None:
+        kernel_params["vocab_size"] = vocab_size
+    if num_experts is not None:
+        kernel_params["num_experts"] = num_experts
+    if top_k is not None:
+        kernel_params["top_k"] = top_k
+    if swiglu:
+        kernel_params["swiglu"] = True
+
+    required = ["hidden_size", "num_heads", "ffn_hidden_size", "vocab_size"]
+    missing = [k for k in required if k not in kernel_params]
+    if missing:
+        typer.echo(
+            f"Error: missing required arch fields: {missing}. "
+            "Use --model or pass them directly.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    is_moe = kernel_params.get("num_experts", 0) > 0
+    configs = [
+        (t, e, b, s)
+        for t, e, b, s in product(tp_values, ep_values, batch_sizes, seq_lens)
+        if not (e > 1 and not is_moe)
+    ]
+
+    if dry_run:
+        label = model or name
+        typer.echo(f"Sweep configurations for GPU '{name}' (arch: {label}):")
+        for t, e, b, s in configs:
+            typer.echo(f"  tp={t} ep={e} bs={b} seq={s}")
+        typer.echo(f"Total: {len(configs)} configurations")
+        raise typer.Exit(0)
+
+    # Run sweep with progress display.
+    label = model or name
+    results: list[SweepResult] = []
+
+    try:
+        from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+        ) as progress:
+            task_id = progress.add_task(f"Profiling {label}", total=len(configs))
+            for t, e, b, s in configs:
+                progress.update(task_id, description=f"Profiling {label}  tp={t} ep={e} bs={b} seq={s}")
+                single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num)
+                r = single[0] if single else SweepResult(
+                    config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
+                )
+                results.append(r)
+                if r.oom:
+                    progress.update(task_id, advance=1, description=f"[red]✗ OOM  tp={t} ep={e} bs={b} seq={s}")
+                else:
+                    progress.update(task_id, advance=1)
+
+    except ImportError:
+        for t, e, b, s in configs:
+            typer.echo(f"  Running tp={t} ep={e} bs={b} seq={s} ...")
+            single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num)
+            r = single[0] if single else SweepResult(
+                config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
+            )
+            results.append(r)
+            typer.echo("    ✗ OOM" if r.oom else "    ✓ Done")
+
+    # Save results.
     if output is None:
         safe_name = name.lower().replace(" ", "-")
         output = Path("templates/gpu") / f"{safe_name}.yaml"
@@ -135,14 +218,17 @@ def profile_gpu(
         existing = {k: v for k, v in existing.items() if v is not None}
         existing_runs = []
 
-    new_runs = [kr.model_dump() for kr in kernel_runs]
-    existing_runs.extend(new_runs)
+    completed = [r for r in results if not r.oom]
+    oom_count = sum(1 for r in results if r.oom)
+    all_new_runs = [kr for r in completed if r.runs for kr in r.runs]
+    existing_runs.extend([kr.model_dump() for kr in all_new_runs])
     existing["kernel_runs"] = existing_runs
 
     with open(output, "w") as f:
         yaml.dump(existing, f, default_flow_style=False, sort_keys=False)
 
-    typer.echo(f"Saved {len(kernel_runs)} kernel runs to {output}")
+    typer.echo(f"Saved {len(all_new_runs)} kernel runs to {output}")
+    typer.echo(f"Completed {len(completed)}/{len(results)} configs, {oom_count} skipped (OOM)")
 
     GPUSpec.model_validate(existing)
     typer.echo("Profile validated successfully.")
