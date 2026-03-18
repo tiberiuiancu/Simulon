@@ -6,14 +6,19 @@ import typer
 import yaml
 
 def _dump_profile(data: dict, f) -> None:
-    """Write a GPU profile YAML with compact one-line-per-kernel_run formatting."""
-    top = {k: v for k, v in data.items() if k != "kernel_runs"}
+    """Write a GPU profile YAML with compact one-line-per-entry formatting."""
+    top = {k: v for k, v in data.items() if k not in ("kernel_runs", "oom_configs")}
     f.write(yaml.dump(top, default_flow_style=False, sort_keys=False))
     runs = data.get("kernel_runs", [])
     if runs:
         f.write("kernel_runs:\n")
         for run in runs:
             f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
+    oom = data.get("oom_configs", [])
+    if oom:
+        f.write("oom_configs:\n")
+        for cfg in oom:
+            f.write(f"  - {yaml.dump(cfg, default_flow_style=True, sort_keys=False).strip()}\n")
 
 
 app = typer.Typer(name="simulon", help="AI cluster simulator")
@@ -186,6 +191,7 @@ def profile_gpu(
         with open(output) as f:
             existing = yaml.safe_load(f) or {}
         existing_runs: list[dict] = existing.get("kernel_runs", [])
+        existing_oom: list[dict] = existing.get("oom_configs", [])
     else:
         existing = {
             "name": name,
@@ -196,9 +202,11 @@ def profile_gpu(
         }
         existing = {k: v for k, v in existing.items() if v is not None}
         existing_runs = []
+        existing_oom = []
 
     if purge:
         existing_runs = []
+        existing_oom = []
 
     # For skip logic: pass existing_runs unless --overwrite (forces re-profiling).
     runs_for_skip = [] if overwrite else existing_runs
@@ -255,6 +263,16 @@ def profile_gpu(
         existing_runs.extend(kr.model_dump() for kr in all_new_runs)
 
     existing["kernel_runs"] = existing_runs
+
+    # Merge new OOM configs, deduplicating by config dict.
+    new_oom = [r.config for r in results if r.oom]
+    if new_oom:
+        existing_oom_set = {frozenset(c.items()) for c in existing_oom}
+        for cfg in new_oom:
+            if frozenset(cfg.items()) not in existing_oom_set:
+                existing_oom.append(cfg)
+                existing_oom_set.add(frozenset(cfg.items()))
+    existing["oom_configs"] = existing_oom
 
     with open(output, "w") as f:
         _dump_profile(existing, f)
