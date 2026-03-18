@@ -343,5 +343,64 @@ def test_oom_config_is_skipped_gracefully(tmp_path):
     result, out_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
     assert result.exit_code == 0
     data = yaml.safe_load(out_file.read_text())
-    # No runs were added since the only config OOMed.
     assert data.get("kernel_runs", []) == []
+
+
+def test_oom_config_saved_to_profile(tmp_path):
+    """OOM configs must be written to oom_configs in the YAML."""
+    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
+    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    _, out_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
+    data = yaml.safe_load(out_file.read_text())
+    assert oom_cfg in data.get("oom_configs", [])
+
+
+def test_oom_configs_deduplicated_across_runs(tmp_path):
+    """Re-running with the same OOM config must not duplicate the entry."""
+    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
+    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    out_file = tmp_path / "gpu.yaml"
+    base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    for _ in range(2):
+        with _patch_sweep([oom_result]):
+            runner.invoke(app, base)
+
+    data = yaml.safe_load(out_file.read_text())
+    assert data["oom_configs"].count(oom_cfg) == 1
+
+
+def test_purge_clears_oom_configs(tmp_path):
+    """--purge must also clear previously recorded oom_configs."""
+    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
+    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    out_file = tmp_path / "gpu.yaml"
+    base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    # First run: record an OOM.
+    with _patch_sweep([oom_result]):
+        runner.invoke(app, base)
+    data = yaml.safe_load(out_file.read_text())
+    assert len(data.get("oom_configs", [])) == 1
+
+    # Second run with --purge and a successful result: OOM list should be empty.
+    with _patch_sweep([_FAKE_RESULT]):
+        runner.invoke(app, base + ["--purge"])
+    data = yaml.safe_load(out_file.read_text())
+    assert data.get("oom_configs", []) == []
+
+
+def test_oom_and_success_in_same_sweep(tmp_path):
+    """A sweep with mixed OOM/success results saves both kernel_runs and oom_configs."""
+    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 512}
+    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    out_file = tmp_path / "gpu.yaml"
+    # Two configs (batch 1 and 128): first succeeds, second OOMs.
+    with patch("simulon.profiling.sweep.run_sweep", side_effect=[[_FAKE_RESULT], [oom_result]]):
+        runner.invoke(app, [
+            "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+            "--batch-size", "1,128", "--seq-len", "512",
+        ] + _ARCH_ARGS)
+    data = yaml.safe_load(out_file.read_text())
+    assert len(data.get("kernel_runs", [])) >= 1
+    assert oom_cfg in data.get("oom_configs", [])
