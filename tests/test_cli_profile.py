@@ -260,6 +260,66 @@ def test_dry_run_does_not_call_sweep(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# EP filtering
+# ---------------------------------------------------------------------------
+
+
+def test_ep_gt1_filtered_for_dense_model(tmp_path):
+    """EP > 1 configs must be silently dropped for dense (non-MoE) models."""
+    out_file = tmp_path / "gpu.yaml"
+    captured = {}
+
+    def _fake_sweep(*args, **kwargs):
+        captured.setdefault("calls", []).append(kwargs)
+        return [_FAKE_RESULT]
+
+    with patch("simulon.profiling.sweep.run_sweep", side_effect=_fake_sweep):
+        result = runner.invoke(app, [
+            "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+            "--ep", "1,2,4", "--seq-len", "512",
+        ] + _ARCH_ARGS)
+
+    assert result.exit_code == 0
+    # Verify filtering via dry-run (no mock needed).
+    dry = runner.invoke(app, [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--ep", "1,2,4", "--seq-len", "512", "--dry-run",
+    ] + _ARCH_ARGS)
+    assert "ep=2" not in dry.output
+    assert "ep=4" not in dry.output
+    assert "ep=1" in dry.output
+
+
+def test_ep_gt_num_experts_filtered_for_moe_model(tmp_path):
+    """EP values exceeding num_experts must be dropped for MoE models."""
+    out_file = tmp_path / "gpu.yaml"
+    moe_args = _ARCH_ARGS + ["--num-experts", "4", "--top-k", "2"]
+
+    dry = runner.invoke(app, [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--ep", "1,2,4,8,16", "--seq-len", "512", "--dry-run",
+    ] + moe_args)
+
+    assert "ep=8" not in dry.output
+    assert "ep=16" not in dry.output
+    assert "ep=4" in dry.output
+
+
+def test_ep_sweep_included_for_valid_moe(tmp_path):
+    """All EP values that are <= num_experts should appear for MoE models."""
+    out_file = tmp_path / "gpu.yaml"
+    moe_args = _ARCH_ARGS + ["--num-experts", "8", "--top-k", "2"]
+
+    dry = runner.invoke(app, [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--ep", "1,2,4,8", "--seq-len", "512", "--dry-run",
+    ] + moe_args)
+
+    for ep in [1, 2, 4, 8]:
+        assert f"ep={ep}" in dry.output
+
+
+# ---------------------------------------------------------------------------
 # Missing arch fields
 # ---------------------------------------------------------------------------
 

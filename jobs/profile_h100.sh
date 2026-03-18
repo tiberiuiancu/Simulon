@@ -20,22 +20,22 @@ mkdir -p jobs/logs
 
 # --- Sweep parameters ---
 TP="1,2,4,8"
-EP="1"
+EP="1,2,4,8,16,32,64"  # ep > num_experts and ep > 1 for dense models are skipped automatically
 BATCH="1,2,4,8,16,32,64,128"
 SEQ="256,512,1024,2048,4096,8192"
 GPU_NAME="H100"
 OUTPUT="templates/gpu/h100.yaml"
 
-DENSE_MODELS=(
+MODELS=(
     llama-7b
+    llama-3-70b
+    deepseek-v3
+    qwen3-30b-a3b
+    qwen3-235b-a22b
 )
-#    llama-13b
-#    llama-70b
-#    deepseek-7b
-#)
 
 # --- Profile each model ---
-for MODEL in "${DENSE_MODELS[@]}"; do
+for MODEL in "${MODELS[@]}"; do
     echo "=== Profiling model: $MODEL ==="
     simulon profile gpu \
         --name "$GPU_NAME" \
@@ -44,8 +44,7 @@ for MODEL in "${DENSE_MODELS[@]}"; do
         --ep "$EP" \
         --batch-size "$BATCH" \
         --seq-len "$SEQ" \
-        --output "$OUTPUT" \
-	--purge
+        --output "$OUTPUT"
 done
 
 echo "=== Done. Profile saved to $OUTPUT ==="
