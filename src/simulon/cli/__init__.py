@@ -5,6 +5,17 @@ from typing import Optional
 import typer
 import yaml
 
+def _dump_profile(data: dict, f) -> None:
+    """Write a GPU profile YAML with compact one-line-per-kernel_run formatting."""
+    top = {k: v for k, v in data.items() if k != "kernel_runs"}
+    f.write(yaml.dump(top, default_flow_style=False, sort_keys=False))
+    runs = data.get("kernel_runs", [])
+    if runs:
+        f.write("kernel_runs:\n")
+        for run in runs:
+            f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
+
+
 app = typer.Typer(name="simulon", help="AI cluster simulator")
 profile_app = typer.Typer(help="Profile local hardware and save templates.")
 app.add_typer(profile_app, name="profile")
@@ -86,6 +97,8 @@ def profile_gpu(
     seq_len: str = typer.Option("2048", help="Sequence length(s), comma-separated"),
     swiglu: bool = typer.Option(False, help="Use SwiGLU activation shape for mlp_act"),
     epoch_num: int = typer.Option(10, help="Number of timed iterations per kernel"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Re-profile and replace all matching existing kernel entries"),
+    purge: bool = typer.Option(False, "--purge", help="Clear all existing kernel_runs before profiling"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print sweep configurations without running"),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o",
@@ -160,43 +173,7 @@ def profile_gpu(
         typer.echo(f"Total: {len(configs)} configurations")
         raise typer.Exit(0)
 
-    # Run sweep with progress display.
-    label = model or name
-    results: list[SweepResult] = []
-
-    try:
-        from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
-
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-        ) as progress:
-            task_id = progress.add_task(f"Profiling {label}", total=len(configs))
-            for t, e, b, s in configs:
-                progress.update(task_id, description=f"Profiling {label}  tp={t} ep={e} bs={b} seq={s}")
-                single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num)
-                r = single[0] if single else SweepResult(
-                    config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
-                )
-                results.append(r)
-                if r.oom:
-                    progress.update(task_id, advance=1, description=f"[red]✗ OOM  tp={t} ep={e} bs={b} seq={s}")
-                else:
-                    progress.update(task_id, advance=1)
-
-    except ImportError:
-        for t, e, b, s in configs:
-            typer.echo(f"  Running tp={t} ep={e} bs={b} seq={s} ...")
-            single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num)
-            r = single[0] if single else SweepResult(
-                config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
-            )
-            results.append(r)
-            typer.echo("    ✗ OOM" if r.oom else "    ✓ Done")
-
-    # Save results.
+    # Load or initialise the existing profile.
     if output is None:
         safe_name = name.lower().replace(" ", "-")
         output = Path("templates/gpu") / f"{safe_name}.yaml"
@@ -218,14 +195,67 @@ def profile_gpu(
         existing = {k: v for k, v in existing.items() if v is not None}
         existing_runs = []
 
+    if purge:
+        existing_runs = []
+
+    # For skip logic: pass existing_runs unless --overwrite (forces re-profiling).
+    runs_for_skip = [] if overwrite else existing_runs
+
+    # Run sweep with progress display.
+    label = model or name
+    results: list[SweepResult] = []
+
+    try:
+        from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+        ) as progress:
+            task_id = progress.add_task(f"Profiling {label}", total=len(configs))
+            for t, e, b, s in configs:
+                progress.update(task_id, description=f"Profiling {label}  tp={t} ep={e} bs={b} seq={s}")
+                single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num, existing_runs=runs_for_skip)
+                r = single[0] if single else SweepResult(
+                    config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
+                )
+                results.append(r)
+                if r.oom:
+                    progress.update(task_id, advance=1, description=f"[red]✗ OOM  tp={t} ep={e} bs={b} seq={s}")
+                else:
+                    progress.update(task_id, advance=1)
+
+    except ImportError:
+        for t, e, b, s in configs:
+            typer.echo(f"  Running tp={t} ep={e} bs={b} seq={s} ...")
+            single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num, existing_runs=runs_for_skip)
+            r = single[0] if single else SweepResult(
+                config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
+            )
+            results.append(r)
+            typer.echo("    ✗ OOM" if r.oom else "    ✓ Done")
+
+    # Merge new runs into existing_runs, replacing any entries with the same
+    # (kernel, params) key (handles re-runs of entries with insufficient timings
+    # and --overwrite).
     completed = [r for r in results if not r.oom]
     oom_count = sum(1 for r in results if r.oom)
     all_new_runs = [kr for r in completed if r.runs for kr in r.runs]
-    existing_runs.extend([kr.model_dump() for kr in all_new_runs])
+
+    if all_new_runs:
+        new_keys = {(kr.kernel, frozenset(kr.params.items())) for kr in all_new_runs}
+        existing_runs = [
+            r for r in existing_runs
+            if (r["kernel"], frozenset(r["params"].items())) not in new_keys
+        ]
+        existing_runs.extend(kr.model_dump() for kr in all_new_runs)
+
     existing["kernel_runs"] = existing_runs
 
     with open(output, "w") as f:
-        yaml.dump(existing, f, default_flow_style=False, sort_keys=False)
+        _dump_profile(existing, f)
 
     typer.echo(f"Saved {len(all_new_runs)} kernel runs to {output}")
     typer.echo(f"Completed {len(completed)}/{len(results)} configs, {oom_count} skipped (OOM)")
