@@ -159,10 +159,12 @@ def profile_gpu(
         raise typer.Exit(1)
 
     is_moe = kernel_params.get("num_experts", 0) > 0
+    num_experts = kernel_params.get("num_experts", 0)
     configs = [
         (t, e, b, s)
         for t, e, b, s in product(tp_values, ep_values, batch_sizes, seq_lens)
         if not (e > 1 and not is_moe)
+        and (not is_moe or e <= num_experts)
     ]
 
     if dry_run:
