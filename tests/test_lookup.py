@@ -115,3 +115,71 @@ def test_multiple_partial_runs_pooled():
     )
     result = lookup_kernel_time("layernorm", {"hidden_size": 4096, "seq_len": 2048, "tp": 1}, gpu)
     assert result == statistics.median([1.0, 3.0, 5.0, 7.0])
+
+
+# ---------------------------------------------------------------------------
+# Proportional scaling fallback
+# ---------------------------------------------------------------------------
+
+
+def test_scaling_fallback_doubles_time_for_double_tokens():
+    """Requesting 2× the tokens should return 2× the reference time."""
+    gpu = _gpu(_run("mlp_fc1", {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 1024}, [10.0]))
+    result = lookup_kernel_time(
+        "mlp_fc1",
+        {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 2048},
+        gpu,
+        warn=False,
+    )
+    assert result == pytest.approx(20.0)
+
+
+def test_scaling_fallback_batch_and_seq():
+    """Scaling applies across both batch_size and seq_len dimensions."""
+    gpu = _gpu(_run("mlp_fc1", {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 2, "seq_len": 512}, [8.0]))
+    result = lookup_kernel_time(
+        "mlp_fc1",
+        {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 4, "seq_len": 1024},
+        gpu,
+        warn=False,
+    )
+    # scale = (4 * 1024) / (2 * 512) = 4.0
+    assert result == pytest.approx(32.0)
+
+
+def test_scaling_fallback_emits_warning():
+    """A UserWarning is emitted when the scaling fallback is used."""
+    gpu = _gpu(_run("mlp_fc1", {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 1024}, [10.0]))
+    with pytest.warns(UserWarning, match="scaling from"):
+        lookup_kernel_time(
+            "mlp_fc1",
+            {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 2048},
+            gpu,
+        )
+
+
+def test_scaling_fallback_not_used_when_arch_differs():
+    """Scaling fallback requires matching arch params; different hidden_size → None."""
+    gpu = _gpu(_run("mlp_fc1", {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 1024}, [10.0]))
+    result = lookup_kernel_time(
+        "mlp_fc1",
+        {"hidden_size": 8192, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 2048},
+        gpu,
+        warn=False,
+    )
+    assert result is None
+
+
+def test_exact_preferred_over_scaling_fallback():
+    """An exact match is used even when a scaling candidate also exists."""
+    gpu = _gpu(
+        _run("mlp_fc1", {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 1024}, [10.0]),
+        _run("mlp_fc1", {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 2048}, [5.0]),
+    )
+    result = lookup_kernel_time(
+        "mlp_fc1",
+        {"hidden_size": 4096, "tp": 1, "dtype": "bf16", "batch_size": 1, "seq_len": 2048},
+        gpu,
+        warn=False,
+    )
+    assert result == pytest.approx(5.0)
