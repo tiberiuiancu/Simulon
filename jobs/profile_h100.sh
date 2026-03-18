@@ -1,26 +1,20 @@
 #!/bin/bash
 #SBATCH --job-name=simulon-profile-h100
-#SBATCH --nodelist=gpu_h100
 #SBATCH --partition=gpu_h100
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:1
-#SBATCH --time=02:00:00
+#SBATCH --gpus=1
+#SBATCH --time=05:00:00
 #SBATCH --output=jobs/logs/profile_h100_%j.out
 #SBATCH --error=jobs/logs/profile_h100_%j.err
 
 set -euo pipefail
-
-# TODO: load your CUDA module here, e.g.:
-#   module load cuda/12.x
-# Then remove the exit below.
-echo "ERROR: No module loaded. Edit this script to load the correct CUDA module." >&2
-exit 1
+module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 
 # --- Environment setup ---
-pip install -e ".[profiling]"
-simulon install apex
-simulon install deepgemm
+uv sync --extra profiling
+uv pip install pip
+source .venv/bin/activate
+#uv run simulon install apex --skip-cuda-version-check
+#uv run simulon install deepgemm
 
 mkdir -p jobs/logs
 
@@ -29,15 +23,16 @@ TP="1,2,4,8"
 EP="1"
 BATCH="1,2,4,8,16,32,64,128"
 SEQ="256,512,1024,2048,4096,8192"
-GPU_NAME="H100-SXM5-80GB"
-OUTPUT="templates/gpu/h100-sxm5-80gb.yaml"
+GPU_NAME="H100"
+OUTPUT="templates/gpu/h100.yaml"
 
 DENSE_MODELS=(
     llama-7b
-    llama-13b
-    llama-70b
-    deepseek-7b
 )
+#    llama-13b
+#    llama-70b
+#    deepseek-7b
+#)
 
 # --- Profile each model ---
 for MODEL in "${DENSE_MODELS[@]}"; do
@@ -49,7 +44,8 @@ for MODEL in "${DENSE_MODELS[@]}"; do
         --ep "$EP" \
         --batch-size "$BATCH" \
         --seq-len "$SEQ" \
-        --output "$OUTPUT"
+        --output "$OUTPUT" \
+	--purge
 done
 
 echo "=== Done. Profile saved to $OUTPUT ==="

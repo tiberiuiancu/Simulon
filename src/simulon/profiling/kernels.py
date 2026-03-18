@@ -368,6 +368,7 @@ def benchmark_kernels(
     num_experts: int = 0,
     ep: int = 1,
     top_k: int = 1,
+    existing_runs: Optional[list[dict]] = None,
 ) -> list[KernelRun]:
     """Benchmark all transformer kernels and return KernelRun measurements.
 
@@ -407,11 +408,20 @@ def benchmark_kernels(
         "tp": tp,
     }
 
+    # Build a fast lookup: (kernel, frozenset(params)) -> timing count
+    _sufficient: set[tuple] = set()
+    for run in (existing_runs or []):
+        key = (run["kernel"], frozenset(run["params"].items()))
+        if len(run["times_ms"]) >= epoch_num:
+            _sufficient.add(key)
+
     results: list[KernelRun] = []
 
     def _run(kernel, fn, extra_params=None):
-        times = fn()
         p = {**params_base, **(extra_params or {})}
+        if (kernel, frozenset(p.items())) in _sufficient:
+            return
+        times = fn()
         results.append(KernelRun(kernel=kernel, params=p, times_ms=times[:epoch_num]))
 
     _run(
