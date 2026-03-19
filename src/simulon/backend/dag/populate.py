@@ -40,9 +40,7 @@ def populate_dag(
 
 
 def _model_hidden_size(workload: MegatronWorkload) -> int | None:
-    from simulon.config.workload import LLMSpec
+    from simulon.backend.dag.tracer import _resolve_model
 
-    model = workload.model
-    if isinstance(model, LLMSpec):
-        return model.hidden_size
-    return None
+    model = _resolve_model(workload.model)
+    return model.hidden_size

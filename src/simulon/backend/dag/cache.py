@@ -235,7 +235,7 @@ def load(cache_dir: Path, key: str) -> ExecutionDAG | None:
     try:
         arrays = dict(np.load(path, allow_pickle=True))
         dag = _from_npz(arrays)
-        logger.info("DAG cache hit: %s", path.name)
+        logger.info("  DAG cache hit: %s", path.name)
         return dag
     except Exception as exc:
         logger.warning("DAG cache read failed (%s), rebuilding", exc)
@@ -248,6 +248,6 @@ def save(cache_dir: Path, key: str, dag: ExecutionDAG) -> None:
     try:
         arrays = _to_npz(dag)
         np.savez(path, **arrays)
-        logger.info("DAG cached: %s", path.name)
+        logger.info("  DAG cached: %s", path.name)
     except Exception as exc:
         logger.warning("DAG cache write failed: %s", exc)
