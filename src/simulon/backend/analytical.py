@@ -2,6 +2,7 @@ import logging
 
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
+from simulon.backend.dag.populate import populate_network
 from simulon.collective import CCLDecomposer, NCCLDecomposer, RCCLDecomposer
 from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.scenario import ScenarioConfig
@@ -106,9 +107,13 @@ class AnalyticalBackend(Backend):
         populate_dag(dag, scenario.workload, gpu_spec)
         logger.info("  Compute durations resolved")
 
+        logger.info("Populating network durations (%d comm nodes) ...", len(dag.comm_nodes))
+        populate_network(dag, scenario.datacenter)
+        logger.info("  Network durations resolved")
+
         total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes)
         logger.info("Replaying DAG (%d nodes) ...", total_nodes)
-        result = replay(dag, scenario.datacenter)
+        result = replay(dag)
         logger.info("  Replay done: total_time=%.3f ms", result.total_time_ms)
 
         return dag, result
