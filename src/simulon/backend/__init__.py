@@ -1,9 +1,9 @@
 """Simulation backend for simulon."""
 
-from .astra_sim import AstraSimBackend
+from .analytical import AnalyticalBackend
 from .base import Backend
 
 __all__ = [
     "Backend",
-    "AstraSimBackend",
+    "AnalyticalBackend",
 ]

@@ -1,4 +1,4 @@
-from .megatron import generate_megatron_trace
+# Legacy workload trace types (kept for test_legacy_compare.py)
 from .trace import (
     CommOp,
     CommOpType,
@@ -9,7 +9,6 @@ from .trace import (
 )
 
 __all__ = [
-    "generate_megatron_trace",
     "CommOp",
     "CommOpType",
     "ComputeOp",

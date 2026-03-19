@@ -326,18 +326,6 @@ def _bench_logit(
     return _cuda_time(fn)
 
 
-# ---------------------------------------------------------------------------
-# _DTYPE_MAP
-# ---------------------------------------------------------------------------
-
-_DTYPE_MAP = {
-    DType.fp32: None,  # resolved lazily
-    DType.fp16: None,
-    DType.bf16: None,
-    DType.fp8: None,
-}
-
-
 def _torch_dtype(dtype: DType):
     import torch
 

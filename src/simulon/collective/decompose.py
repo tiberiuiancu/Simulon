@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Callable
 
 from simulon.collective.common import P2PFlow
 from simulon.collective.collnet import collnet_chain_all_reduce, collnet_direct_all_reduce
@@ -17,6 +18,19 @@ class CollectiveResult:
     flows: list[P2PFlow]
 
 
+_REGISTRY: dict[tuple[str, str], Callable] = {
+    ("ring", "AllReduce"):           ring_all_reduce,
+    ("ring", "AllGather"):           ring_all_gather,
+    ("ring", "ReduceScatter"):       ring_reduce_scatter,
+    ("ring", "AllToAll"):            ring_all_to_all,
+    ("tree", "AllReduce"):           tree_all_reduce,
+    ("collnet_direct", "AllReduce"): collnet_direct_all_reduce,
+    ("collnet_chain",  "AllReduce"): collnet_chain_all_reduce,
+    ("nvls",      "AllReduce"):      nvls_all_reduce,
+    ("nvls_tree", "AllReduce"):      nvls_tree_all_reduce,
+}
+
+
 def decompose_collective(
     collective_type: str,
     group_ranks: list[int],
@@ -24,79 +38,33 @@ def decompose_collective(
     num_channels: int = 1,
     algorithm: str = "ring",
     flow_id_start: int = 0,
-    node_id_start: int = 0,
-) -> tuple[CollectiveResult, int, int]:
+) -> tuple[CollectiveResult, int]:
     """Decompose a collective into P2PFlows.
 
-    Returns (result, next_flow_id, next_node_id).
+    Returns (result, next_flow_id).
     """
-    flows: list[P2PFlow] = []
+    key = (algorithm, collective_type)
+    fn = _REGISTRY.get(key)
+    if fn is None:
+        supported = sorted(_REGISTRY.keys())
+        raise ValueError(
+            f"Unsupported combination: algorithm={algorithm!r}, collective_type={collective_type!r}. "
+            f"Supported (algorithm, collective_type) pairs: {supported}"
+        )
 
-    if algorithm == "tree" and collective_type == "AllReduce":
-        flows, next_flow_id = tree_all_reduce(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif algorithm == "collnet_direct" and collective_type == "AllReduce":
-        flows, next_flow_id = collnet_direct_all_reduce(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif algorithm == "collnet_chain" and collective_type == "AllReduce":
-        flows, next_flow_id = collnet_chain_all_reduce(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif algorithm == "nvls" and collective_type == "AllReduce":
-        flows, next_flow_id = nvls_all_reduce(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif algorithm == "nvls_tree" and collective_type == "AllReduce":
-        flows, next_flow_id = nvls_tree_all_reduce(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif algorithm not in ("ring", "tree", "collnet_direct", "collnet_chain", "nvls", "nvls_tree"):
-        raise ValueError(f"Unknown algorithm: {algorithm!r}. Choose from: ring, tree, collnet_direct, collnet_chain, nvls, nvls_tree")
-    elif collective_type == "AllReduce":
-        flows, next_flow_id = ring_all_reduce(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif collective_type == "ReduceScatter":
-        flows, next_flow_id = ring_reduce_scatter(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif collective_type == "AllGather":
-        flows, next_flow_id = ring_all_gather(
-            group_ranks=group_ranks,
-            data_size=data_size,
-            num_channels=num_channels,
-            flow_id_start=flow_id_start,
-        )
-    elif collective_type == "AllToAll":
-        flows, next_flow_id = ring_all_to_all(
+    # AllToAll does not use num_channels
+    if collective_type == "AllToAll":
+        flows, next_flow_id = fn(
             group_ranks=group_ranks,
             data_size=data_size,
             flow_id_start=flow_id_start,
         )
     else:
-        raise ValueError(f"Unknown collective_type: {collective_type}")
+        flows, next_flow_id = fn(
+            group_ranks=group_ranks,
+            data_size=data_size,
+            num_channels=num_channels,
+            flow_id_start=flow_id_start,
+        )
 
-    return CollectiveResult(flows=flows), next_flow_id, node_id_start
+    return CollectiveResult(flows=flows), next_flow_id

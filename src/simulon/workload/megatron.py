@@ -72,12 +72,9 @@ def generate_megatron_trace(
     model_spec: LLMSpec,
     gpu_profile: Optional[GPUSpec] = None,
 ) -> WorkloadTrace:
-    """Generate a WorkloadTrace for one training iteration.
-
-    Models the perspective of the first PP stage (which is also the last when pp=1).
-    For pp>1, ISend/IRecv pipeline ops are included; embedding/logit are present only
-    when the GPU is both first and last stage (pp=1).
-    """
+    raise NotImplementedError(
+        "generate_megatron_trace() is legacy. Use MegatronDAGTracer instead."
+    )
     # --- Parallelism ---
     tp = workload.parallelism.tp
     pp = workload.parallelism.pp
