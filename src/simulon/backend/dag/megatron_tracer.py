@@ -7,7 +7,7 @@ from simulon.backend.dag.nodes import ComputeNode, CommNode, DAGEdge, ExecutionD
 from simulon.backend.dag.pipeline import make_scheduler
 from simulon.backend.dag.layer_expander import LayerExpander
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
-from simulon.collective import CCLDecomposer, DefaultCCLDecomposer
+from simulon.collective import CCLDecomposer, NCCLDecomposer
 from simulon.config.dc import DatacenterConfig
 from simulon.config.workload import LLMSpec, MegatronWorkload
 from simulon.profiling.models import _resolve_model
@@ -67,7 +67,7 @@ def _params_per_tp_rank(model: LLMSpec, tp: int, ep: int) -> int:
 class MegatronDAGTracer(DAGTracer):
     def __init__(self, config: DAGTracerConfig | None = None, ccl: CCLDecomposer | None = None):
         self.config = config or DAGTracerConfig()
-        self._ccl = ccl or DefaultCCLDecomposer()
+        self._ccl = ccl or NCCLDecomposer()
 
     def trace(self, workload: MegatronWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
         from simulon.backend.dag import cache as _cache

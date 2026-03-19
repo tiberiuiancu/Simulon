@@ -2,22 +2,29 @@ import logging
 
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
+from simulon.collective import CCLDecomposer, NCCLDecomposer, RCCLDecomposer
 from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import MegatronWorkload
 
 logger = logging.getLogger(__name__)
 
-_SUPPORTED_LIBRARIES = {"nccl"}
+_CCL_MAP: dict[str, type[CCLDecomposer]] = {
+    "nccl": NCCLDecomposer,
+    "rccl": RCCLDecomposer,
+}
+
+
+def _ccl_from_scenario(scenario: ScenarioConfig) -> CCLDecomposer:
+    library = scenario.collective.library
+    cls = _CCL_MAP.get(library)
+    if cls is None:
+        raise ValueError(f"Unknown CCL library {library!r}. Supported: {sorted(_CCL_MAP)}")
+    return cls()
 
 
 def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
     c = scenario.collective
-    if c.library not in _SUPPORTED_LIBRARIES:
-        raise NotImplementedError(
-            f"CCL library {c.library!r} is not yet implemented. "
-            f"Supported: {sorted(_SUPPORTED_LIBRARIES)}"
-        )
     return DAGTracerConfig(
         num_channels=c.num_channels,
         algorithm=c.algorithm,
@@ -76,7 +83,7 @@ class AnalyticalBackend(Backend):
         from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AnalyticalBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
-        tracer = MegatronDAGTracer(_tracer_config_from_scenario(scenario))
+        tracer = MegatronDAGTracer(_tracer_config_from_scenario(scenario), ccl=_ccl_from_scenario(scenario))
         return tracer.trace(scenario.workload, scenario.datacenter)
 
     def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
