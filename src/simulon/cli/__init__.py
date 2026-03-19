@@ -6,14 +6,19 @@ import typer
 import yaml
 
 def _dump_profile(data: dict, f) -> None:
-    """Write a GPU profile YAML with compact one-line-per-kernel_run formatting."""
-    top = {k: v for k, v in data.items() if k != "kernel_runs"}
+    """Write a GPU profile YAML with compact one-line-per-entry formatting."""
+    top = {k: v for k, v in data.items() if k not in ("kernel_runs", "oom_configs")}
     f.write(yaml.dump(top, default_flow_style=False, sort_keys=False))
     runs = data.get("kernel_runs", [])
     if runs:
         f.write("kernel_runs:\n")
         for run in runs:
             f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
+    oom = data.get("oom_configs", [])
+    if oom:
+        f.write("oom_configs:\n")
+        for cfg in oom:
+            f.write(f"  - {yaml.dump(cfg, default_flow_style=True, sort_keys=False).strip()}\n")
 
 
 app = typer.Typer(name="simulon", help="AI cluster simulator")
@@ -44,6 +49,10 @@ def simulate(
     if not isinstance(sc.workload, MegatronWorkload):
         typer.echo("Error: simulate only supports MegatronWorkload scenarios.", err=True)
         raise typer.Exit(1)
+
+    if verbose:
+        import logging
+        logging.basicConfig(format="%(message)s", level=logging.INFO)
 
     backend = AstraSimBackend()
     dag, result = backend.simulate(sc)
@@ -159,19 +168,13 @@ def profile_gpu(
         raise typer.Exit(1)
 
     is_moe = kernel_params.get("num_experts", 0) > 0
+    num_experts = kernel_params.get("num_experts", 0)
     configs = [
         (t, e, b, s)
         for t, e, b, s in product(tp_values, ep_values, batch_sizes, seq_lens)
         if not (e > 1 and not is_moe)
+        and (not is_moe or e <= num_experts)
     ]
-
-    if dry_run:
-        label = model or name
-        typer.echo(f"Sweep configurations for GPU '{name}' (arch: {label}):")
-        for t, e, b, s in configs:
-            typer.echo(f"  tp={t} ep={e} bs={b} seq={s}")
-        typer.echo(f"Total: {len(configs)} configurations")
-        raise typer.Exit(0)
 
     # Load or initialise the existing profile.
     if output is None:
@@ -184,6 +187,7 @@ def profile_gpu(
         with open(output) as f:
             existing = yaml.safe_load(f) or {}
         existing_runs: list[dict] = existing.get("kernel_runs", [])
+        existing_oom: list[dict] = existing.get("oom_configs", [])
     else:
         existing = {
             "name": name,
@@ -194,15 +198,70 @@ def profile_gpu(
         }
         existing = {k: v for k, v in existing.items() if v is not None}
         existing_runs = []
+        existing_oom = []
 
     if purge:
         existing_runs = []
+        existing_oom = []
 
     # For skip logic: pass existing_runs unless --overwrite (forces re-profiling).
     runs_for_skip = [] if overwrite else existing_runs
 
-    # Run sweep with progress display.
     label = model or name
+
+    # Build skip-filter structures (used for both dry-run output and actual sweep).
+    _oom_set = {frozenset(c.items()) for c in existing_oom}
+    _sufficient: set[tuple] = set()
+    for run in runs_for_skip:
+        key = (run["kernel"], frozenset(run["params"].items()))
+        if len(run["times_ms"]) >= epoch_num:
+            _sufficient.add(key)
+
+    dtype_str = dtype_enum.value
+    ffn_hidden_size_val = kernel_params["ffn_hidden_size"]
+    hidden_size_val = kernel_params["hidden_size"]
+    num_heads_val = kernel_params["num_heads"]
+    vocab_size_val = kernel_params["vocab_size"]
+    num_experts_val = kernel_params.get("num_experts", 0)
+    top_k_val = kernel_params.get("top_k", 1)
+    swiglu_val = kernel_params.get("swiglu", False)
+
+    def _config_done(t: int, e: int, b: int, s: int) -> bool:
+        if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s}.items()) in _oom_set:
+            return True
+        base = {"hidden_size": hidden_size_val, "seq_len": s, "batch_size": b, "dtype": dtype_str, "tp": t}
+        expected = [
+            ("embedding", {}),
+            ("layernorm", {}),
+            ("attn_qkv", {}),
+            ("attn_flash", {"num_heads": num_heads_val}),
+            ("attn_proj", {}),
+            ("mlp_linear1", {"ffn_hidden_size": ffn_hidden_size_val}),
+            ("mlp_act", {"ffn_hidden_size": ffn_hidden_size_val, "swiglu": swiglu_val}),
+            ("mlp_linear2", {"ffn_hidden_size": ffn_hidden_size_val}),
+            ("logit", {"vocab_size": vocab_size_val}),
+        ]
+        if num_experts_val > 0:
+            expected += [
+                ("moe_route", {"num_experts": num_experts_val}),
+                ("moe_expert", {"num_experts": num_experts_val, "ep": e, "top_k": top_k_val, "ffn_hidden_size": ffn_hidden_size_val}),
+            ]
+        return all(
+            (kernel, frozenset({**base, **extra}.items())) in _sufficient
+            for kernel, extra in expected
+        )
+
+    pending = [(t, e, b, s) for t, e, b, s in configs if not _config_done(t, e, b, s)]
+    skipped = len(configs) - len(pending)
+
+    if dry_run:
+        typer.echo(f"Sweep configurations for GPU '{name}' (arch: {label}):")
+        for t, e, b, s in pending:
+            typer.echo(f"  tp={t} ep={e} bs={b} seq={s}")
+        typer.echo(f"Total: {len(pending)} configurations to run, {skipped} already done (skipped)")
+        raise typer.Exit(0)
+
+    # Run sweep with progress display.
     results: list[SweepResult] = []
 
     try:
@@ -214,8 +273,8 @@ def profile_gpu(
             BarColumn(),
             MofNCompleteColumn(),
         ) as progress:
-            task_id = progress.add_task(f"Profiling {label}", total=len(configs))
-            for t, e, b, s in configs:
+            task_id = progress.add_task(f"Profiling {label}", total=len(pending))
+            for t, e, b, s in pending:
                 progress.update(task_id, description=f"Profiling {label}  tp={t} ep={e} bs={b} seq={s}")
                 single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num, existing_runs=runs_for_skip)
                 r = single[0] if single else SweepResult(
@@ -228,7 +287,7 @@ def profile_gpu(
                     progress.update(task_id, advance=1)
 
     except ImportError:
-        for t, e, b, s in configs:
+        for t, e, b, s in pending:
             typer.echo(f"  Running tp={t} ep={e} bs={b} seq={s} ...")
             single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num, existing_runs=runs_for_skip)
             r = single[0] if single else SweepResult(
@@ -253,6 +312,16 @@ def profile_gpu(
         existing_runs.extend(kr.model_dump() for kr in all_new_runs)
 
     existing["kernel_runs"] = existing_runs
+
+    # Merge new OOM configs, deduplicating by config dict.
+    new_oom = [r.config for r in results if r.oom]
+    if new_oom:
+        existing_oom_set = {frozenset(c.items()) for c in existing_oom}
+        for cfg in new_oom:
+            if frozenset(cfg.items()) not in existing_oom_set:
+                existing_oom.append(cfg)
+                existing_oom_set.add(frozenset(cfg.items()))
+    existing["oom_configs"] = existing_oom
 
     with open(output, "w") as f:
         _dump_profile(existing, f)

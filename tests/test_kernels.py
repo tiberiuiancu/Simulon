@@ -38,20 +38,31 @@ _MOE_KERNELS = _DENSE_KERNELS | {"moe_route", "moe_expert"}
 
 _FAKE_TIMES = [1.0, 2.0, 3.0, 4.0, 5.0]  # len == 5
 
-
-def _mock_cuda_time(fn, warmup=3, repeats=10):
-    """Replacement for _cuda_time: ignore warmup/repeats, just return fake list."""
-    return list(_FAKE_TIMES)
+# All _bench_* functions that allocate CUDA tensors — patch them all so no
+# real GPU is needed. Each returns _FAKE_TIMES regardless of arguments.
+_BENCH_FUNS = [
+    "_bench_embedding", "_bench_layernorm", "_bench_attn_qkv", "_bench_attn_flash",
+    "_bench_attn_proj", "_bench_mlp_linear1", "_bench_mlp_act", "_bench_mlp_linear2",
+    "_bench_logit", "_bench_moe_route", "_bench_moe_expert",
+]
 
 
 def _patch_cuda(fn):
-    """Decorator: patches CUDA availability + timing so no GPU is needed."""
+    """Decorator: patches CUDA availability + all bench functions so no GPU is needed."""
     import functools
 
     @functools.wraps(fn)
+    @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        with patch("torch.cuda.is_available", return_value=True), \
-             patch("simulon.profiling.kernels._cuda_time", side_effect=_mock_cuda_time):
+        import contextlib
+        targets = (
+            [("torch.cuda.is_available", dict(return_value=True))]
+            + [(f"simulon.profiling.kernels.{name}", dict(return_value=list(_FAKE_TIMES)))
+               for name in _BENCH_FUNS]
+        )
+        with contextlib.ExitStack() as stack:
+            for target, kwargs_ in targets:
+                stack.enter_context(patch(target, **kwargs_))
             return fn(*args, **kwargs)
 
     return wrapper

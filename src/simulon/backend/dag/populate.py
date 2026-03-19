@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
+
+from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import ExecutionDAG
 from simulon.config.dc import GPUSpec
 from simulon.config.workload import MegatronWorkload
 from simulon.profiling.lookup import lookup_kernel_time
+
+logger = logging.getLogger(__name__)
 
 
 def populate_dag(
@@ -26,16 +31,16 @@ def populate_dag(
         "tp": p.tp,
     }
 
-    for node in dag.compute_nodes:
-        node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
+    with log_progress("  resolving compute", len(dag.compute_nodes), logger) as advance:
+        for node in dag.compute_nodes:
+            node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
+            advance()
 
     return dag
 
 
 def _model_hidden_size(workload: MegatronWorkload) -> int | None:
-    from simulon.config.workload import LLMSpec
+    from simulon.backend.dag.tracer import _resolve_model
 
-    model = workload.model
-    if isinstance(model, LLMSpec):
-        return model.hidden_size
-    return None
+    model = _resolve_model(workload.model)
+    return model.hidden_size

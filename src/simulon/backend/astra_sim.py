@@ -1,8 +1,12 @@
+import logging
+
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracer, DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
 from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import MegatronWorkload
+
+logger = logging.getLogger(__name__)
 
 _SUPPORTED_LIBRARIES = {"nccl"}
 
@@ -77,8 +81,25 @@ class AstraSimBackend(Backend):
     def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
+
+        p = scenario.workload.parallelism
+        t = scenario.workload.training
+        num_gpus = t.num_gpus
+        logger.info("Building DAG  (GPUs=%d  tp=%d  pp=%d  ep=%d  dp=%d) ...",
+                    num_gpus, p.tp, p.pp, p.ep,
+                    p.dp if p.dp is not None else num_gpus // (p.tp * p.pp * p.ep))
         dag = self.run_trace(scenario)
+        logger.info("  DAG built: %d compute nodes, %d comm nodes, %d edges",
+                    len(dag.compute_nodes), len(dag.comm_nodes), len(dag.edges))
+
         gpu_spec = _resolve_gpu_spec(scenario.datacenter)
+        logger.info("Resolving compute durations (%d nodes) ...", len(dag.compute_nodes))
         populate_dag(dag, scenario.workload, gpu_spec)
+        logger.info("  Compute durations resolved")
+
+        total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes)
+        logger.info("Replaying DAG (%d nodes) ...", total_nodes)
         result = replay(dag, scenario.datacenter)
+        logger.info("  Replay done: total_time=%.3f ms", result.total_time_ms)
+
         return dag, result

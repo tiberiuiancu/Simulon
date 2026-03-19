@@ -1,0 +1,13 @@
+name: deepseek-v3
+hidden_size: 7168
+num_layers: 61
+num_heads: 128  # MLA (Multi-head Latent Attention); modeled here as standard MHA — KV compression not captured
+ffn_hidden_size: 2048  # per routed expert (moe_intermediate_size); 256 routed experts, top-8
+vocab_size: 129280
+num_experts: 256
+top_k: 8
+swiglu: true
+# Notes:
+#   - First 3 layers are dense (intermediate_size=18432); modeled as MoE throughout for simplicity
+#   - 1 shared expert (intermediate_size=2048) always active; not modeled separately
+#   - MLA uses q_lora_rank=1536, kv_lora_rank=512; approximated as standard MHA above
