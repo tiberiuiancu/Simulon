@@ -246,7 +246,7 @@ def test_dry_run_shows_configurations(tmp_path):
     ] + _ARCH_ARGS)
     assert "tp=1" in result.output
     assert "tp=2" in result.output
-    assert "Total: 4 configurations" in result.output
+    assert "Total: 4 configurations to run" in result.output
 
 
 def test_dry_run_does_not_call_sweep(tmp_path):
@@ -404,3 +404,106 @@ def test_oom_and_success_in_same_sweep(tmp_path):
     data = yaml.safe_load(out_file.read_text())
     assert len(data.get("kernel_runs", [])) >= 1
     assert oom_cfg in data.get("oom_configs", [])
+
+
+# ---------------------------------------------------------------------------
+# Dry-run skip filtering (existing data + OOM)
+# ---------------------------------------------------------------------------
+
+_DENSE_KERNELS = [
+    "embedding", "layernorm", "attn_qkv", "attn_flash", "attn_proj",
+    "mlp_linear1", "mlp_act", "mlp_linear2", "logit",
+]
+_BASE_PARAMS = {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16", "tp": 1}
+_EXTRA_PARAMS = {
+    "embedding": {},
+    "layernorm": {},
+    "attn_qkv": {},
+    "attn_flash": {"num_heads": 32},
+    "attn_proj": {},
+    "mlp_linear1": {"ffn_hidden_size": 11008},
+    "mlp_act": {"ffn_hidden_size": 11008, "swiglu": False},
+    "mlp_linear2": {"ffn_hidden_size": 11008},
+    "logit": {"vocab_size": 32000},
+}
+
+
+def _full_kernel_runs(tp=1, ep=1, batch_size=1, seq_len=512, epoch_num=10):
+    """Return a complete set of KernelRun objects for a config (dense model)."""
+    base = {"hidden_size": 4096, "seq_len": seq_len, "batch_size": batch_size, "dtype": "bf16", "tp": tp}
+    return [
+        KernelRun(kernel=k, params={**base, **_EXTRA_PARAMS[k]}, times_ms=[1.0] * epoch_num)
+        for k in _DENSE_KERNELS
+    ]
+
+
+def test_dry_run_skips_fully_profiled_config(tmp_path):
+    """Configs with all kernels already having >= epoch_num runs must be omitted from dry-run output."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    # Write a profile with a fully-complete config (tp=1, ep=1, bs=1, seq=512).
+    full_runs = _full_kernel_runs()
+    fake_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=full_runs, oom=False)
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[fake_result]):
+        runner.invoke(app, base_args)
+
+    # Dry-run for the same config: it should be filtered out.
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "tp=1 ep=1 bs=1 seq=512" not in dry.output
+    assert "0 configurations to run" in dry.output
+    assert "1 already done" in dry.output
+
+
+def test_dry_run_skips_oom_config(tmp_path):
+    """Configs recorded as OOM must be omitted from dry-run output."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True)
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
+        runner.invoke(app, base_args)
+
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "tp=1 ep=1 bs=1 seq=512" not in dry.output
+    assert "1 already done" in dry.output
+
+
+def test_dry_run_shows_pending_configs_only(tmp_path):
+    """Only configs that still need profiling should appear in dry-run output."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--batch-size", "1,2", "--seq-len", "512",
+    ] + _ARCH_ARGS
+
+    # Profile bs=1 fully, leave bs=2 pending.
+    full_runs = _full_kernel_runs(batch_size=1)
+    fake_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=full_runs, oom=False)
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[fake_result]):
+        runner.invoke(app, base_args)
+
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "bs=1" not in dry.output
+    assert "bs=2" in dry.output
+    assert "1 configurations to run" in dry.output
+    assert "1 already done" in dry.output
+
+
+def test_dry_run_overwrite_shows_all_configs(tmp_path):
+    """--overwrite combined with --dry-run should show all configs regardless of existing data."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    full_runs = _full_kernel_runs()
+    fake_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=full_runs, oom=False)
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[fake_result]):
+        runner.invoke(app, base_args)
+
+    dry = runner.invoke(app, base_args + ["--dry-run", "--overwrite"])
+    assert dry.exit_code == 0
+    assert "tp=1 ep=1 bs=1 seq=512" in dry.output
+    assert "1 configurations to run" in dry.output
