@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
 from simulon.config.dc import DatacenterConfig, NICSpec, SwitchSpec
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +187,23 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     per_gpu_comm: dict[int, float] = defaultdict(float)
     per_gpu_finish: dict[int, float] = defaultdict(float)
 
+    _verbose = logger.isEnabledFor(logging.INFO)
+    _progress_ctx: object = None
+    _progress_task = None
+    if _verbose:
+        try:
+            from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
+            _progress_ctx = Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeRemainingColumn(),
+            )
+            _progress_ctx.__enter__()
+            _progress_task = _progress_ctx.add_task("  replaying", total=len(topo_order))
+        except ImportError:
+            _progress_ctx = None
+
     for nid in topo_order:
         node = all_nodes[nid]
         start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
@@ -212,6 +232,12 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
                 per_gpu_finish[node.src_gpu] = finish
             if finish > per_gpu_finish[node.dst_gpu]:
                 per_gpu_finish[node.dst_gpu] = finish
+
+        if _progress_ctx is not None:
+            _progress_ctx.advance(_progress_task)
+
+    if _progress_ctx is not None:
+        _progress_ctx.__exit__(None, None, None)
 
     total = max(per_gpu_finish.values(), default=0.0)
 

@@ -50,6 +50,10 @@ def simulate(
         typer.echo("Error: simulate only supports MegatronWorkload scenarios.", err=True)
         raise typer.Exit(1)
 
+    if verbose:
+        import logging
+        logging.basicConfig(format="%(message)s", level=logging.INFO)
+
     backend = AstraSimBackend()
     dag, result = backend.simulate(sc)
 
