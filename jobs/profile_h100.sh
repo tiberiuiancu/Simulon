@@ -13,8 +13,6 @@ module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2
 uv sync --extra profiling
 uv pip install pip
 source .venv/bin/activate
-#uv run simulon install apex --skip-cuda-version-check
-#uv run simulon install deepgemm
 
 mkdir -p jobs/logs
 
