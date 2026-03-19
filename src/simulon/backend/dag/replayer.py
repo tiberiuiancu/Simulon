@@ -5,6 +5,7 @@ import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
+from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
 from simulon.config.dc import DatacenterConfig, NICSpec, SwitchSpec
 
@@ -187,57 +188,37 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     per_gpu_comm: dict[int, float] = defaultdict(float)
     per_gpu_finish: dict[int, float] = defaultdict(float)
 
-    _verbose = logger.isEnabledFor(logging.INFO)
-    _progress_ctx: object = None
-    _progress_task = None
-    if _verbose:
-        try:
-            from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
-            _progress_ctx = Progress(
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TimeRemainingColumn(),
-            )
-            _progress_ctx.__enter__()
-            _progress_task = _progress_ctx.add_task("  replaying", total=len(topo_order))
-        except ImportError:
-            _progress_ctx = None
+    with log_progress("  replaying DAG", len(topo_order), logger) as advance:
+        for nid in topo_order:
+            node = all_nodes[nid]
+            start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
 
-    for nid in topo_order:
-        node = all_nodes[nid]
-        start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
+            if isinstance(node, ComputeNode):
+                duration = node.duration_ms if node.duration_ms is not None else 0.0
+                finish = start_time + duration
+                finish_time[nid] = finish
+                node.start_ms = start_time
+                node.finish_ms = finish
+                per_gpu_compute[node.gpu_rank] += duration
+                if finish > per_gpu_finish[node.gpu_rank]:
+                    per_gpu_finish[node.gpu_rank] = finish
 
-        if isinstance(node, ComputeNode):
-            duration = node.duration_ms if node.duration_ms is not None else 0.0
-            finish = start_time + duration
-            finish_time[nid] = finish
-            node.start_ms = start_time
-            node.finish_ms = finish
-            per_gpu_compute[node.gpu_rank] += duration
-            if finish > per_gpu_finish[node.gpu_rank]:
-                per_gpu_finish[node.gpu_rank] = finish
+            else:  # CommNode
+                bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
+                duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
+                finish = start_time + duration
+                finish_time[nid] = finish
+                node.duration_ms = duration
+                node.start_ms = start_time
+                node.finish_ms = finish
+                per_gpu_comm[node.src_gpu] += duration
+                per_gpu_comm[node.dst_gpu] += duration
+                if finish > per_gpu_finish[node.src_gpu]:
+                    per_gpu_finish[node.src_gpu] = finish
+                if finish > per_gpu_finish[node.dst_gpu]:
+                    per_gpu_finish[node.dst_gpu] = finish
 
-        else:  # CommNode
-            bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
-            duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
-            finish = start_time + duration
-            finish_time[nid] = finish
-            node.duration_ms = duration
-            node.start_ms = start_time
-            node.finish_ms = finish
-            per_gpu_comm[node.src_gpu] += duration
-            per_gpu_comm[node.dst_gpu] += duration
-            if finish > per_gpu_finish[node.src_gpu]:
-                per_gpu_finish[node.src_gpu] = finish
-            if finish > per_gpu_finish[node.dst_gpu]:
-                per_gpu_finish[node.dst_gpu] = finish
-
-        if _progress_ctx is not None:
-            _progress_ctx.advance(_progress_task)
-
-    if _progress_ctx is not None:
-        _progress_ctx.__exit__(None, None, None)
+            advance()
 
     total = max(per_gpu_finish.values(), default=0.0)
 
