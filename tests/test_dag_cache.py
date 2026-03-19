@@ -103,10 +103,10 @@ def test_save_and_load_roundtrip(tmp_path):
     assert isinstance(loaded, ExecutionDAG)
 
 
-def test_save_creates_pkl_file(tmp_path):
+def test_save_creates_npz_file(tmp_path):
     dag = ExecutionDAG()
     dag_cache.save(tmp_path, "abc123", dag)
-    assert (tmp_path / "abc123.pkl").exists()
+    assert (tmp_path / "abc123.npz").exists()
 
 
 def test_load_returns_none_on_corrupt_file(tmp_path):
@@ -141,14 +141,14 @@ def test_cache_miss_then_hit(tmp_path):
 def test_cache_file_written_after_build(tmp_path):
     workload = _small_workload()
     _trace(workload, tmp_path)
-    pkl_files = list(tmp_path.glob("*.pkl"))
+    pkl_files = list(tmp_path.glob("*.npz"))
     assert len(pkl_files) == 1
 
 
 def test_different_workloads_produce_different_cache_files(tmp_path):
     _trace(_small_workload(tp=1, pp=1), tmp_path)
     _trace(_small_workload(tp=1, pp=2), tmp_path)
-    pkl_files = list(tmp_path.glob("*.pkl"))
+    pkl_files = list(tmp_path.glob("*.npz"))
     assert len(pkl_files) == 2
 
 
@@ -156,7 +156,7 @@ def test_same_workload_reuses_single_cache_file(tmp_path):
     workload = _small_workload()
     _trace(workload, tmp_path)
     _trace(workload, tmp_path)
-    pkl_files = list(tmp_path.glob("*.pkl"))
+    pkl_files = list(tmp_path.glob("*.npz"))
     assert len(pkl_files) == 1
 
 
@@ -165,7 +165,7 @@ def test_cache_disabled_when_none(tmp_path):
     workload = _small_workload()
     tracer = DAGTracer(DAGTracerConfig(cache_dir=None))
     dag = tracer.trace(workload, None)  # type: ignore[arg-type]
-    assert len(list(tmp_path.glob("*.pkl"))) == 0
+    assert len(list(tmp_path.glob("*.npz"))) == 0
     assert len(dag.compute_nodes) > 0
 
 
@@ -216,4 +216,4 @@ def test_string_and_inline_model_share_cache(tmp_path):
     _trace(w_inline, tmp_path)
 
     # Both should map to the same cache file
-    assert len(list(tmp_path.glob("*.pkl"))) == 1
+    assert len(list(tmp_path.glob("*.npz"))) == 1
