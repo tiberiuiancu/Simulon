@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from simulon.backend.dag._progress import log_progress
@@ -19,6 +20,7 @@ class DAGTracerConfig:
     num_channels: int = 1
     algorithm: str = "ring"   # ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
     dtype_bytes: int = 2  # bf16
+    cache_dir: Optional[Path] = field(default_factory=lambda: Path.home() / ".cache" / "simulon" / "dag")  # set to None to disable
 
 
 def _resolve_model(model: str | LLMSpec) -> LLMSpec:
@@ -81,6 +83,8 @@ class DAGTracer:
         self.config = config or DAGTracerConfig()
 
     def trace(self, workload: MegatronWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
+        from simulon.backend.dag import cache as _cache
+
         cfg = self.config
         p = workload.parallelism
         t = workload.training
@@ -96,8 +100,16 @@ class DAGTracer:
         else:
             num_microbatches = t.global_batch_size // (dp * t.micro_batch_size)
 
-        # Resolve model spec
+        # Resolve model spec (must happen before cache key so the key is stable
+        # regardless of whether model was given as a string or inline LLMSpec)
         model = _resolve_model(workload.model)
+
+        # --- DAG cache lookup ---
+        if cfg.cache_dir is not None:
+            _key = _cache._cache_key(workload, model, cfg)
+            _dag = _cache.load(Path(cfg.cache_dir), _key)
+            if _dag is not None:
+                return _dag
         num_layers = model.num_layers
         hidden_size = model.hidden_size
         seq_len = t.sequence_length
@@ -397,6 +409,10 @@ class DAGTracer:
             key = (dst_gpu, mb, direction)
             if key in slot_entry_node:
                 dag.edges.append(DAGEdge(src_node_id=pp_send_id, dst_node_id=slot_entry_node[key]))
+
+        # --- DAG cache save ---
+        if cfg.cache_dir is not None:
+            _cache.save(Path(cfg.cache_dir), _key, dag)
 
         return dag
 
