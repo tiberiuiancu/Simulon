@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -8,6 +9,8 @@ from simulon.backend.dag.layer_expander import LayerExpander
 from simulon.collective import decompose_collective
 from simulon.config.dc import DatacenterConfig
 from simulon.config.workload import LLMSpec, MegatronWorkload
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -142,6 +145,22 @@ class DAGTracer:
         pending_pp_deps: list[tuple[int, int, int, str]] = []
 
         # Iterate over all GPUs
+        _progress_ctx = None
+        _progress_task = None
+        if logger.isEnabledFor(logging.INFO):
+            try:
+                from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
+                _progress_ctx = Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    MofNCompleteColumn(),
+                    TimeRemainingColumn(),
+                )
+                _progress_ctx.__enter__()
+                _progress_task = _progress_ctx.add_task("  building DAG", total=dp * pp * ep * tp)
+            except ImportError:
+                _progress_ctx = None
+
         for dp_rank in range(dp):
             for pp_stage in range(pp):
                 for ep_rank in range(ep):
@@ -340,6 +359,9 @@ class DAGTracer:
                             if prev_step_stub_ids:
                                 last_node_per_gpu[gpu] = prev_step_stub_ids[-1]
 
+                        if _progress_ctx is not None:
+                            _progress_ctx.advance(_progress_task)
+
                 # PP_Send at stage boundaries (once per dp_rank, pp_stage pair).
                 if pp > 1:
                     slots = scheduler.schedule_for_stage(pp_stage)
@@ -384,6 +406,9 @@ class DAGTracer:
                             for tr in range(tp):
                                 dst_gpu_tr = global_rank(dp_rank, dst_stage, er, tr)
                                 pending_pp_deps.append((pp_send.node_id, dst_gpu_tr, mb, slot.direction))
+
+        if _progress_ctx is not None:
+            _progress_ctx.__exit__(None, None, None)
 
         # Add cross-stage edges: PP_Send → first node of the receiving stage's slot.
         for pp_send_id, dst_gpu, mb, direction in pending_pp_deps:
