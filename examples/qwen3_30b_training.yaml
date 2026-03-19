@@ -1,0 +1,52 @@
+# Qwen3-30B-A3B (MoE) training scenario
+#
+# Parallelism: TP=1, PP=4, EP=16, DP=2
+# Total GPUs:  1 × 4 × 16 × 2 = 128  (16 nodes × 8 GPUs/node)
+#
+# Network: standard H100 cluster
+#   Scale-up:  900 GB/s NVLink aggregate → port_speed = 7200 Gbps
+#   Scale-out: 400 Gbps InfiniBand, fat-tree
+
+datacenter:
+  datacenter:
+    name: h100-128gpu
+  cluster:
+    num_nodes: 16
+  node:
+    gpus_per_node: 8
+    gpu:
+      from: h100
+  network:
+    scale_up:
+      switch:
+        port_speed: 7200Gbps
+        latency: 0.000025ms
+    scale_out:
+      nic:
+        speed: 400Gbps
+        latency: 0.005ms
+      topology:
+        type: fat_tree
+        params:
+          k: 8
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workload:
+  framework: megatron
+  model: qwen3-30b-a3b
+  parallelism:
+    tp: 1
+    pp: 4
+    ep: 16
+    dp: 2
+    distributed_optimizer: true
+    num_microbatches: 8
+  training:
+    num_gpus: 128
+    global_batch_size: 16   # dp=2 × mbs=1 × num_microbatches=8
+    micro_batch_size: 1
+    sequence_length: 4096

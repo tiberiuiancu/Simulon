@@ -3,13 +3,13 @@
 import pytest
 
 from simulon.backend.dag.nodes import CommNode, ComputeNode, DAGEdge, ExecutionDAG
-from simulon.backend.dag.replayer import (
-    SimulationResult,
+from simulon.backend.dag.populate import (
     _get_link_params,
     _parse_latency,
     _parse_speed,
-    replay,
+    populate_network,
 )
+from simulon.backend.dag.replayer import SimulationResult, replay
 from simulon.config.dc import (
     DatacenterConfig,
     DatacenterMeta,
@@ -186,7 +186,8 @@ def test_single_comm_node_duration():
     expected_duration = bytes_ / bw  # 1 ms
 
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert abs(result.total_time_ms - expected_duration) < 1e-9
     assert abs(result.per_gpu_times_ms[0] - expected_duration) < 1e-9  # src
@@ -201,7 +202,8 @@ def test_single_comm_node_includes_latency():
     expected = 0.5 + bytes_ / bw
 
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert abs(result.total_time_ms - expected) < 1e-9
 
@@ -220,7 +222,8 @@ def test_independent_flows_run_in_parallel():
         _comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_),
         _comm(1, src_gpu=2, dst_gpu=3, bytes=bytes_),
     )
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     # Parallel: 1 ms total
     assert abs(result.total_time_ms - 1.0) < 1e-9
@@ -234,7 +237,8 @@ def test_independent_flows_run_in_parallel():
 def test_single_compute_node():
     dc = _dc()
     dag = _dag(_compute(0, gpu_rank=0, duration_ms=5.0))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert abs(result.total_time_ms - 5.0) < 1e-9
     assert abs(result.per_gpu_times_ms[0] - 5.0) < 1e-9
@@ -246,7 +250,8 @@ def test_compute_node_none_duration():
     dc = _dc()
     n = _compute(0, gpu_rank=0, duration_ms=None)
     dag = _dag(n)
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
     assert result.total_time_ms == 0.0
 
 
@@ -263,7 +268,8 @@ def test_compute_before_comm():
     c = _compute(0, gpu_rank=0, duration_ms=3.0)
     m = _comm(1, src_gpu=0, dst_gpu=1, bytes=bytes_)
     dag = _dag(c, m, edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     # Comm starts at t=3, finishes at t=4
     assert abs(result.total_time_ms - 4.0) < 1e-9
@@ -292,7 +298,8 @@ def test_parent_flow_ids_ordering():
         flow_id=11, parent_flow_ids=[10],  # depends on flow_id=10
     )
     dag = ExecutionDAG(comm_nodes=[parent, child])
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     # Parent finishes at 1ms, child starts at 1ms, finishes at 2ms
     assert abs(result.total_time_ms - 2.0) < 1e-9
@@ -309,7 +316,8 @@ def test_comm_time_counted_for_both_endpoints():
     bytes_ = 1_000_000  # 1 ms
 
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert abs(result.comm_time_ms[0] - 1.0) < 1e-9  # src counted
     assert abs(result.comm_time_ms[1] - 1.0) < 1e-9  # dst counted
@@ -326,7 +334,8 @@ def test_per_gpu_finish_covers_src_gpu():
     bytes_ = 1_000_000
 
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert 0 in result.per_gpu_times_ms
     assert 1 in result.per_gpu_times_ms
@@ -350,7 +359,8 @@ def test_inter_node_uses_nic_bandwidth():
 
     # GPU 0 (node 0) → GPU 2 (node 1)
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=2, bytes=bytes_))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert abs(result.total_time_ms - 1.0) < 1e-9
 
@@ -368,6 +378,7 @@ def test_intra_node_uses_nvswitch_bandwidth():
 
     # GPU 0 → GPU 3, same node
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=3, bytes=bytes_))
-    result = replay(dag, dc)
+    populate_network(dag, dc)
+    result = replay(dag)
 
     assert abs(result.total_time_ms - 1.0) < 1e-9
