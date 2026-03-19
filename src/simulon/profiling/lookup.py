@@ -13,6 +13,12 @@ _SCALE_ARCH_KEYS = frozenset(
     {"hidden_size", "num_heads", "ffn_hidden_size", "num_experts", "ep", "top_k", "tp", "dtype"}
 )
 
+# Cache: (kernel, frozen_params, id(gpu_spec)) → Optional[float]
+# Keyed on id(gpu_spec) so different GPUSpec objects don't share entries.
+# The gpu_spec object is kept alive by the caller throughout the simulation,
+# so using its id() as a key is safe.
+_cache: dict[tuple, Optional[float]] = {}
+
 
 def lookup_kernel_time(
     kernel: str,
@@ -21,6 +27,10 @@ def lookup_kernel_time(
     warn: bool = True,
 ) -> Optional[float]:
     """Find the median runtime (ms) for a kernel with the given parameters.
+
+    Results are cached per (kernel, match_params, gpu_spec identity) so that
+    repeated lookups for the same kernel across many DAG nodes are O(1).
+    The proportional-scaling warning is emitted at most once per kernel.
 
     Matching strategy (tried in order, returns on first hit):
 
@@ -31,10 +41,25 @@ def lookup_kernel_time(
        (``hidden_size``, ``num_heads``, ``ffn_hidden_size``, ``num_experts``,
        ``ep``, ``top_k``, ``tp``, ``dtype``) match, then scale the median time
        by ``(req_batch * req_seq) / (ref_batch * ref_seq)``.  Emits a
-       ``UserWarning`` unless *warn* is ``False``.
+       ``UserWarning`` (once per kernel) unless *warn* is ``False``.
 
     Returns ``None`` if no usable run is found.
     """
+    cache_key = (kernel, frozenset(match_params.items()), id(gpu_spec))
+    if cache_key in _cache:
+        return _cache[cache_key]
+
+    result = _lookup_kernel_time_impl(kernel, match_params, gpu_spec, warn=warn)
+    _cache[cache_key] = result
+    return result
+
+
+def _lookup_kernel_time_impl(
+    kernel: str,
+    match_params: dict[str, Any],
+    gpu_spec: GPUSpec,
+    warn: bool = True,
+) -> Optional[float]:
     exact: list[float] = []
     partial: list[float] = []
 
@@ -84,7 +109,7 @@ def lookup_kernel_time(
             f"kernel '{kernel}': no exact match for batch_size={req_batch} seq_len={req_seq}; "
             f"scaling from batch_size={ref_batch} seq_len={ref_seq} by factor {scale:.2f}x",
             UserWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
 
     return ref_time * scale

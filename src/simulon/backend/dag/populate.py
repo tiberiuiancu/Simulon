@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
+
+from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import ExecutionDAG
 from simulon.config.dc import GPUSpec
 from simulon.config.workload import MegatronWorkload
 from simulon.profiling.lookup import lookup_kernel_time
+
+logger = logging.getLogger(__name__)
 
 
 def populate_dag(
@@ -26,8 +31,10 @@ def populate_dag(
         "tp": p.tp,
     }
 
-    for node in dag.compute_nodes:
-        node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
+    with log_progress("  resolving compute", len(dag.compute_nodes), logger) as advance:
+        for node in dag.compute_nodes:
+            node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
+            advance()
 
     return dag
 
