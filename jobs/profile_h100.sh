@@ -19,7 +19,7 @@ mkdir -p jobs/logs
 # --- Sweep parameters ---
 TP="1,2,4,8"
 EP="1,2,4,8,16,32,64"  # ep > num_experts and ep > 1 for dense models are skipped automatically
-BATCH="1,2,4,8,16,32,64,128"
+BATCH="1,2,4,8,16,32,64,128,256,512"
 SEQ="256,512,1024,2048,4096,8192"
 GPU_NAME="H100"
 OUTPUT="templates/gpu/h100.yaml"
