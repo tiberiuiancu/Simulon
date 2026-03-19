@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
+from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
 from simulon.config.dc import DatacenterConfig, NICSpec, SwitchSpec
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -145,38 +149,47 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     predecessors: dict[int, set[int]] = {nid: set() for nid in all_nodes}
     in_degree: dict[int, int] = {nid: 0 for nid in all_nodes}
 
-    for edge in dag.edges:
-        predecessors[edge.dst_node_id].add(edge.src_node_id)
-        in_degree[edge.dst_node_id] += 1
+    with log_progress("  indexing edges", len(dag.edges), logger) as advance:
+        for edge in dag.edges:
+            predecessors[edge.dst_node_id].add(edge.src_node_id)
+            in_degree[edge.dst_node_id] += 1
+            advance()
 
-    for cn in dag.comm_nodes:
-        for fid in cn.parent_flow_ids:
-            if fid in flow_to_node:
-                parent_nid = flow_to_node[fid]
-                if parent_nid not in predecessors[cn.node_id]:
-                    predecessors[cn.node_id].add(parent_nid)
-                    in_degree[cn.node_id] += 1
+    with log_progress("  indexing flow deps", len(dag.comm_nodes), logger) as advance:
+        for cn in dag.comm_nodes:
+            for fid in cn.parent_flow_ids:
+                if fid in flow_to_node:
+                    parent_nid = flow_to_node[fid]
+                    if parent_nid not in predecessors[cn.node_id]:
+                        predecessors[cn.node_id].add(parent_nid)
+                        in_degree[cn.node_id] += 1
+            advance()
 
     # Build successors for Kahn's algorithm
     successors: dict[int, list[int]] = defaultdict(list)
-    for edge in dag.edges:
-        successors[edge.src_node_id].append(edge.dst_node_id)
-    for cn in dag.comm_nodes:
-        for fid in cn.parent_flow_ids:
-            if fid in flow_to_node:
-                successors[flow_to_node[fid]].append(cn.node_id)
+    with log_progress("  building successors", len(dag.edges) + len(dag.comm_nodes), logger) as advance:
+        for edge in dag.edges:
+            successors[edge.src_node_id].append(edge.dst_node_id)
+            advance()
+        for cn in dag.comm_nodes:
+            for fid in cn.parent_flow_ids:
+                if fid in flow_to_node:
+                    successors[flow_to_node[fid]].append(cn.node_id)
+            advance()
 
     # Topological sort (Kahn's algorithm)
     temp_in_degree = dict(in_degree)
     queue: deque[int] = deque(nid for nid, deg in temp_in_degree.items() if deg == 0)
     topo_order: list[int] = []
-    while queue:
-        nid = queue.popleft()
-        topo_order.append(nid)
-        for succ in successors[nid]:
-            temp_in_degree[succ] -= 1
-            if temp_in_degree[succ] == 0:
-                queue.append(succ)
+    with log_progress("  topological sort", len(all_nodes), logger) as advance:
+        while queue:
+            nid = queue.popleft()
+            topo_order.append(nid)
+            for succ in successors[nid]:
+                temp_in_degree[succ] -= 1
+                if temp_in_degree[succ] == 0:
+                    queue.append(succ)
+            advance()
 
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}
@@ -184,34 +197,37 @@ def replay(dag: ExecutionDAG, datacenter: DatacenterConfig) -> SimulationResult:
     per_gpu_comm: dict[int, float] = defaultdict(float)
     per_gpu_finish: dict[int, float] = defaultdict(float)
 
-    for nid in topo_order:
-        node = all_nodes[nid]
-        start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
+    with log_progress("  replaying DAG", len(topo_order), logger) as advance:
+        for nid in topo_order:
+            node = all_nodes[nid]
+            start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
 
-        if isinstance(node, ComputeNode):
-            duration = node.duration_ms if node.duration_ms is not None else 0.0
-            finish = start_time + duration
-            finish_time[nid] = finish
-            node.start_ms = start_time
-            node.finish_ms = finish
-            per_gpu_compute[node.gpu_rank] += duration
-            if finish > per_gpu_finish[node.gpu_rank]:
-                per_gpu_finish[node.gpu_rank] = finish
+            if isinstance(node, ComputeNode):
+                duration = node.duration_ms if node.duration_ms is not None else 0.0
+                finish = start_time + duration
+                finish_time[nid] = finish
+                node.start_ms = start_time
+                node.finish_ms = finish
+                per_gpu_compute[node.gpu_rank] += duration
+                if finish > per_gpu_finish[node.gpu_rank]:
+                    per_gpu_finish[node.gpu_rank] = finish
 
-        else:  # CommNode
-            bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
-            duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
-            finish = start_time + duration
-            finish_time[nid] = finish
-            node.duration_ms = duration
-            node.start_ms = start_time
-            node.finish_ms = finish
-            per_gpu_comm[node.src_gpu] += duration
-            per_gpu_comm[node.dst_gpu] += duration
-            if finish > per_gpu_finish[node.src_gpu]:
-                per_gpu_finish[node.src_gpu] = finish
-            if finish > per_gpu_finish[node.dst_gpu]:
-                per_gpu_finish[node.dst_gpu] = finish
+            else:  # CommNode
+                bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
+                duration = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
+                finish = start_time + duration
+                finish_time[nid] = finish
+                node.duration_ms = duration
+                node.start_ms = start_time
+                node.finish_ms = finish
+                per_gpu_comm[node.src_gpu] += duration
+                per_gpu_comm[node.dst_gpu] += duration
+                if finish > per_gpu_finish[node.src_gpu]:
+                    per_gpu_finish[node.src_gpu] = finish
+                if finish > per_gpu_finish[node.dst_gpu]:
+                    per_gpu_finish[node.dst_gpu] = finish
+
+            advance()
 
     total = max(per_gpu_finish.values(), default=0.0)
 

@@ -1,0 +1,54 @@
+# DeepSeek V3 (671B) training scenario
+#
+# Parallelism: TP=1, PP=16, EP=64, DP=2
+# Total GPUs:  1 × 16 × 64 × 2 = 2048  (256 nodes × 8 GPUs/node)
+#
+# Network (reduced NVLink vs standard H100):
+#   Scale-up:  400 GB/s aggregate  (standard H100: 900 GB/s)
+#              300 GB/s single link bidirectional  (standard: 600 GB/s)
+#              → port_speed = 400 GB/s × 8 b/B = 3200 Gbps
+#   Scale-out: 400 Gbps InfiniBand, fat-tree (k=16 → up to 1024 hosts)
+
+datacenter:
+  datacenter:
+    name: deepseek-v3-cluster
+  cluster:
+    num_nodes: 256
+  node:
+    gpus_per_node: 8
+    gpu:
+      from: h100
+  network:
+    scale_up:
+      switch:
+        port_speed: 3200Gbps   # 400 GB/s aggregate (vs 7200 Gbps on standard H100)
+        latency: 0.000025ms
+    scale_out:
+      nic:
+        speed: 400Gbps
+        latency: 0.005ms
+      topology:
+        type: fat_tree
+        params:
+          k: 16
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workload:
+  framework: megatron
+  model: deepseek-v3
+  parallelism:
+    tp: 1
+    pp: 16
+    ep: 64
+    dp: 2
+    distributed_optimizer: true
+    num_microbatches: 60
+  training:
+    num_gpus: 2048
+    global_batch_size: 15360   # dp=2 × mbs=128 × num_microbatches=60
+    micro_batch_size: 128
+    sequence_length: 4096

@@ -1,0 +1,9 @@
+name: qwen3-30b-a3b
+hidden_size: 2048
+num_layers: 48
+num_heads: 32  # GQA: 4 KV heads, head_dim=128; profiler uses Q heads only
+ffn_hidden_size: 768  # per routed expert (moe_intermediate_size); 128 experts, top-8
+vocab_size: 151936
+num_experts: 128
+top_k: 8
+swiglu: true
