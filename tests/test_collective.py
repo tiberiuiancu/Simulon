@@ -188,30 +188,29 @@ def test_nvls_all_reduce_not_implemented():
 
 
 def test_decompose_ring_all_reduce():
-    result, nfid, nnid = decompose_collective(
+    result, nfid = decompose_collective(
         "AllReduce", [0, 1, 2, 3], data_size=1024, algorithm="ring"
     )
     assert isinstance(result, CollectiveResult)
     assert len(result.flows) == 24
-    assert nnid == 0
 
 
 def test_decompose_ring_reduce_scatter():
-    result, nfid, _ = decompose_collective(
+    result, nfid = decompose_collective(
         "ReduceScatter", [0, 1, 2, 3], data_size=1024, algorithm="ring"
     )
     assert len(result.flows) == 12
 
 
 def test_decompose_ring_all_gather():
-    result, nfid, _ = decompose_collective(
+    result, nfid = decompose_collective(
         "AllGather", [0, 1, 2, 3], data_size=1024, algorithm="ring"
     )
     assert len(result.flows) == 12
 
 
 def test_decompose_ring_all_to_all():
-    result, nfid, _ = decompose_collective(
+    result, nfid = decompose_collective(
         "AllToAll", [0, 1, 2, 3], data_size=1024, algorithm="ring"
     )
     assert len(result.flows) == 12
@@ -222,26 +221,26 @@ def test_decompose_nvls_not_implemented():
         decompose_collective("AllReduce", list(range(8)), data_size=4096, algorithm="nvls")
 
 
-def test_decompose_nvls_non_allreduce_falls_back_to_ring():
-    """Non-AllReduce collectives with nvls algorithm fall back to ring."""
-    result, _, _ = decompose_collective("AllGather", [0, 1, 2, 3], data_size=1024, algorithm="nvls")
-    assert len(result.flows) == 12  # same as ring AllGather
+def test_decompose_nvls_non_allreduce_unsupported():
+    """Non-AllReduce collectives with nvls algorithm raise ValueError (no silent fallback)."""
+    with pytest.raises(ValueError, match="Unsupported combination"):
+        decompose_collective("AllGather", [0, 1, 2, 3], data_size=1024, algorithm="nvls")
 
 
 def test_decompose_unknown_algorithm():
-    with pytest.raises(ValueError, match="Unknown algorithm"):
+    with pytest.raises(ValueError, match="Unsupported combination"):
         decompose_collective("AllReduce", [0, 1, 2, 3], data_size=1024, algorithm="unknown")
 
 
 def test_decompose_unknown_collective():
-    with pytest.raises(ValueError, match="Unknown collective_type"):
+    with pytest.raises(ValueError, match="Unsupported combination"):
         decompose_collective("Broadcast", [0, 1, 2, 3], data_size=1024, algorithm="ring")
 
 
 def test_decompose_flow_id_continuity():
     """next_flow_id from one call can be used as flow_id_start for next."""
-    result1, nfid1, _ = decompose_collective("AllGather", [0, 1, 2], data_size=768)
-    result2, nfid2, _ = decompose_collective(
+    result1, nfid1 = decompose_collective("AllGather", [0, 1, 2], data_size=768)
+    result2, nfid2 = decompose_collective(
         "ReduceScatter", [0, 1, 2], data_size=768, flow_id_start=nfid1
     )
     all_fids = [f.flow_id for f in result1.flows] + [f.flow_id for f in result2.flows]

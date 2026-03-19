@@ -52,7 +52,6 @@ def _patch_cuda(fn):
     import functools
 
     @functools.wraps(fn)
-    @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         import contextlib
         targets = (

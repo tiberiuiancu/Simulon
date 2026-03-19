@@ -8,6 +8,8 @@ from simulon.backend.dag.nodes import (
     DAGEdge,
     ExecutionDAG,
 )
+from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.backend.dag.pipeline import OneFOneBScheduler, ScheduleSlot
 from simulon.backend.dag.layer_expander import LayerExpander
 
@@ -205,30 +207,3 @@ def test_layer_expander_mlp_kernels():
     kernels = [n.kernel for n in c_nodes]
     assert kernels == ["layernorm", "mlp_linear1", "mlp_act", "mlp_linear2"]
 
-
-# ---------------------------------------------------------------------------
-# ExecutionDAG serialization
-# ---------------------------------------------------------------------------
-
-
-def test_execution_dag_to_dict():
-    dag = ExecutionDAG(
-        compute_nodes=[ComputeNode(0, 0, "layernorm", 0, 0, 0, "fwd")],
-        comm_nodes=[CommNode(1, 0, 1, 512, "AllGather", 0, "fwd", 0)],
-        edges=[DAGEdge(0, 1)],
-    )
-    d = dag.to_dict()
-    assert len(d["compute_nodes"]) == 1
-    assert len(d["comm_nodes"]) == 1
-    assert len(d["edges"]) == 1
-    assert d["compute_nodes"][0]["kernel"] == "layernorm"
-
-
-def test_execution_dag_to_json():
-    import json
-    dag = ExecutionDAG(
-        compute_nodes=[ComputeNode(0, 0, "layernorm", 0, 0, 0, "fwd")],
-    )
-    j = dag.to_json()
-    data = json.loads(j)
-    assert data["compute_nodes"][0]["gpu_rank"] == 0

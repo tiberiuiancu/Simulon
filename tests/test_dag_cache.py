@@ -8,7 +8,8 @@ import pytest
 
 from simulon.backend.dag import cache as dag_cache
 from simulon.backend.dag.nodes import ExecutionDAG
-from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
+from simulon.backend.dag.tracer import DAGTracerConfig
+from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
 from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
 
 
@@ -37,8 +38,8 @@ def _small_workload(tp: int = 1, pp: int = 1) -> MegatronWorkload:
     )
 
 
-def _tracer(cache_dir: Path) -> DAGTracer:
-    return DAGTracer(DAGTracerConfig(cache_dir=cache_dir))
+def _tracer(cache_dir: Path) -> MegatronDAGTracer:
+    return MegatronDAGTracer(DAGTracerConfig(cache_dir=cache_dir))
 
 
 def _trace(workload: MegatronWorkload, cache_dir: Path) -> ExecutionDAG:
@@ -163,7 +164,7 @@ def test_same_workload_reuses_single_cache_file(tmp_path):
 def test_cache_disabled_when_none(tmp_path):
     """cache_dir=None → no files written, trace still works."""
     workload = _small_workload()
-    tracer = DAGTracer(DAGTracerConfig(cache_dir=None))
+    tracer = MegatronDAGTracer(DAGTracerConfig(cache_dir=None))
     dag = tracer.trace(workload, None)  # type: ignore[arg-type]
     assert len(list(tmp_path.glob("*.npz"))) == 0
     assert len(dag.compute_nodes) > 0

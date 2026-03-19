@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example: Run ASTRA-Sim simulation through Python bindings."""
 
-from simulon.backend import AnalyticalBackend, AstraSimBackend
+from simulon.backend import AnalyticalBackend
 from simulon.config.common import DType
 from simulon.config.dc import (
     ClusterSpec,
@@ -89,30 +89,6 @@ def main():
           f"TP={results['workload']['tensor_parallel']}, "
           f"PP={results['workload']['pipeline_parallel']}")
 
-    print("\n" + "=" * 80)
-    print("OPTION 2: Run actual ASTRA-Sim simulation")
-    print("=" * 80)
-
-    # Option 2: Run the actual simulation
-    backend = AstraSimBackend(
-        network_backend="analytical",
-        run_simulation=True  # <-- This runs the C++ simulation!
-    )
-
-    results = backend.run(scenario)
-
-    print(f"Status: {results['status']}")
-    print(f"Output directory: {results['simulation']['output_dir']}")
-    print(f"Workload file: {results['simulation']['workload_file']}")
-    print(f"Results directory: {results['simulation']['results_dir']}")
-
-    # Print first few lines of simulation output
-    stdout = results['simulation']['stdout']
-    lines = stdout.split('\n')[:20]
-    print("\nSimulation output (first 20 lines):")
-    print("-" * 80)
-    for line in lines:
-        print(line)
 
 
 if __name__ == "__main__":

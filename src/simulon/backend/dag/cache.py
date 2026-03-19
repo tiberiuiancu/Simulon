@@ -39,7 +39,6 @@ Layout inside the .npz:
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import logging
 import math

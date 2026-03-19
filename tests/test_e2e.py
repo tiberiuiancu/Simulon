@@ -2,8 +2,9 @@
 
 import pytest
 
-from simulon.backend.dag import DAGTracer, DAGTracerConfig, ExecutionDAG
-from simulon.backend.astra_sim import AstraSimBackend
+from simulon.backend.dag import DAGTracerConfig, ExecutionDAG
+from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.analytical import AnalyticalBackend
 from simulon.config.common import DType
 from simulon.config.dc import (
     ClusterSpec,
@@ -97,21 +98,21 @@ def simple_scenario():
 
 def test_dag_tracer_returns_execution_dag(simple_scenario):
     """DAGTracer.trace() returns an ExecutionDAG instance."""
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     assert isinstance(dag, ExecutionDAG)
 
 
 def test_dag_tracer_has_compute_nodes(simple_scenario):
     """DAG has compute nodes."""
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     assert len(dag.compute_nodes) > 0
 
 
 def test_dag_tracer_tp1_no_comm_stubs(simple_scenario):
     """With tp=1, no AllGather/ReduceScatter comm nodes are generated."""
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     tp_collectives = [
         n for n in dag.comm_nodes
@@ -124,7 +125,7 @@ def test_dag_tracer_tp2_generates_comm_nodes():
     """With tp=2, AllGather and ReduceScatter comm nodes are generated."""
     wl = make_workload(tp=2, pp=1, num_gpus=4, num_layers=1)
     dc = make_datacenter()
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(wl, dc)
 
     ag_nodes = [n for n in dag.comm_nodes if n.collective_type == "AllGather"]
@@ -137,7 +138,7 @@ def test_dag_tracer_pp2_generates_pp_sends():
     """With pp=2, PP_Send comm nodes are generated at stage boundaries."""
     wl = make_workload(tp=1, pp=2, num_gpus=4, num_layers=1, global_batch_size=4)
     dc = make_datacenter()
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(wl, dc)
 
     pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
@@ -147,7 +148,7 @@ def test_dag_tracer_pp2_generates_pp_sends():
 def test_dag_to_json_is_valid_json(simple_scenario):
     """ExecutionDAG.to_json() returns valid JSON."""
     import json
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     json_str = dag.to_json()
     data = json.loads(json_str)
@@ -158,7 +159,7 @@ def test_dag_to_json_is_valid_json(simple_scenario):
 
 def test_dag_to_dict_structure(simple_scenario):
     """ExecutionDAG.to_dict() has correct keys."""
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     d = dag.to_dict()
     assert isinstance(d["compute_nodes"], list)
@@ -168,7 +169,7 @@ def test_dag_to_dict_structure(simple_scenario):
 
 def test_compute_node_fields(simple_scenario):
     """ComputeNodes have expected fields."""
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     cn = dag.compute_nodes[0]
     assert hasattr(cn, "node_id")
@@ -184,7 +185,7 @@ def test_flow_ids_nonnegative():
     """All flow_ids in comm nodes (from actual flows) are >= 0."""
     wl = make_workload(tp=2, pp=1, num_gpus=4, num_layers=1)
     dc = make_datacenter()
-    tracer = DAGTracer()
+    tracer = MegatronDAGTracer()
     dag = tracer.trace(wl, dc)
     for n in dag.comm_nodes:
         assert n.flow_id >= 0 or n.flow_id == -1, f"Unexpected flow_id={n.flow_id}"
@@ -195,13 +196,13 @@ def test_flow_ids_nonnegative():
 
 
 # ---------------------------------------------------------------------------
-# AstraSimBackend tests
+# AnalyticalBackend tests
 # ---------------------------------------------------------------------------
 
 
 def test_astra_sim_backend_run(simple_scenario):
-    """AstraSimBackend.run() returns a dict with expected keys."""
-    backend = AstraSimBackend()
+    """AnalyticalBackend.run() returns a dict with expected keys."""
+    backend = AnalyticalBackend()
     result = backend.run(simple_scenario)
     assert result["status"] == "success"
     assert "compute_nodes" in result
@@ -211,14 +212,14 @@ def test_astra_sim_backend_run(simple_scenario):
 
 
 def test_astra_sim_backend_run_trace(simple_scenario):
-    """AstraSimBackend.run_trace() returns an ExecutionDAG."""
-    backend = AstraSimBackend()
+    """AnalyticalBackend.run_trace() returns an ExecutionDAG."""
+    backend = AnalyticalBackend()
     dag = backend.run_trace(simple_scenario)
     assert isinstance(dag, ExecutionDAG)
 
 
 def test_astra_sim_backend_rejects_non_megatron():
-    """AstraSimBackend raises ValueError for non-MegatronWorkload."""
+    """AnalyticalBackend raises ValueError for non-MegatronWorkload."""
     from simulon.config.workload import InferenceWorkload, InferenceParallelism, InferenceRun
     dc = make_datacenter()
     wl = InferenceWorkload(
@@ -228,8 +229,8 @@ def test_astra_sim_backend_rejects_non_megatron():
         inference=InferenceRun(num_gpus=4, batch_size=1, seq_length=128),
     )
     sc = ScenarioConfig(datacenter=dc, workload=wl)
-    backend = AstraSimBackend()
-    with pytest.raises(ValueError, match="AstraSimBackend only supports MegatronWorkload"):
+    backend = AnalyticalBackend()
+    with pytest.raises(ValueError, match="AnalyticalBackend only supports MegatronWorkload"):
         backend.run_trace(sc)
 
 
@@ -242,6 +243,6 @@ def test_astra_sim_num_channels():
     sc1 = ScenarioConfig(datacenter=dc, workload=wl, collective=NcclConfig(num_channels=1))
     sc2 = ScenarioConfig(datacenter=dc, workload=wl, collective=NcclConfig(num_channels=2))
 
-    dag1 = AstraSimBackend().run_trace(sc1)
-    dag2 = AstraSimBackend().run_trace(sc2)
+    dag1 = AnalyticalBackend().run_trace(sc1)
+    dag2 = AnalyticalBackend().run_trace(sc2)
     assert len(dag2.comm_nodes) > len(dag1.comm_nodes)

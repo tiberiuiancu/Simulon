@@ -2,8 +2,9 @@
 
 import pytest
 
-from simulon.backend.dag import DAGTracer, DAGTracerConfig
-from simulon.backend.dag.tracer import _params_per_tp_rank
+from simulon.backend.dag import DAGTracerConfig
+from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.dag.megatron_tracer import _params_per_tp_rank
 from simulon.config.common import DType
 from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
 from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
@@ -62,7 +63,7 @@ def make_dc(gpus: int = 8) -> DatacenterConfig:
 def trace(wl: MegatronWorkload, dc: DatacenterConfig | None = None):
     if dc is None:
         dc = make_dc()
-    return DAGTracer(DAGTracerConfig()).trace(wl, dc)
+    return MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
 
 # ---------------------------------------------------------------------------

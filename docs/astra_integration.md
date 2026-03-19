@@ -21,13 +21,13 @@ any target hardware.
 ScenarioConfig (DatacenterConfig + MegatronWorkload)
     │
     ▼
-DAGTracer.trace()
+MegatronDAGTracer.trace()
     │
     ├─ PipelineScheduler   — 1F1B schedule per pipeline stage
     │
     ├─ LayerExpander       — per sublayer: AG → kernels → RS (Megatron SP pattern)
     │
-    └─ decompose_collective()
+    └─ CCLDecomposer.decompose()  (default: DefaultCCLDecomposer → decompose_collective)
            │
            ├─ ring.py      — AllGather / ReduceScatter / AllReduce / AllToAll
            └─ nvls.py      — NVLS AllReduce (intra-node NVLink Switch)
@@ -65,16 +65,18 @@ Top-level dispatcher: `decompose_collective(collective_type, group_ranks, data_s
 | `nodes.py` | `ComputeNode`, `CommNode`, `DAGEdge`, `ExecutionDAG` (with `to_dict` / `to_json`) |
 | `pipeline.py` | `PipelineScheduler` — 1F1B warmup / steady-state / cooldown schedule |
 | `layer_expander.py` | Expands one sublayer (attn or mlp) into: `AllGather → kernels → ReduceScatter` for fwd/bwd_ig; `kernels` only for bwd_wg |
-| `tracer.py` | `DAGTracer` — iterates all GPU ranks × pipeline slots × layers × sublayers, fills comm stubs via `decompose_collective`, adds PP_Send nodes at stage boundaries |
+| `tracer.py` | `DAGTracer` (ABC) + `DAGTracerConfig` |
+| `megatron_tracer.py` | `MegatronDAGTracer` — iterates all GPU ranks × pipeline slots × layers × sublayers, fills comm stubs via `CCLDecomposer`, adds PP_Send nodes at stage boundaries |
 
-### `simulon.backend.astra_sim`
+### `simulon.backend.analytical`
 
-`AstraSimBackend` is a thin wrapper around `DAGTracer`:
+`AnalyticalBackend` is a thin wrapper around `MegatronDAGTracer`:
 
 ```python
-backend = AstraSimBackend(num_channels=1, algorithm="ring")
+backend = AnalyticalBackend()
 dag = backend.run_trace(scenario)      # returns ExecutionDAG
 result = backend.run(scenario)         # returns dict with counts + dag
+dag, sim = backend.simulate(scenario)  # also runs replay → SimulationResult
 ```
 
 ---
@@ -162,14 +164,14 @@ TP group for a given `(dp_rank, pp_stage)`:
 
 ---
 
-## Analytical network model (future)
+## Analytical network model
 
-The ASTRA-Sim analytical backend used a **LogGP model** for flow timing:
+The DAG replayer (`backend/dag/replayer.py`) models flow timing with a **LogGP-style** formula:
 
 ```
 transfer_ns = L + 2*o + G*(bytes - 1)
            ≈  latency_ns + bytes / bandwidth
 ```
 
-With per-link serialisation for contention. A Python DAG replayer
-(`backend/dag/replayer.py`) implementing this model is planned.
+With per-link serialisation for contention. `replay(dag, datacenter)` returns a
+`SimulationResult` with `total_time_ms` and per-GPU breakdowns.

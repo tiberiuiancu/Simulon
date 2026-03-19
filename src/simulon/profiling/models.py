@@ -26,6 +26,34 @@ def load_model_template(name: str) -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def _resolve_model(model: "str | Any") -> "Any":
+    """Resolve a model reference to an LLMSpec.
+
+    If model is already an LLMSpec, return it directly.
+    If it is a string (named model), load from templates/model/<name>.yaml.
+    """
+    from simulon.config.workload import LLMSpec
+    if isinstance(model, LLMSpec):
+        return model
+
+    path = _TEMPLATES_DIR / f"{model}.yaml"
+    if not path.exists():
+        candidates = list(_TEMPLATES_DIR.glob("*.yaml")) if _TEMPLATES_DIR.exists() else []
+        for c in candidates:
+            if c.stem.lower() == model.lower():
+                path = c
+                break
+        else:
+            raise FileNotFoundError(
+                f"Model template not found: {model!r}. "
+                f"Expected at {_TEMPLATES_DIR}/{model}.yaml"
+            )
+
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    return LLMSpec.model_validate(data)
+
+
 def model_to_kernel_params(tmpl: dict[str, Any]) -> dict[str, Any]:
     """Extract kernel parameter fields from a model template dict."""
     keys = ["hidden_size", "num_heads", "ffn_hidden_size", "vocab_size",
