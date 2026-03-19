@@ -46,18 +46,19 @@ simulon/
 │   │   └── decompose.py     # decompose_collective() top-level dispatcher
 │   ├── backend/
 │   │   ├── base.py          # Backend ABC
-│   │   ├── astra_sim.py     # AstraSimBackend → DAGTracer wrapper
+│   │   ├── analytical.py    # AnalyticalBackend — thin wrapper around MegatronDAGTracer
 │   │   └── dag/
 │   │       ├── nodes.py          # ComputeNode, CommNode, DAGEdge, ExecutionDAG
 │   │       ├── pipeline.py       # PipelineScheduler ABC, OneFOneBScheduler, make_scheduler
 │   │       ├── layer_expander.py # per-sublayer kernel + comm stub expansion
-│   │       ├── tracer.py         # DAGTracer — assembles full multi-GPU DAG
+│   │       ├── tracer.py         # DAGTracer (ABC) + DAGTracerConfig
+│   │       ├── megatron_tracer.py # MegatronDAGTracer — assembles full multi-GPU DAG
 │   │       ├── populate.py       # injects GPU kernel timing into DAG nodes
 │   │       ├── replayer.py       # critical-path replay → SimulationResult
 │   │       └── chrome_trace.py   # Chrome/Perfetto trace export
 │   ├── workload/
-│   │   ├── trace.py         # WorkloadTrace, CommOp, ComputeOp (legacy)
-│   │   └── megatron.py      # generate_megatron_trace() (legacy)
+│   │   ├── trace.py         # WorkloadTrace, CommOp, ComputeOp (legacy types)
+│   │   └── megatron.py      # generate_megatron_trace() — legacy stub (use MegatronDAGTracer)
 │   ├── profiling/
 │   │   └── kernels.py       # benchmark_kernels() — CUDA event timing
 │   └── cli/
@@ -74,10 +75,10 @@ simulon/
 └── tests/
     ├── test_collective.py   # Collective decomposition unit tests
     ├── test_dag.py          # DAG nodes, pipeline scheduler, LayerExpander
-    ├── test_e2e.py          # DAGTracer + AstraSimBackend integration
+    ├── test_e2e.py          # MegatronDAGTracer + AnalyticalBackend integration
     ├── test_moe.py          # MoE/EP layer expansion and DAG tracing
     ├── test_step.py         # DP gradient sync step phase
-    ├── test_megatron.py     # Legacy workload trace generation
+    ├── test_legacy_compare.py # Parity record: tracer vs legacy workload model
     └── test_scenario.py     # Config serialisation round-trip
 ```
 
@@ -168,14 +169,14 @@ simulon simulate scenario.yaml -v
 ### 3. Use the Python API directly
 
 ```python
-from simulon.backend.astra_sim import AstraSimBackend
+from simulon.backend.analytical import AnalyticalBackend
 from simulon.config.scenario import ScenarioConfig
 import yaml, json
 
 with open("scenario.yaml") as f:
     sc = ScenarioConfig.model_validate(yaml.safe_load(f))
 
-backend = AstraSimBackend()
+backend = AnalyticalBackend()
 dag, result = backend.simulate(sc)
 
 print(f"Total: {result.total_time_ms:.1f} ms")
@@ -241,12 +242,12 @@ of the DAG tracer. The algorithm is taken from the scenario's `collective` block
 ```python
 from simulon.collective import decompose_collective
 
-result, next_flow_id, next_node_id = decompose_collective(
+result, next_flow_id = decompose_collective(
     collective_type="AllReduce",   # AllGather | ReduceScatter | AllReduce | AllToAll
     group_ranks=[0, 1, 2, 3],
     data_size=1024 * 1024,         # bytes
     num_channels=2,
-    algorithm="ring",              # ring (tree | collnet_direct | collnet_chain | nvls are stubs)
+    algorithm="ring",              # ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
 )
 
 print(f"{len(result.flows)} flows")

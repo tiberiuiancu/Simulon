@@ -37,7 +37,7 @@ def simulate(
 ):
     """Run simulation and write a Chrome/Perfetto trace."""
     import json
-    from simulon.backend.astra_sim import AstraSimBackend
+    from simulon.backend.analytical import AnalyticalBackend
     from simulon.backend.dag.chrome_trace import to_chrome_trace
     from simulon.config.scenario import ScenarioConfig
     from simulon.config.workload import MegatronWorkload
@@ -54,7 +54,7 @@ def simulate(
         import logging
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
-    backend = AstraSimBackend()
+    backend = AnalyticalBackend()
     dag, result = backend.simulate(sc)
 
     p = sc.workload.parallelism
