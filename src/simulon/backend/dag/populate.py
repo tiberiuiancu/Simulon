@@ -115,7 +115,10 @@ def populate_dag(
 
     with log_progress("  resolving compute", len(dag.compute_nodes), logger) as advance:
         for node in dag.compute_nodes:
-            node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
+            if node.fused_kernels:
+                node.duration_ms = sum(lookup_kernel_time(k, match_params, gpu_spec) for k in node.fused_kernels)
+            else:
+                node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
             advance()
 
     return dag
