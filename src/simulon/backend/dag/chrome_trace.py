@@ -54,6 +54,10 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
 
     Returns:
         Dict with "traceEvents" list, ready for json.dump().
+
+    Compute event args include: kernel, phase, layer_id, microbatch_id,
+    pipeline_stage, duration_ms. For compacted nodes (fused sequential kernels),
+    a ``fused_kernels`` arg is also present with the comma-joined original kernel names.
     """
     events: list[dict[str, Any]] = []
 
@@ -105,6 +109,16 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
     for n in dag.compute_nodes:
         if n.start_ms is None or n.finish_ms is None:
             continue
+        args: dict[str, Any] = {
+            "kernel":          n.kernel,
+            "phase":           n.phase,
+            "layer_id":        n.layer_id,
+            "microbatch_id":   n.microbatch_id,
+            "pipeline_stage":  n.pipeline_stage,
+            "duration_ms":     n.duration_ms,
+        }
+        if n.fused_kernels:
+            args["fused_kernels"] = ", ".join(n.fused_kernels)
         events.append({
             "name": n.kernel,
             "ph": "X",
@@ -112,14 +126,7 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
             "tid": _TID_COMPUTE,
             "ts":  n.start_ms * 1_000,
             "dur": (n.duration_ms or 0.0) * 1_000,
-            "args": {
-                "kernel":          n.kernel,
-                "phase":           n.phase,
-                "layer_id":        n.layer_id,
-                "microbatch_id":   n.microbatch_id,
-                "pipeline_stage":  n.pipeline_stage,
-                "duration_ms":     n.duration_ms,
-            },
+            "args": args,
         })
 
     # Comm events — one send event on src, one recv event on dst.
