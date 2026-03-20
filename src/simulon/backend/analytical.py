@@ -80,14 +80,16 @@ class AnalyticalBackend(Backend):
             "dag": d,
         }
 
-    def run_trace(self, scenario: ScenarioConfig) -> ExecutionDAG:
+    def run_trace(self, scenario: ScenarioConfig, compact: bool = False) -> ExecutionDAG:
         from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AnalyticalBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
-        tracer = MegatronDAGTracer(_tracer_config_from_scenario(scenario), ccl=_ccl_from_scenario(scenario))
+        cfg = _tracer_config_from_scenario(scenario)
+        cfg.compact = compact
+        tracer = MegatronDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
         return tracer.trace(scenario.workload, scenario.datacenter)
 
-    def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
+    def simulate(self, scenario: ScenarioConfig, compact: bool = False) -> tuple[ExecutionDAG, SimulationResult]:
         from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AnalyticalBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
@@ -98,7 +100,7 @@ class AnalyticalBackend(Backend):
         logger.info("Building DAG  (GPUs=%d  tp=%d  pp=%d  ep=%d  dp=%d) ...",
                     num_gpus, p.tp, p.pp, p.ep,
                     p.dp if p.dp is not None else num_gpus // (p.tp * p.pp * p.ep))
-        dag = self.run_trace(scenario)
+        dag = self.run_trace(scenario, compact=compact)
         logger.info("  DAG built: %d compute nodes, %d comm nodes, %d edges",
                     len(dag.compute_nodes), len(dag.comm_nodes), len(dag.edges))
 

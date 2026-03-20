@@ -16,6 +16,7 @@ class ComputeNode:
     duration_ms: Optional[float] = None
     start_ms: Optional[float] = None
     finish_ms: Optional[float] = None
+    fused_kernels: list[str] = field(default_factory=list)  # non-empty when this node fuses multiple kernels
 
 
 @dataclass

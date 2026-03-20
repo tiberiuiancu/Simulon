@@ -34,6 +34,7 @@ def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json (default: trace.json)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Print per-GPU timing summary"),
+    compact: bool = typer.Option(False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"),
 ):
     """Run simulation and write a Chrome/Perfetto trace."""
     import json
@@ -55,7 +56,7 @@ def simulate(
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
     backend = AnalyticalBackend()
-    dag, result = backend.simulate(sc)
+    dag, result = backend.simulate(sc, compact=compact)
 
     p = sc.workload.parallelism
     t = sc.workload.training
