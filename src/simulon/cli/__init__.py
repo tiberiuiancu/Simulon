@@ -8,7 +8,8 @@ import yaml
 def _dump_profile(data: dict, f) -> None:
     """Write a GPU profile YAML with compact one-line-per-entry formatting."""
     top = {k: v for k, v in data.items() if k not in ("kernel_runs", "oom_configs")}
-    f.write(yaml.dump(top, default_flow_style=False, sort_keys=False))
+    if top:
+        f.write(yaml.dump(top, default_flow_style=False, sort_keys=False))
     runs = data.get("kernel_runs", [])
     if runs:
         f.write("kernel_runs:\n")
@@ -177,29 +178,46 @@ def profile_gpu(
         and (not is_moe or e <= num_experts)
     ]
 
-    # Load or initialise the existing profile.
+    # Determine spec and profile paths.
     if output is None:
         safe_name = name.lower().replace(" ", "-")
-        output = Path("templates/gpu") / f"{safe_name}.yaml"
-
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    if output.exists():
-        with open(output) as f:
-            existing = yaml.safe_load(f) or {}
-        existing_runs: list[dict] = existing.get("kernel_runs", [])
-        existing_oom: list[dict] = existing.get("oom_configs", [])
+        spec_path = Path("templates/gpu") / f"{safe_name}.yaml"
     else:
-        existing = {
+        spec_path = output
+
+    profile_path = spec_path.with_suffix('').with_suffix('.profile.yaml')
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing profile data (kernel_runs / oom_configs).
+    if profile_path.exists():
+        with open(profile_path) as f:
+            profile_data: dict = yaml.safe_load(f) or {}
+        existing_runs: list[dict] = profile_data.get("kernel_runs", [])
+        existing_oom: list[dict] = profile_data.get("oom_configs", [])
+    else:
+        profile_data = {}
+        existing_runs = []
+        existing_oom = []
+
+    # Create hardware spec file if it doesn't exist yet (skip for --dry-run).
+    _hw_args_provided = any(v is not None for v in [vendor, memory_capacity_gb, tdp_w]) or flops_multiplier != 1.0
+    if not dry_run and not spec_path.exists():
+        spec_dict = {
             "name": name,
             "vendor": vendor,
             "memory_capacity_gb": memory_capacity_gb,
             "tdp_w": tdp_w,
             "flops_multiplier": flops_multiplier,
         }
-        existing = {k: v for k, v in existing.items() if v is not None}
-        existing_runs = []
-        existing_oom = []
+        spec_dict = {k: v for k, v in spec_dict.items() if v is not None}
+        with open(spec_path, "w") as f:
+            yaml.dump(spec_dict, f, default_flow_style=False, sort_keys=False)
+    elif spec_path.exists() and _hw_args_provided:
+        typer.echo(
+            f"Warning: {spec_path} already exists — hardware fields (--vendor, --memory-capacity-gb, "
+            "--tdp-w, --flops-multiplier) were ignored. Edit the spec file directly to update them.",
+            err=True,
+        )
 
     if purge:
         existing_runs = []
@@ -312,7 +330,7 @@ def profile_gpu(
         ]
         existing_runs.extend(kr.model_dump() for kr in all_new_runs)
 
-    existing["kernel_runs"] = existing_runs
+    profile_data["kernel_runs"] = existing_runs
 
     # Merge new OOM configs, deduplicating by config dict.
     new_oom = [r.config for r in results if r.oom]
@@ -322,13 +340,16 @@ def profile_gpu(
             if frozenset(cfg.items()) not in existing_oom_set:
                 existing_oom.append(cfg)
                 existing_oom_set.add(frozenset(cfg.items()))
-    existing["oom_configs"] = existing_oom
+    profile_data["oom_configs"] = existing_oom
 
-    with open(output, "w") as f:
-        _dump_profile(existing, f)
+    with open(profile_path, "w") as f:
+        _dump_profile(profile_data, f)
 
-    typer.echo(f"Saved {len(all_new_runs)} kernel runs to {output}")
+    typer.echo(f"Saved {len(all_new_runs)} kernel runs to {profile_path}")
     typer.echo(f"Completed {len(completed)}/{len(results)} configs, {oom_count} skipped (OOM)")
 
-    GPUSpec.model_validate(existing)
+    with open(spec_path) as f:
+        merged = yaml.safe_load(f) or {}
+    merged.update(profile_data)
+    GPUSpec.model_validate(merged)
     typer.echo("Profile validated successfully.")
