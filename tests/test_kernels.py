@@ -10,6 +10,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from simulon.config.common import DType
+from utils import requires_torch
+
+pytestmark = requires_torch
 from simulon.config.dc import KernelRun
 from simulon.profiling.kernels import benchmark_kernels
 
