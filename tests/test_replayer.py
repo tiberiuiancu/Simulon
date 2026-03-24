@@ -9,7 +9,12 @@ from simulon.backend.dag.populate import (
     _parse_speed,
     populate_network,
 )
-from simulon.backend.dag.replayer import SimulationResult, replay
+from simulon.backend.dag.replayer import (
+    SimulationResult,
+    _intersection_duration,
+    _merge_intervals,
+    replay,
+)
 from simulon.config.dc import (
     DatacenterConfig,
     DatacenterMeta,
@@ -242,7 +247,7 @@ def test_single_compute_node():
 
     assert abs(result.total_time_ms - 5.0) < 1e-9
     assert abs(result.per_gpu_times_ms[0] - 5.0) < 1e-9
-    assert abs(result.compute_time_ms[0] - 5.0) < 1e-9
+    assert abs(result.compute_ms - 5.0) < 1e-9
 
 
 def test_compute_node_none_duration():
@@ -311,7 +316,12 @@ def test_parent_flow_ids_ordering():
 
 
 def test_comm_time_counted_for_both_endpoints():
-    """comm_time_ms[gpu] is incremented for both src_gpu and dst_gpu."""
+    """Both src and dst GPU are accounted for in the summary.
+
+    The dst GPU (receiver) waits for the recv → exposed_comm.
+    The src GPU (sender) has no compute or recv → bubble.
+    Averaged across 2 GPUs: exposed_comm = 0.5 ms, bubble = 0.5 ms.
+    """
     dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
     bytes_ = 1_000_000  # 1 ms
 
@@ -319,8 +329,8 @@ def test_comm_time_counted_for_both_endpoints():
     populate_network(dag, dc)
     result = replay(dag)
 
-    assert abs(result.comm_time_ms[0] - 1.0) < 1e-9  # src counted
-    assert abs(result.comm_time_ms[1] - 1.0) < 1e-9  # dst counted
+    assert abs(result.exposed_comm_ms - 0.5) < 1e-9   # avg: 0 (src) + 1.0 (dst) / 2
+    assert abs(result.bubble_ms - 0.5) < 1e-9          # avg: 1.0 (src) + 0 (dst) / 2
 
 
 # ---------------------------------------------------------------------------
@@ -382,3 +392,361 @@ def test_intra_node_uses_nvswitch_bandwidth():
     result = replay(dag)
 
     assert abs(result.total_time_ms - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# _merge_intervals
+# ---------------------------------------------------------------------------
+
+
+class TestMergeIntervals:
+    def test_empty(self):
+        """Empty input returns empty list."""
+        assert _merge_intervals([]) == []
+
+    def test_single(self):
+        """A single interval is returned unchanged."""
+        assert _merge_intervals([(1.0, 3.0)]) == [(1.0, 3.0)]
+
+    def test_non_overlapping(self):
+        """Non-overlapping intervals are returned in sorted order."""
+        assert _merge_intervals([(0.0, 1.0), (2.0, 3.0)]) == [(0.0, 1.0), (2.0, 3.0)]
+
+    def test_non_overlapping_unsorted(self):
+        """Out-of-order non-overlapping intervals are sorted first."""
+        assert _merge_intervals([(2.0, 3.0), (0.0, 1.0)]) == [(0.0, 1.0), (2.0, 3.0)]
+
+    def test_overlapping(self):
+        """Overlapping intervals are merged into one span."""
+        assert _merge_intervals([(0.0, 2.0), (1.0, 3.0)]) == [(0.0, 3.0)]
+
+    def test_adjacent(self):
+        """Adjacent intervals (end == start) are merged because s <= end."""
+        assert _merge_intervals([(0.0, 1.0), (1.0, 2.0)]) == [(0.0, 2.0)]
+
+    def test_contained(self):
+        """An interval fully inside another is absorbed into the outer span."""
+        assert _merge_intervals([(0.0, 5.0), (1.0, 3.0)]) == [(0.0, 5.0)]
+
+    def test_multiple_overlapping_collapse_to_one(self):
+        """Three mutually-overlapping intervals collapse to a single interval."""
+        result = _merge_intervals([(0.0, 2.0), (1.0, 3.0), (2.5, 4.0)])
+        assert result == [(0.0, 4.0)]
+
+    def test_two_disjoint_groups(self):
+        """Two disjoint clusters each merge independently."""
+        result = _merge_intervals([(0.0, 2.0), (1.0, 3.0), (5.0, 7.0), (6.0, 8.0)])
+        assert result == [(0.0, 3.0), (5.0, 8.0)]
+
+
+# ---------------------------------------------------------------------------
+# _intersection_duration
+# ---------------------------------------------------------------------------
+
+
+class TestIntersectionDuration:
+    def test_both_empty(self):
+        """No intervals on either side → zero intersection."""
+        assert _intersection_duration([], []) == pytest.approx(0.0)
+
+    def test_first_empty(self):
+        """First list empty → zero intersection."""
+        assert _intersection_duration([], [(0.0, 1.0)]) == pytest.approx(0.0)
+
+    def test_second_empty(self):
+        """Second list empty → zero intersection."""
+        assert _intersection_duration([(0.0, 1.0)], []) == pytest.approx(0.0)
+
+    def test_no_overlap(self):
+        """Disjoint intervals produce zero intersection."""
+        assert _intersection_duration([(0.0, 1.0)], [(2.0, 3.0)]) == pytest.approx(0.0)
+
+    def test_partial_overlap(self):
+        """Partially overlapping intervals: intersection equals the overlap length."""
+        assert _intersection_duration([(0.0, 2.0)], [(1.0, 3.0)]) == pytest.approx(1.0)
+
+    def test_full_containment(self):
+        """Smaller interval fully inside larger: intersection equals the smaller length."""
+        assert _intersection_duration([(0.0, 4.0)], [(1.0, 3.0)]) == pytest.approx(2.0)
+
+    def test_identical_intervals(self):
+        """Identical intervals: intersection equals the full interval length."""
+        assert _intersection_duration([(0.0, 5.0)], [(0.0, 5.0)]) == pytest.approx(5.0)
+
+    def test_multiple_intervals_each_side(self):
+        """Multiple intervals per side: sum of all pairwise overlaps is correct.
+
+        a=[(0,2),(4,6)], b=[(1,5)] → overlaps at (1,2)=1 and (4,5)=1 → total=2.
+        """
+        a = [(0.0, 2.0), (4.0, 6.0)]
+        b = [(1.0, 5.0)]
+        assert _intersection_duration(a, b) == pytest.approx(2.0)
+
+    def test_touching_boundary_zero(self):
+        """Adjacent intervals that touch but do not overlap contribute nothing (hi == lo)."""
+        assert _intersection_duration([(0.0, 1.0)], [(1.0, 2.0)]) == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Helper: CommNode with pre-set duration_ms (bypasses populate_network)
+# ---------------------------------------------------------------------------
+
+
+def _comm_preset(node_id, src_gpu, dst_gpu, duration_ms, collective_type="AllReduce"):
+    """Build a CommNode with duration already set, skipping populate_network."""
+    n = CommNode(
+        node_id=node_id,
+        src_gpu=src_gpu,
+        dst_gpu=dst_gpu,
+        bytes=0,
+        collective_type=collective_type,
+        layer_id=0,
+        phase="fwd",
+        flow_id=node_id,
+        parent_flow_ids=[],
+    )
+    n.duration_ms = duration_ms
+    return n
+
+
+# ---------------------------------------------------------------------------
+# _summarize / SimulationResult metrics via replay()
+# ---------------------------------------------------------------------------
+
+
+class TestSummarize:
+
+    # ------------------------------------------------------------------
+    # Pure compute
+    # ------------------------------------------------------------------
+
+    def test_pure_compute_no_comm_no_bubble(self):
+        """Pure compute on one GPU: compute_ms correct, exposed_comm and bubble both 0."""
+        dag = _dag(_compute(0, gpu_rank=0, duration_ms=5.0))
+        result = replay(dag)
+
+        assert result.compute_ms == pytest.approx(5.0)
+        assert result.exposed_comm_ms == pytest.approx(0.0)
+        assert result.bubble_ms == pytest.approx(0.0)
+        assert result.overlapped_comm_ms == pytest.approx(0.0)
+        assert result.exposed_comm_by_type == {}
+
+    def test_two_gpus_different_compute_durations_avg(self):
+        """Two GPUs with different compute durations: averages are correct.
+
+        GPU0: 4ms, GPU1: 2ms.  total=4.  avg_compute=3, avg_bubble=1.
+        """
+        c0 = _compute(0, gpu_rank=0, duration_ms=4.0)
+        c1 = _compute(1, gpu_rank=1, duration_ms=2.0)
+        dag = _dag(c0, c1)
+        result = replay(dag)
+
+        assert result.total_time_ms == pytest.approx(4.0)
+        assert result.compute_ms == pytest.approx(3.0)   # avg(4, 2)
+        assert result.bubble_ms == pytest.approx(1.0)    # avg(0, 2)
+        assert result.exposed_comm_ms == pytest.approx(0.0)
+
+    def test_three_gpus_compute_avg(self):
+        """Three GPUs compute independently; averages span all three."""
+        c0 = _compute(0, gpu_rank=0, duration_ms=4.0)
+        c1 = _compute(1, gpu_rank=1, duration_ms=2.0)
+        c2 = _compute(2, gpu_rank=2, duration_ms=6.0)
+        dag = _dag(c0, c1, c2)
+        result = replay(dag)
+
+        assert result.total_time_ms == pytest.approx(6.0)
+        assert result.compute_ms == pytest.approx(4.0)   # avg(4, 2, 6)
+        assert result.bubble_ms == pytest.approx(2.0)    # avg(2, 4, 0)
+
+    # ------------------------------------------------------------------
+    # Pure recv (no compute on dst GPU)
+    # ------------------------------------------------------------------
+
+    def test_pure_recv_fully_exposed(self):
+        """Recv with no overlapping compute is fully exposed on the dst GPU.
+
+        Src GPU (sender) contributes no exposed_comm.
+        Averaged over 2 GPUs: exposed_comm = recv_duration / 2.
+        """
+        dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
+        bytes_ = 2_000_000  # 2 ms at 1 GBps
+
+        dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_))
+        populate_network(dag, dc)
+        result = replay(dag)
+
+        # dst GPU: exposed=2ms.  src GPU: exposed=0.  avg = 1ms.
+        assert result.exposed_comm_ms == pytest.approx(1.0)
+        assert result.compute_ms == pytest.approx(0.0)
+        # src GPU has 2ms where it is neither computing nor receiving → bubble
+        assert result.bubble_ms == pytest.approx(1.0)   # avg(2, 0) / 2
+
+    # ------------------------------------------------------------------
+    # Sequential compute then recv (no overlap)
+    # ------------------------------------------------------------------
+
+    def test_sequential_compute_then_recv_on_dst(self):
+        """Compute (3ms) then recv (1ms) on dst GPU: both fully accounted.
+
+        GPU1 (dst): compute=3, exposed_comm=1, bubble=0.
+        GPU0 (src): send starts at t=3, bubble=3+0=3 (no recv, compute=0).
+        Actually GPU0 finishes at t=4 (blocking during send);
+        bubble for GPU0 = total(4) - 0 - 0 = 4.
+        Averages: compute=1.5, exposed_comm=0.5, bubble=2.
+        """
+        dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
+        bytes_ = 1_000_000  # 1 ms
+
+        c = _compute(0, gpu_rank=1, duration_ms=3.0)
+        m = _comm(1, src_gpu=0, dst_gpu=1, bytes=bytes_)
+        dag = _dag(c, m, edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
+        populate_network(dag, dc)
+        result = replay(dag)
+
+        assert result.total_time_ms == pytest.approx(4.0)
+        assert result.compute_ms == pytest.approx(1.5)        # avg(3, 0)
+        assert result.exposed_comm_ms == pytest.approx(0.5)   # avg(1, 0)
+        assert result.bubble_ms == pytest.approx(2.0)         # avg(0, 4)
+
+    # ------------------------------------------------------------------
+    # Compute overlapping recv (comm hidden)
+    # ------------------------------------------------------------------
+
+    def test_recv_fully_inside_compute_window_zero_exposed(self):
+        """Recv fully inside compute window: exposed_comm == 0, overlapped_comm > 0.
+
+        Setup: GPU0 runs compute 0-5ms.  GPU1 sends, GPU0 receives 1-3ms.
+        Overlap = 2ms.  Exposed = 0.
+        """
+        c = _compute(0, gpu_rank=0, duration_ms=5.0)
+        m = _comm_preset(1, src_gpu=1, dst_gpu=0, duration_ms=2.0)
+        # delay comm start to t=1 via a 1ms pre-compute on GPU0
+        c_pre = _compute(2, gpu_rank=0, duration_ms=1.0)
+        dag = _dag(c_pre, c, m, edges=[
+            DAGEdge(src_node_id=2, dst_node_id=0),  # c starts after c_pre
+            DAGEdge(src_node_id=2, dst_node_id=1),  # comm starts after c_pre
+        ])
+        result = replay(dag)
+
+        # c_pre [0,1], c [1,6], comm [1,3]
+        assert result.total_time_ms == pytest.approx(6.0)
+        assert result.exposed_comm_ms == pytest.approx(0.0)
+        # GPU0: compute=[0,1]+[1,6]=[0,6]=6ms, comm=[1,3], overlap=2ms
+        # GPU1: no compute, no recv, bubble=6ms
+        assert result.overlapped_comm_ms == pytest.approx(2.0 / 2)  # avg over 2 GPUs
+
+    def test_recv_partially_overlapping_compute(self):
+        """Recv partially overlapping compute: exposed = recv duration - overlap.
+
+        GPU0: compute 0-2ms, recv 1-4ms.  Overlap with [0,2] = 1ms.  Exposed = 2ms.
+        But GPU0 has c_pre [0,1] + c [1,3] = merged [0,3].
+        Recv [1,4] ∩ [0,3] = [1,3] = 2ms hidden.  Exposed = 3 - 2 = 1ms.
+        GPU1: sender, no recv, bubble = 4ms.
+        Averages: compute=1.5, exposed=0.5, bubble=2.
+        """
+        c_pre = _compute(2, gpu_rank=0, duration_ms=1.0)
+        c = _compute(0, gpu_rank=0, duration_ms=2.0)
+        m = _comm_preset(1, src_gpu=1, dst_gpu=0, duration_ms=3.0)
+        dag = _dag(c_pre, c, m, edges=[
+            DAGEdge(src_node_id=2, dst_node_id=0),
+            DAGEdge(src_node_id=2, dst_node_id=1),
+        ])
+        result = replay(dag)
+
+        # c_pre [0,1], c [1,3], comm [1,4]
+        assert result.total_time_ms == pytest.approx(4.0)
+        assert result.compute_ms == pytest.approx(1.5)        # avg(3, 0)
+        assert result.exposed_comm_ms == pytest.approx(0.5)   # avg(1, 0)
+        assert result.bubble_ms == pytest.approx(2.0)         # avg(0, 4)
+
+    # ------------------------------------------------------------------
+    # exposed_comm_by_type bucketing
+    # ------------------------------------------------------------------
+
+    def test_exposed_comm_by_type_two_distinct_types(self):
+        """Two recv nodes on same GPU with different types bucket to separate keys.
+
+        GPU0 receives AllReduce (2ms at t=0-2) then ReduceScatter (1ms at t=2-3).
+        GPU1 and GPU2 are pure senders (no recv).
+        Avg over 3 GPUs: AllReduce = 2/3 ms, ReduceScatter = 1/3 ms.
+        """
+        ar = _comm_preset(0, src_gpu=1, dst_gpu=0, duration_ms=2.0, collective_type="AllReduce")
+        rs = _comm_preset(1, src_gpu=2, dst_gpu=0, duration_ms=1.0, collective_type="ReduceScatter")
+        dag = _dag(ar, rs, edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
+        result = replay(dag)
+
+        assert result.total_time_ms == pytest.approx(3.0)
+        assert "AllReduce" in result.exposed_comm_by_type
+        assert "ReduceScatter" in result.exposed_comm_by_type
+        assert result.exposed_comm_by_type["AllReduce"] == pytest.approx(2.0 / 3)
+        assert result.exposed_comm_by_type["ReduceScatter"] == pytest.approx(1.0 / 3)
+
+    def test_exposed_comm_by_type_hidden_recv_zero(self):
+        """Recv fully hidden by compute records 0 exposed for its collective_type."""
+        c = _compute(0, gpu_rank=0, duration_ms=5.0)
+        m = _comm_preset(1, src_gpu=1, dst_gpu=0, duration_ms=2.0, collective_type="AllGather")
+        c_pre = _compute(2, gpu_rank=0, duration_ms=1.0)
+        dag = _dag(c_pre, c, m, edges=[
+            DAGEdge(src_node_id=2, dst_node_id=0),
+            DAGEdge(src_node_id=2, dst_node_id=1),
+        ])
+        result = replay(dag)
+
+        assert result.exposed_comm_by_type.get("AllGather", 0.0) == pytest.approx(0.0)
+
+    # ------------------------------------------------------------------
+    # bubble_ms: idle time invariants
+    # ------------------------------------------------------------------
+
+    def test_bubble_ms_equals_idle_time(self):
+        """bubble_ms accounts for GPU time that is neither compute nor exposed_comm.
+
+        GPU1 (dst): compute=3ms (0-3), then recv=2ms (3-5).  bubble=0.
+        GPU0 (src): no compute, send 3-5ms.  bubble = total(5) - 0 - 0 = 5.
+        Avg bubble = (0 + 5) / 2 = 2.5.
+        """
+        dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
+        bytes_ = 2_000_000  # 2 ms
+
+        c = _compute(0, gpu_rank=1, duration_ms=3.0)
+        m = _comm(1, src_gpu=0, dst_gpu=1, bytes=bytes_)
+        dag = _dag(c, m, edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
+        populate_network(dag, dc)
+        result = replay(dag)
+
+        assert result.total_time_ms == pytest.approx(5.0)
+        assert result.bubble_ms == pytest.approx(2.5)
+        assert result.compute_ms == pytest.approx(1.5)
+        assert result.exposed_comm_ms == pytest.approx(1.0)
+
+    def test_components_sum_to_total_time(self):
+        """compute_ms + exposed_comm_ms + bubble_ms == total_time_ms for any DAG."""
+        dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
+        bytes_ = 1_000_000
+
+        c = _compute(0, gpu_rank=0, duration_ms=2.0)
+        m = _comm(1, src_gpu=0, dst_gpu=1, bytes=bytes_)
+        dag = _dag(c, m, edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
+        populate_network(dag, dc)
+        result = replay(dag)
+
+        total_components = result.compute_ms + result.exposed_comm_ms + result.bubble_ms
+        assert total_components == pytest.approx(result.total_time_ms)
+
+    def test_components_sum_pure_compute(self):
+        """Summation invariant holds for a pure-compute single-GPU DAG."""
+        dag = _dag(_compute(0, gpu_rank=0, duration_ms=7.0))
+        result = replay(dag)
+
+        total_components = result.compute_ms + result.exposed_comm_ms + result.bubble_ms
+        assert total_components == pytest.approx(result.total_time_ms)
+
+    def test_components_sum_pure_recv(self):
+        """Summation invariant holds for a pure-recv two-GPU DAG."""
+        dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
+        dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=3_000_000))
+        populate_network(dag, dc)
+        result = replay(dag)
+
+        total_components = result.compute_ms + result.exposed_comm_ms + result.bubble_ms
+        assert total_components == pytest.approx(result.total_time_ms)
