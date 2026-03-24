@@ -1,4 +1,7 @@
 import logging
+from pathlib import Path
+
+import yaml
 
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
@@ -46,10 +49,15 @@ def _resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
     return gpu
 
 
-def _load_gpu_template(name: str) -> GPUSpec:
-    import yaml
-    from pathlib import Path
+def _load_profile_data(template_path: Path) -> dict:
+    profile_path = template_path.with_suffix('').with_suffix('.profile.yaml')
+    if profile_path.exists():
+        with open(profile_path) as f:
+            return yaml.safe_load(f) or {}
+    return {}
 
+
+def _load_gpu_template(name: str) -> GPUSpec:
     template_path = Path("templates/gpu") / f"{name}.yaml"
     if not template_path.exists():
         candidates = list(Path("templates/gpu").glob("*.yaml")) if Path("templates/gpu").exists() else []
@@ -63,6 +71,7 @@ def _load_gpu_template(name: str) -> GPUSpec:
             )
     with open(template_path) as f:
         data = yaml.safe_load(f)
+    data.update(_load_profile_data(template_path))
     return GPUSpec.model_validate(data)
 
 
