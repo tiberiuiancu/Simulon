@@ -33,11 +33,17 @@ app.add_typer(install_app, name="install", help="Install third-party components 
 @app.command()
 def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for trace.json (default: trace.json)"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Print per-GPU timing summary"),
+    summary: bool = typer.Option(True, "--summary/--no-summary", help="Print iteration summary to stdout"),
+    chrome: Optional[Path] = typer.Option(None, "--chrome", help="Write Chrome/Perfetto trace to this path"),
+    dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
     compact: bool = typer.Option(False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
 ):
-    """Run simulation and write a Chrome/Perfetto trace."""
+    """Run simulation and print an iteration summary.
+
+    Optionally export a Chrome/Perfetto trace (--chrome) and/or a
+    timing-populated DAG JSON (--dag) for offline analysis.
+    """
     import json
     from simulon.backend.analytical import AnalyticalBackend
     from simulon.backend.dag.chrome_trace import to_chrome_trace
@@ -59,32 +65,52 @@ def simulate(
     backend = AnalyticalBackend()
     dag, result = backend.simulate(sc, compact=compact)
 
-    p = sc.workload.parallelism
-    t = sc.workload.training
-    tp = p.tp
-    pp_val = p.pp
-    ep = p.ep
-    dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
+    if summary:
+        _print_summary(result)
 
-    trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+    if chrome is not None:
+        p = sc.workload.parallelism
+        t = sc.workload.training
+        tp = p.tp
+        pp_val = p.pp
+        ep = p.ep
+        dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
+        trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+        with open(chrome, "w") as f:
+            json.dump(trace_dict, f)
+        typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
 
-    if output is None:
-        output = Path("trace.json")
-    with open(output, "w") as f:
-        json.dump(trace_dict, f)
+    if dag_out is not None:
+        with open(dag_out, "w") as f:
+            json.dump(dag.to_dict(), f)
+        typer.echo(f"DAG written to {dag_out}")
 
-    typer.echo(f"Trace written to {output}")
-    typer.echo(f"  GPUs: {len(result.per_gpu_times_ms)}  |  Total: {result.total_time_ms:.3f} ms")
-    typer.echo(f"  Load in https://ui.perfetto.dev or chrome://tracing")
 
-    if verbose:
-        typer.echo("")
-        typer.echo("Per-GPU finish times (ms):")
-        for gpu_rank in sorted(result.per_gpu_times_ms):
-            compute = result.compute_time_ms.get(gpu_rank, 0.0)
-            comm = result.comm_time_ms.get(gpu_rank, 0.0)
-            finish = result.per_gpu_times_ms[gpu_rank]
-            typer.echo(f"  GPU {gpu_rank:3d}: finish={finish:.3f}  compute={compute:.3f}  comm={comm:.3f}")
+def _print_summary(result) -> None:
+    """Print a human-readable simulation summary to stdout.
+
+    Args:
+        result: SimulationResult from AnalyticalBackend.simulate().
+    """
+
+    total = result.total_time_ms
+    n_gpus = len(result.per_gpu_times_ms)
+
+    def _pct(ms: float) -> str:
+        return f"{ms / total * 100:5.1f}%" if total > 0 else "  n/a"
+
+    typer.echo(f"\nIteration wall time:  {total:.3f} ms")
+    typer.echo(f"  (metrics below averaged across {n_gpus} GPUs)")
+    typer.echo("")
+    typer.echo(f"  Compute:        {result.compute_ms:9.3f} ms  {_pct(result.compute_ms)}")
+    typer.echo(f"  Exposed comm:   {result.exposed_comm_ms:9.3f} ms  {_pct(result.exposed_comm_ms)}")
+    for ctype, ms in sorted(result.exposed_comm_by_type.items(), key=lambda x: -x[1]):
+        typer.echo(f"    {ctype + ':':22s} {ms:9.3f} ms")
+    typer.echo(f"  Bubble:         {result.bubble_ms:9.3f} ms  {_pct(result.bubble_ms)}")
+    typer.echo("")
+    typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
+               "  (hidden by compute, not in totals above)")
+    typer.echo("")
 
 
 @profile_app.command("gpu")
