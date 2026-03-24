@@ -42,6 +42,10 @@ def _patch_sweep(return_value=None):
     return patch("simulon.profiling.sweep.run_sweep", return_value=rv)
 
 
+def _profile_path(spec_path: Path) -> Path:
+    return spec_path.with_suffix('').with_suffix('.profile.yaml')
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -49,6 +53,7 @@ def _patch_sweep(return_value=None):
 
 def _run_profile(tmp_path: Path, extra_args: list[str], sweep_rv=None) -> tuple:
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base_args = [
         "profile", "gpu",
         "--name", "TestGPU",
@@ -59,7 +64,7 @@ def _run_profile(tmp_path: Path, extra_args: list[str], sweep_rv=None) -> tuple:
     ctx = _patch_sweep(sweep_rv) if sweep_rv is not None else _patch_sweep()
     with ctx:
         result = runner.invoke(app, base_args)
-    return result, out_file
+    return result, out_file, profile_file
 
 
 # ---------------------------------------------------------------------------
@@ -68,20 +73,21 @@ def _run_profile(tmp_path: Path, extra_args: list[str], sweep_rv=None) -> tuple:
 
 
 def test_profile_creates_output_file(tmp_path):
-    result, out_file = _run_profile(tmp_path, [])
+    result, out_file, profile_file = _run_profile(tmp_path, [])
     assert result.exit_code == 0, result.output
     assert out_file.exists()
+    assert profile_file.exists()
 
 
 def test_profile_output_contains_kernel_runs(tmp_path):
-    _, out_file = _run_profile(tmp_path, [])
-    data = yaml.safe_load(out_file.read_text())
+    _, out_file, profile_file = _run_profile(tmp_path, [])
+    data = yaml.safe_load(profile_file.read_text())
     assert "kernel_runs" in data
     assert len(data["kernel_runs"]) >= 1
 
 
 def test_profile_output_yaml_has_gpu_name(tmp_path):
-    _, out_file = _run_profile(tmp_path, [])
+    _, out_file, profile_file = _run_profile(tmp_path, [])
     data = yaml.safe_load(out_file.read_text())
     assert data["name"] == "TestGPU"
 
@@ -94,6 +100,7 @@ def test_profile_output_yaml_has_gpu_name(tmp_path):
 def test_extend_appends_new_runs(tmp_path):
     """Second invocation with a different config appends new kernel_runs."""
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
     run1 = KernelRun(
@@ -113,13 +120,14 @@ def test_extend_appends_new_runs(tmp_path):
     with _patch_sweep([SweepResult(config={"tp": 1, "ep": 1, "batch_size": 2, "seq_len": 512}, runs=[run2], oom=False)]):
         runner.invoke(app, base + ["--batch-size", "2"])
 
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert len(data["kernel_runs"]) == 2
 
 
 def test_extend_does_not_duplicate_existing_run(tmp_path):
     """Re-running with the same config replaces, not duplicates, the entry."""
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
     run = KernelRun(
@@ -134,7 +142,7 @@ def test_extend_does_not_duplicate_existing_run(tmp_path):
     with _patch_sweep([result_obj]):
         runner.invoke(app, base)
 
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     layernorm_entries = [r for r in data["kernel_runs"] if r["kernel"] == "layernorm"]
     assert len(layernorm_entries) == 1, "Duplicate kernel entries should not be created"
 
@@ -147,6 +155,7 @@ def test_extend_does_not_duplicate_existing_run(tmp_path):
 def test_purge_clears_existing_runs(tmp_path):
     """--purge should remove all kernel_runs present before the new profiling."""
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
     # First run: write 2 kernel entries.
@@ -155,7 +164,7 @@ def test_purge_clears_existing_runs(tmp_path):
     with _patch_sweep([SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=[run_a, run_b], oom=False)]):
         runner.invoke(app, base)
 
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert len(data["kernel_runs"]) == 2
 
     # Second run with --purge: only one new entry.
@@ -163,14 +172,14 @@ def test_purge_clears_existing_runs(tmp_path):
     with _patch_sweep([SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=[run_c], oom=False)]):
         runner.invoke(app, base + ["--purge"])
 
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert len(data["kernel_runs"]) == 1
     assert data["kernel_runs"][0]["kernel"] == "layernorm"
 
 
 def test_purge_on_new_file_is_harmless(tmp_path):
     """--purge on a file that doesn't exist yet should behave like a normal run."""
-    result, out_file = _run_profile(tmp_path, ["--purge"])
+    result, out_file, profile_file = _run_profile(tmp_path, ["--purge"])
     assert result.exit_code == 0
     assert out_file.exists()
 
@@ -206,6 +215,7 @@ def test_overwrite_passes_empty_existing_runs_to_sweep(tmp_path):
 def test_overwrite_replaces_existing_kernel_run(tmp_path):
     """--overwrite should result in updated timings for the same kernel+params."""
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
     run_old = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16", "tp": 1}, times_ms=[1.0] * 5)
@@ -217,7 +227,7 @@ def test_overwrite_replaces_existing_kernel_run(tmp_path):
     with _patch_sweep([SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=[run_new], oom=False)]):
         runner.invoke(app, base + ["--overwrite"])
 
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     layernorm = [r for r in data["kernel_runs"] if r["kernel"] == "layernorm"]
     assert len(layernorm) == 1
     assert layernorm[0]["times_ms"] == [99.0] * 5
@@ -340,18 +350,18 @@ def test_missing_arch_fields_exits_nonzero(tmp_path):
 
 def test_oom_config_is_skipped_gracefully(tmp_path):
     oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True)
-    result, out_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
+    result, out_file, profile_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
     assert result.exit_code == 0
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert data.get("kernel_runs", []) == []
 
 
 def test_oom_config_saved_to_profile(tmp_path):
-    """OOM configs must be written to oom_configs in the YAML."""
+    """OOM configs must be written to oom_configs in the profile YAML."""
     oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
     oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
-    _, out_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
-    data = yaml.safe_load(out_file.read_text())
+    _, out_file, profile_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
+    data = yaml.safe_load(profile_file.read_text())
     assert oom_cfg in data.get("oom_configs", [])
 
 
@@ -360,13 +370,14 @@ def test_oom_configs_deduplicated_across_runs(tmp_path):
     oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
     oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
     for _ in range(2):
         with _patch_sweep([oom_result]):
             runner.invoke(app, base)
 
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert data["oom_configs"].count(oom_cfg) == 1
 
 
@@ -375,18 +386,19 @@ def test_purge_clears_oom_configs(tmp_path):
     oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
     oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
     # First run: record an OOM.
     with _patch_sweep([oom_result]):
         runner.invoke(app, base)
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert len(data.get("oom_configs", [])) == 1
 
     # Second run with --purge and a successful result: OOM list should be empty.
     with _patch_sweep([_FAKE_RESULT]):
         runner.invoke(app, base + ["--purge"])
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert data.get("oom_configs", []) == []
 
 
@@ -395,13 +407,14 @@ def test_oom_and_success_in_same_sweep(tmp_path):
     oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 512}
     oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
     out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
     # Two configs (batch 1 and 128): first succeeds, second OOMs.
     with patch("simulon.profiling.sweep.run_sweep", side_effect=[[_FAKE_RESULT], [oom_result]]):
         runner.invoke(app, [
             "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
             "--batch-size", "1,128", "--seq-len", "512",
         ] + _ARCH_ARGS)
-    data = yaml.safe_load(out_file.read_text())
+    data = yaml.safe_load(profile_file.read_text())
     assert len(data.get("kernel_runs", [])) >= 1
     assert oom_cfg in data.get("oom_configs", [])
 
