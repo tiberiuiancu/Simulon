@@ -750,3 +750,58 @@ class TestSummarize:
 
         total_components = result.compute_ms + result.exposed_comm_ms + result.bubble_ms
         assert total_components == pytest.approx(result.total_time_ms)
+
+    # ------------------------------------------------------------------
+    # TIB-113: two overlapping recvs on the same GPU (no compute)
+    # ------------------------------------------------------------------
+
+    def test_overlapping_recvs_no_double_count(self):
+        """Two overlapping recv nodes on one GPU must not double-count exposed time.
+
+        Regression for TIB-113: before the fix, exposed_total was computed by
+        summing per-recv durations, so overlapping recvs inflated it beyond the
+        actual wall-clock wait time, clamping bubble_ms to zero and causing
+        component percentages to exceed 100%.
+
+        Setup (no compute anywhere):
+          GPU 0: dst of both recvs, both start at t=0 in parallel.
+            - AllReduce (src=1 → dst=0): duration 4 ms  [0, 4]
+            - AllGather  (src=2 → dst=0): duration 3 ms  [0, 3]
+          GPU 1: pure sender, no recv. Finishes at t=4.
+          GPU 2: pure sender, no recv. Finishes at t=4.
+
+        total_time_ms = 4 ms.
+
+        Per GPU 0: union of recv intervals = [0,4] → exposed_total = 4 ms.
+          Per-type sum = AllReduce(4) + AllGather(3) = 7 ms > exposed_total.
+        Per GPU 1: bubble = 4, exposed = 0.
+        Per GPU 2: bubble = 4, exposed = 0.
+
+        Averages (3 GPUs):
+          compute_ms      = 0
+          exposed_comm_ms = 4/3
+          bubble_ms       = (0 + 4 + 4) / 3 = 8/3
+          sum             = 4/3 + 8/3 = 12/3 = 4  ✓
+        """
+        ar = _comm_preset(0, src_gpu=1, dst_gpu=0, duration_ms=4.0, collective_type="AllReduce")
+        ag = _comm_preset(1, src_gpu=2, dst_gpu=0, duration_ms=3.0, collective_type="AllGather")
+        dag = _dag(ar, ag)  # no edges: both start at t=0 in parallel
+        result = replay(dag)
+
+        assert result.total_time_ms == pytest.approx(4.0)
+
+        # Invariant 1: components sum to total_time_ms
+        total_components = result.compute_ms + result.exposed_comm_ms + result.bubble_ms
+        assert total_components == pytest.approx(result.total_time_ms)
+
+        # Invariant 2: bubble must not be clamped to zero (GPU 0 idle after
+        # the shorter recv finishes; GPUs 1 and 2 are idle the entire time)
+        assert result.bubble_ms > 0.0
+
+        # Invariant 3: per-type sum exceeds the de-duplicated total,
+        # confirming the union-based computation removed the overlap
+        per_type_sum = (
+            result.exposed_comm_by_type.get("AllReduce", 0.0)
+            + result.exposed_comm_by_type.get("AllGather", 0.0)
+        )
+        assert result.exposed_comm_ms < per_type_sum
