@@ -151,13 +151,19 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
         # overlap each other (two collectives in flight simultaneously on one
         # GPU), but that is rare in practice and acceptable for a summary.
         exposed_by_type: dict[str, float] = defaultdict(float)
-        exposed_total = 0.0
         for start, finish, ctype in recv_entries:
             raw = finish - start
             hidden = _intersection_duration([(start, finish)], compute_ivs)
             exp = max(0.0, raw - hidden)
             exposed_by_type[ctype] += exp
-            exposed_total += exp
+
+        # Compute total exposed using the union of all recv intervals to avoid
+        # double-counting when two recv nodes overlap on the same GPU.
+        all_recv_ivs = _merge_intervals([(s, e) for s, e, _ in recv_entries])
+        exposed_total = max(
+            0.0,
+            _union_duration(all_recv_ivs) - _intersection_duration(all_recv_ivs, compute_ivs),
+        )
 
         overlapped = _intersection_duration(comm_ivs, compute_ivs)
         bubble = max(0.0, total_time_ms - compute_ms - exposed_total)
