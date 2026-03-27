@@ -18,11 +18,14 @@ Python overhead.
 
 Layout inside the .npz:
 
-  compute_int   – int32 (N_c, 6): node_id, gpu_rank, kernel_code,
+  compute_int   – int32 (N_c, 7): node_id, gpu_rank, kernel_code,
                   layer_id, microbatch_id, pipeline_stage, phase_code
-                  NOTE: 7 columns despite the name "6" – see _COMPUTE_INT_COLS
   compute_float – float32 (N_c, 3): duration_ms, start_ms, finish_ms
                   (NaN where the original value is None)
+  fk_flat       – int32 (total fused_kernels entries across all compute nodes):
+                  kernel vocab codes for fused kernels (compact mode nodes only)
+  fk_offsets    – int32 (N_c + 1): CSR row-pointer into fk_flat;
+                  fk_offsets[i] == fk_offsets[i+1] means node i has no fused kernels
 
   comm_int      – int32/int64 (N_m, 7): node_id, src_gpu, dst_gpu,
                   bytes (int64), collective_code, layer_id, phase_code,
@@ -98,8 +101,11 @@ def _to_npz(dag: ExecutionDAG) -> dict[str, np.ndarray]:
     mn = dag.comm_nodes
     ed = dag.edges
 
-    # Build string vocabularies from actual data
-    kernel_vocab  = _build_vocab([n.kernel           for n in cn])
+    # Build string vocabularies from actual data.
+    # Include fused kernel names (which are the real kernel names inside fused compact nodes)
+    # alongside the node-level kernel names (which may be "N kernels" display strings).
+    all_kernel_names = [n.kernel for n in cn] + [k for n in cn for k in n.fused_kernels]
+    kernel_vocab  = _build_vocab(all_kernel_names)
     phase_vocab   = _build_vocab([n.phase            for n in cn] +
                                  [n.phase            for n in mn])
     coll_vocab    = _build_vocab([n.collective_type  for n in mn])
@@ -115,11 +121,16 @@ def _to_npz(dag: ExecutionDAG) -> dict[str, np.ndarray]:
     # columns: node_id, gpu_rank, kernel_code, layer_id, microbatch_id, pipeline_stage, phase_code
     c_int = np.empty((N_c, 7), dtype=np.int32)
     c_flt = np.empty((N_c, 3), dtype=np.float32)
+    fk_flat: list[int] = []
+    fk_offsets = np.empty(N_c + 1, dtype=np.int32)
+    fk_offsets[0] = 0
     for i, n in enumerate(cn):
         c_int[i] = (n.node_id, n.gpu_rank, kernel_vocab[n.kernel],
                     n.layer_id, n.microbatch_id, n.pipeline_stage,
                     phase_vocab[n.phase])
         c_flt[i] = (_f32(n.duration_ms), _f32(n.start_ms), _f32(n.finish_ms))
+        fk_flat.extend(kernel_vocab[k] for k in n.fused_kernels)
+        fk_offsets[i + 1] = len(fk_flat)
 
     # --- comm_nodes ---
     N_m = len(mn)
@@ -154,6 +165,8 @@ def _to_npz(dag: ExecutionDAG) -> dict[str, np.ndarray]:
     return {
         "compute_int":    c_int,
         "compute_float":  c_flt,
+        "fk_flat":        np.array(fk_flat, dtype=np.int32),
+        "fk_offsets":     fk_offsets,
         "comm_int":       m_int,
         "comm_bytes":     m_bytes,
         "comm_float":     m_flt,
@@ -176,8 +189,10 @@ def _from_npz(arrays: dict[str, np.ndarray]) -> ExecutionDAG:
     def _opt_f(v: np.float32) -> float | None:
         return None if math.isnan(v) else float(v)
 
-    c_int = arrays["compute_int"]
-    c_flt = arrays["compute_float"]
+    c_int        = arrays["compute_int"]
+    c_flt        = arrays["compute_float"]
+    fk_flat      = arrays["fk_flat"]
+    fk_offsets   = arrays["fk_offsets"]
     compute_nodes = [
         ComputeNode(
             node_id=int(c_int[i, 0]),
@@ -190,6 +205,7 @@ def _from_npz(arrays: dict[str, np.ndarray]) -> ExecutionDAG:
             duration_ms=_opt_f(c_flt[i, 0]),
             start_ms=_opt_f(c_flt[i, 1]),
             finish_ms=_opt_f(c_flt[i, 2]),
+            fused_kernels=[kernels[k] for k in fk_flat[fk_offsets[i]:fk_offsets[i + 1]].tolist()],
         )
         for i in range(len(c_int))
     ]
