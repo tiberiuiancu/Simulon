@@ -10,18 +10,20 @@ This file describes the hardware and network topology of the simulated datacente
 1. [Overview](#overview)
 2. [Profile References](#profile-references)
 3. [Cost Specification](#cost-specification)
-4. [Top-Level Structure](#top-level-structure)
-5. [`datacenter` Block](#datacenter-block)
-6. [`cluster` Block](#cluster-block)
-7. [`node` Block](#node-block)
+4. [Power Model](#power-model)
+5. [Cost Model](#cost-model)
+6. [Top-Level Structure](#top-level-structure)
+7. [`datacenter` Block](#datacenter-block)
+8. [`cluster` Block](#cluster-block)
+9. [`node` Block](#node-block)
    - [GPU](#gpu)
    - [CPU](#cpu)
    - [Node-Level Cooling](#node-level-cooling)
-8. [`network` Block](#network-block)
-   - [`network.scale_up` (Intra-Node)](#networkscale_up-intra-node)
-   - [`network.scale_out` (Inter-Node)](#networkscale_out-inter-node)
-   - [Topology Templates](#topology-templates)
-9. [Full Example](#full-example)
+10. [`network` Block](#network-block)
+    - [`network.scale_up` (Intra-Node)](#networkscale_up-intra-node)
+    - [`network.scale_out` (Inter-Node)](#networkscale_out-inter-node)
+    - [Topology Templates](#topology-templates)
+11. [Full Example](#full-example)
 
 ---
 
@@ -64,7 +66,9 @@ gpu:
   from: H100          # inherit all fields from the H100 profile
   name: B200          # override the display name
   flops_multiplier: 2.0
-  tdp_w: 1000
+  power_model:
+    type: constant
+    tdp_w: 1000
 ```
 
 **Fully inline** (no profile, all fields explicit):
@@ -99,6 +103,140 @@ cost:
 
 ---
 
+## Power Model
+
+A `power_model` block can be attached to any hardware component that draws power (GPU, CPU,
+NIC, switches). It is always **optional**. When omitted, the component contributes no power
+draw to energy calculations.
+
+The `type` field selects the model. It defaults to `constant` if omitted.
+
+### `constant`
+
+Draws a fixed wattage regardless of utilisation. Suitable for components where utilisation
+data is unavailable or irrelevant (CPU, NIC, switches, cooling units).
+
+```yaml
+power_model:
+  type: constant    # optional; this is the default
+  tdp_w: 700
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `tdp_w` | float | Constant power draw in watts |
+
+### `linear`
+
+Interpolates linearly between idle power at 0% utilisation and TDP at 100% utilisation.
+GPU utilisation per rank is derived from DAG replay results (active time / total iteration time).
+
+```
+power_w = idle_power_w + utilisation × (tdp_w − idle_power_w)
+```
+
+where `utilisation ∈ [0, 1]` = active GPU time / total iteration time.
+
+```yaml
+power_model:
+  type: linear
+  tdp_w: 700
+  idle_power_w: 100
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `tdp_w` | float | Power draw at 100% utilisation, in watts |
+| `idle_power_w` | float | Power draw at 0% utilisation, in watts |
+
+> **Extensibility:** The `type` discriminator is the extension point for future power models
+> (e.g. polynomial curve, measured lookup table). Unknown types should be rejected with a
+> clear error.
+
+---
+
+## Cost Model
+
+Cost modeling is driven by `cost` fields on individual hardware components (see
+[Cost Specification](#cost-specification)) and two optional parameters in the `datacenter` block:
+`datacenter_lifetime_years` and `idle_fraction`.
+
+All monetary values are in **USD**.
+
+### CAPEX
+
+Total hardware acquisition cost is summed across all component types, scaled by their
+quantities in the cluster:
+
+| Component | Multiplier |
+|---|---|
+| GPU | `cost × gpus_per_node × num_nodes` |
+| CPU | `cost × sockets × num_nodes` (cost is per socket) |
+| Node-level cooling | `cost × num_nodes` |
+| NIC | `cost × nics_per_node × num_nodes` |
+| NVSwitch (scale-up) | `cost × num_nodes` (one per node) |
+| Leaf switches | `cost × num_leaf_switches` |
+| Spine switches | `cost × num_spine_switches` |
+| Rack hardware | `rack.cost × num_racks` |
+| Rack cooling | `rack.cooling.cost × num_racks` |
+| Datacenter cooling | `datacenter.cooling.cost` |
+
+CAPEX is reported as a breakdown by component type and as a cluster total. If `cost.min` /
+`cost.max` are provided on any component, the range is propagated to the totals.
+
+### OPEX
+
+OPEX is reported per training run:
+
+```
+energy_cost_per_run = energy_per_run_kwh × electricity_cost_per_kwh
+```
+
+where `energy_per_run_kwh` comes from the energy model (see [Power Model](#power-model)).
+
+The `idle_fraction` parameter controls what fraction of cluster lifetime the GPUs are idle.
+During idle periods, each component draws power at 0% utilisation: `idle_power_w` for `linear`
+models, `tdp_w` for `constant` models. This affects both the energy cost of a run and — when
+`datacenter_lifetime_years` is provided — the number of runs that fit in the cluster lifetime.
+
+### Combined cost per training run
+
+When `datacenter_lifetime_years` is provided, the simulator also calculates cost per training run:
+
+```
+runs_per_lifetime = floor(
+    lifetime_years × 8760h × (1 − idle_fraction) / run_duration_hours
+)
+capex_per_run    = total_capex / runs_per_lifetime
+cost_per_run     = capex_per_run + energy_cost_per_run
+```
+
+where `run_duration_hours` is derived from the simulation result — the total simulated wall-clock
+time for the workload. No additional input is required.
+
+### Output format
+
+```
+Cost result
+├── capex
+│   ├── total:           $X,XXX,XXX
+│   ├── range:           [$X,XXX,XXX – $X,XXX,XXX]   (if min/max provided)
+│   └── breakdown
+│       ├── gpu:         $X,XXX,XXX  (XX%)
+│       ├── cpu:           $XXX,XXX  (X%)
+│       ├── nic:           $XXX,XXX  (X%)
+│       ├── switches:      $XXX,XXX  (X%)
+│       ├── rack:          $XXX,XXX  (X%)
+│       └── cooling:       $XXX,XXX  (X%)
+├── opex_per_run
+│   └── energy_cost:         $XX.XX
+└── cost_per_run             $X,XXX   (only if datacenter_lifetime_years provided)
+    ├── capex_component:     $X,XXX
+    └── opex_component:      $XX.XX
+```
+
+---
+
 ## Top-Level Structure
 
 ```yaml
@@ -117,7 +255,6 @@ Datacenter-level infrastructure and operational parameters.
 ```yaml
 datacenter:
   name: "My AI Cluster"         # optional, human-readable label
-  location: "US-East-1"         # optional, geographic label
 
   # Path to hardware profile library.
   # Defaults to the built-in bundled profiles if omitted or empty.
@@ -130,6 +267,24 @@ datacenter:
 
   # Electricity cost in USD per kWh.
   electricity_cost_per_kwh: 0.07
+
+  # Expected operational lifetime of the datacenter in years.
+  # When provided, enables combined CAPEX+OPEX cost-per-run output.
+  # When omitted, only OPEX per run is reported.
+  datacenter_lifetime_years: 4
+
+  # Fraction of cluster lifetime during which the cluster is idle (0.0–1.0).
+  # Affects both energy consumption and the number of training runs that fit
+  # within the cluster lifetime. Default: 0.0 (fully utilised).
+  idle_fraction: 0.10
+
+  # Optional facility-level cooling unit (e.g. chillers, CRAC units).
+  # When specified, the cooling unit's power draw is included in the hardware
+  # power subtotal before PUE is applied. See PUE interaction note below.
+  cooling:
+    tdp_w: 5000               # power draw of the cooling hardware in watts
+    cost:
+      value: 200000
 
   # Rack configuration
   rack:
@@ -150,6 +305,13 @@ datacenter:
       cost:
         value: 8000
 ```
+
+> **PUE and explicit cooling:** PUE is a facility-level multiplier applied to the total IT
+> (hardware) power. If you also specify cooling power at node, rack, or datacenter level,
+> that cooling power is included in the IT power subtotal **before** PUE is applied.
+> To avoid double-counting, either use PUE as your sole overhead mechanism (and omit explicit
+> cooling fields), or set `pue: 1.0` and model all cooling explicitly. Using both is valid
+> only if your PUE value excludes the cooling components you have modelled explicitly.
 
 ---
 
@@ -194,7 +356,7 @@ Every node must have at least one GPU.
 | `vendor` | string | `nvidia` or `amd` |
 | `flops_multiplier` | float | Uniform scalar applied to all profiled FLOP rates. Default: `1.0` |
 | `memory_capacity_gb` | float | HBM capacity in GB |
-| `tdp_w` | float | Thermal Design Power in watts |
+| `power_model` | power model | See [Power Model](#power-model). Optional; supports `constant` and `linear` types. |
 | `cost` | cost | See [Cost Specification](#cost-specification) |
 | `kernel_runs` | list | Measured kernel benchmarks. Populated by `simulon profile gpu`; empty when declared inline. See [Kernel Runs](#kernel-runs). |
 
@@ -239,7 +401,10 @@ node:
     vendor: nvidia
     flops_multiplier: 1.2
     memory_capacity_gb: 80
-    tdp_w: 750
+    power_model:
+      type: linear
+      tdp_w: 700
+      idle_power_w: 67            # H100 idle ~10% of TDP
     cost:
       value: 30000
       min: 25000
@@ -260,7 +425,7 @@ Optional. Used primarily for power and cost modeling.
 | `sockets` | int | Number of CPU sockets per node. Default: `2` |
 | `cores_per_socket` | int | Physical cores per socket |
 | `memory_gb` | float | Total system DRAM in GB |
-| `tdp_w` | float | TDP per socket in watts |
+| `power_model` | power model | See [Power Model](#power-model). Optional; `constant` type only. `type` defaults to `constant` if omitted. |
 | `cost` | cost | Cost per socket |
 | `memory_cost_per_gb` | float | USD/GB; multiplied by `memory_gb` for total memory cost |
 
@@ -273,7 +438,8 @@ Optional. Used primarily for power and cost modeling.
     sockets: 2
     cores_per_socket: 60
     memory_gb: 512
-    tdp_w: 350                    # per socket
+    power_model:
+      tdp_w: 350                  # type omitted; defaults to constant
     cost:
       value: 4000                 # per socket
     memory_cost_per_gb: 5         # optional; total memory cost = 5 * 512 = $2560
@@ -323,7 +489,7 @@ The `switch` field specifies the NVSwitch hardware using `SwitchSpec`.
 | `latency` | time | Switch propagation latency, e.g. `0.000025ms` |
 | `buffer_per_port` | string | Per-port TX queue buffer (NS-3 backend only), e.g. `32MB` |
 | `queue_discipline` | string | `drop_tail` \| `red` \| `codel` \| `fq_codel` (NS-3 backend only) |
-| `tdp_w` | float | Power draw per switch chip |
+| `power_model` | power model | See [Power Model](#power-model). Optional; `constant` type only. `type` defaults to `constant` if omitted. |
 | `cost` | cost | Cost per switch chip |
 
 ```yaml
@@ -333,7 +499,8 @@ network:
       name: NVSwitch3
       port_speed: 2880Gbps        # NVLink bandwidth per port
       latency: 0.000025ms         # propagation latency
-      tdp_w: 110
+      power_model:
+        tdp_w: 110
       cost:
         value: 3000
 ```
@@ -354,7 +521,7 @@ and spine tiers, and the topology configuration.
 | `vendor` | string | e.g. `mellanox`, `broadcom`, `intel` |
 | `speed` | bandwidth | Line rate per NIC port |
 | `latency` | time | End-to-end NIC latency contribution |
-| `tdp_w` | float | Power draw per NIC |
+| `power_model` | power model | See [Power Model](#power-model). Optional; `constant` type only. `type` defaults to `constant` if omitted. |
 | `cost` | cost | Cost per NIC |
 | `bandwidth_efficiency` | float | Effective bandwidth fraction (0.0–1.0). Default: `0.85`. |
 
@@ -371,7 +538,8 @@ network:
       speed: 400Gbps
       latency: 0.0005ms
       bandwidth_efficiency: 0.85
-      tdp_w: 25
+      power_model:
+        tdp_w: 25
       cost:
         value: 2000
 
@@ -381,6 +549,8 @@ network:
       port_speed: 400Gbps
       buffer_per_port: 32MB
       queue_discipline: fq_codel
+      power_model:
+        tdp_w: 300
       cost:
         value: 50000
 
@@ -572,10 +742,11 @@ No generator is invoked. The full topology must be provided via an external desc
 ```yaml
 datacenter:
   name: "Research Cluster A"
-  location: "EU-West"
   profiles_dir: "./templates"
   pue: 1.3
   electricity_cost_per_kwh: 0.08
+  datacenter_lifetime_years: 4
+  idle_fraction: 0.15
   rack:
     nodes_per_rack: 8
     rack_units: 42
@@ -597,7 +768,10 @@ node:
   gpu:
     from: H100
     flops_multiplier: 1.0
-    tdp_w: 700
+    power_model:
+      type: linear
+      tdp_w: 700
+      idle_power_w: 67
     cost:
       value: 30000
       min: 25000
@@ -609,7 +783,8 @@ node:
     sockets: 2
     cores_per_socket: 60
     memory_gb: 512
-    tdp_w: 350
+    power_model:
+      tdp_w: 350
     cost:
       value: 4000
     memory_cost_per_gb: 5
@@ -625,7 +800,8 @@ network:
       name: NVSwitch3
       port_speed: 2880Gbps
       latency: 0.000025ms
-      tdp_w: 110
+      power_model:
+        tdp_w: 110
       cost:
         value: 3000
 
@@ -634,7 +810,8 @@ network:
       from: ConnectX-7
       speed: 400Gbps
       latency: 0.0005ms
-      tdp_w: 25
+      power_model:
+        tdp_w: 25
       cost:
         value: 2000
 
@@ -642,7 +819,8 @@ network:
       from: Spectrum-4
       buffer_per_port: 32MB
       queue_discipline: fq_codel
-      tdp_w: 300
+      power_model:
+        tdp_w: 300
       cost:
         value: 50000
 
