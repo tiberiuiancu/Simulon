@@ -184,3 +184,26 @@ class TestCompactNonCompactEquivalence:
         )
         # Comm nodes must be identical (compaction never touches comm-bearing sublayers)
         assert len(dag_compact.comm_nodes) == len(dag_normal.comm_nodes)
+
+    def test_compact_reduces_node_count_tp2(self):
+        """Compact mode must produce significantly fewer compute nodes for tp=2 configs.
+
+        With tp=2, bwd_wg sublayers are the only pure-compute phases. They should
+        accumulate across all layers in a slot, yielding one fused node per GPU per
+        backward slot instead of one fused node per sublayer call.
+        """
+        sc = ScenarioConfig(
+            datacenter=_make_datacenter(gpus_per_node=2, num_nodes=1),
+            workload=_make_workload(tp=2, pp=1, num_gpus=2, num_layers=8),
+        )
+        backend = AnalyticalBackend()
+        dag_normal = backend.run_trace(sc, compact=False)
+        dag_compact = backend.run_trace(sc, compact=True)
+
+        reduction = 1.0 - len(dag_compact.compute_nodes) / len(dag_normal.compute_nodes)
+        assert reduction >= 0.60, (
+            f"Expected at least 60% compute-node reduction for tp=2, got {reduction:.1%} "
+            f"(compact={len(dag_compact.compute_nodes)} vs normal={len(dag_normal.compute_nodes)})"
+        )
+        # Comm nodes must be identical
+        assert len(dag_compact.comm_nodes) == len(dag_normal.comm_nodes)
