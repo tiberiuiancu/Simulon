@@ -57,11 +57,12 @@ def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
         return load_gpu_template(gpu)
     if isinstance(gpu, GPUSpec) and gpu.from_:
         base = load_gpu_template(gpu.from_)
-        # Apply every field that was explicitly provided in the override
-        # (exclude_unset=True skips fields that were left at their defaults).
+        # Merge override fields into the base dict and re-validate so that nested
+        # objects (cost, power_model, …) are properly coerced by Pydantic, not stored
+        # as raw dicts from model_dump().
+        base_dict = base.model_dump(by_alias=False)
         overrides = gpu.model_dump(exclude_unset=True, by_alias=False)
-        overrides.pop("from_", None)  # don't carry the template reference onto base
-        for key, val in overrides.items():
-            setattr(base, key, val)
-        return base
+        overrides.pop("from_", None)
+        base_dict.update(overrides)
+        return GPUSpec.model_validate(base_dict)
     return gpu
