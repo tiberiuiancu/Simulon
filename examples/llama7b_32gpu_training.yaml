@@ -1,21 +1,24 @@
-# Qwen3-30B-A3B (MoE) training scenario
+# LLaMA-13B training on 32 GPUs (4 nodes × 8 GPUs/node)
 #
-# Parallelism: TP=1, PP=4, EP=16, DP=2
-# Total GPUs:  1 × 4 × 16 × 2 = 128  (16 nodes × 8 GPUs/node)
+# Parallelism: TP=4, PP=4, DP=2
+# Total GPUs:  4 × 4 × 2 = 32
 #
-# Network: standard H100 cluster
-#   Scale-up:  900 GB/s NVLink aggregate → port_speed = 7200 Gbps
-#   Scale-out: 400 Gbps InfiniBand, fat-tree
+# TP=4 keeps tensor-parallel comms within each node over NVLink.
+# PP=4 pipelines across nodes over InfiniBand.
+#
+# Network:
+#   Scale-up:  H100 NVSwitch ~900 GB/s per GPU → 7200 Gbps port speed
+#   Scale-out: 400 Gbps InfiniBand, fat-tree (k=4 → up to 32 hosts)
 
 datacenter:
   datacenter:
-    name: h100-128gpu
+    name: llama7b-32gpu-cluster
     pue: 1.3
     electricity_cost_per_kwh: 0.10   # Netherlands commercial rate (EUR)
     datacenter_lifetime_years: 5
     idle_fraction: 0.4
   cluster:
-    num_nodes: 16
+    num_nodes: 4
   node:
     gpus_per_node: 8
     gpu:
@@ -27,7 +30,7 @@ datacenter:
   network:
     scale_up:
       switch:
-        port_speed: 7200Gbps
+        port_speed: 7200Gbps   # H100 NVSwitch ~900 GB/s per GPU
         latency: 0.000025ms
         power_model:
           tdp_w: 110
@@ -42,7 +45,7 @@ datacenter:
       topology:
         type: fat_tree
         params:
-          k: 8
+          k: 4
 
 collective:
   library: nccl
@@ -51,16 +54,14 @@ collective:
 
 workload:
   framework: megatron
-  model: qwen3-30b-a3b
+  model: llama-7b
   parallelism:
-    tp: 1
+    tp: 4
     pp: 4
-    ep: 16
     dp: 2
-    distributed_optimizer: true
     num_microbatches: 8
   training:
-    num_gpus: 128
-    global_batch_size: 16   # dp=2 × mbs=1 × num_microbatches=8
-    micro_batch_size: 1
-    sequence_length: 4096
+    num_gpus: 32
+    global_batch_size: 1024  # dp=2 × mbs=64 × num_microbatches=8
+    micro_batch_size: 64
+    sequence_length: 2048
