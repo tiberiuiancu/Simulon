@@ -187,6 +187,62 @@ def test_cache_hit_is_faster(tmp_path):
     assert warm < cold
 
 
+# ---------------------------------------------------------------------------
+# Compact-mode cache roundtrip
+# ---------------------------------------------------------------------------
+
+
+def _compact_trace(workload: MegatronWorkload, cache_dir: Path) -> ExecutionDAG:
+    tracer = MegatronDAGTracer(DAGTracerConfig(compact=True, cache_dir=cache_dir))
+    return tracer.trace(workload, None)  # type: ignore[arg-type]
+
+
+def test_compact_cache_roundtrip_fused_kernels_preserved(tmp_path):
+    """Compact DAG loaded from cache must have fused_kernels identical to the original trace."""
+    workload = _small_workload(tp=1, pp=1)
+    dag_original = _compact_trace(workload, tmp_path)
+
+    # Confirm at least one node actually has fused kernels (compact mode produced fusion)
+    fused_nodes = [n for n in dag_original.compute_nodes if n.fused_kernels]
+    assert fused_nodes, "Expected at least one fused ComputeNode in compact DAG"
+
+    # Load from cache — this must be a cache hit, not a re-trace
+    dag_loaded = _compact_trace(workload, tmp_path)
+
+    # Per-node fused_kernels must survive the npz roundtrip exactly
+    assert len(dag_loaded.compute_nodes) == len(dag_original.compute_nodes)
+    for orig, loaded in zip(dag_original.compute_nodes, dag_loaded.compute_nodes):
+        assert loaded.fused_kernels == orig.fused_kernels, (
+            f"node_id={orig.node_id}: expected fused_kernels={orig.fused_kernels!r}, "
+            f"got {loaded.fused_kernels!r}"
+        )
+
+
+def test_compact_cache_hit_has_fused_node(tmp_path):
+    """A cache-loaded compact DAG must still contain at least one node with non-empty fused_kernels."""
+    workload = _small_workload(tp=1, pp=1)
+    _compact_trace(workload, tmp_path)           # cold — writes cache
+    dag_loaded = _compact_trace(workload, tmp_path)  # warm — reads cache
+
+    assert any(n.fused_kernels for n in dag_loaded.compute_nodes), (
+        "No fused ComputeNode found after compact DAG cache hit"
+    )
+
+
+def test_compact_and_noncompact_produce_different_cache_files(tmp_path):
+    """Compact=True and compact=False must result in separate cache files."""
+    workload = _small_workload(tp=1, pp=1)
+
+    # Trace both modes into the same cache directory
+    _trace(workload, tmp_path)           # non-compact
+    _compact_trace(workload, tmp_path)   # compact
+
+    npz_files = list(tmp_path.glob("*.npz"))
+    assert len(npz_files) == 2, (
+        f"Expected 2 separate cache files for compact vs non-compact, found {len(npz_files)}"
+    )
+
+
 def test_string_and_inline_model_share_cache(tmp_path):
     """A workload with model='llama-7b' and an equivalent inline LLMSpec should hit the same cache entry."""
     import yaml

@@ -88,7 +88,8 @@ class MegatronDAGTracer(DAGTracer):
 
         model = _resolve_model(workload.model)
 
-        if cfg.cache_dir is not None and not cfg.compact:
+        _key: str | None = None
+        if cfg.cache_dir is not None:
             _key = _cache._cache_key(workload, model, cfg)
             _dag = _cache.load(Path(cfg.cache_dir), _key)
             if _dag is not None:
@@ -448,7 +449,7 @@ class MegatronDAGTracer(DAGTracer):
             if key in slot_entry_node:
                 dag.edges.append(DAGEdge(src_node_id=pp_send_id, dst_node_id=slot_entry_node[key]))
 
-        if cfg.cache_dir is not None and not cfg.compact:
+        if cfg.cache_dir is not None and _key is not None:
             _cache.save(Path(cfg.cache_dir), _key, dag)
 
         return dag
