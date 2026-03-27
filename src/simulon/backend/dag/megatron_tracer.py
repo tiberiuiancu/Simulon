@@ -118,6 +118,7 @@ class MegatronDAGTracer(DAGTracer):
         node_id_counter = 0
         flow_id_counter = 0
         pending_fused: dict[int, ComputeNode] = {}  # gpu → pending fused node (compact mode)
+        last_was_compute: dict[int, bool] = {}  # gpu → was last emitted node compute?
 
         def global_rank(dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int) -> int:
             return dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
@@ -161,36 +162,83 @@ class MegatronDAGTracer(DAGTracer):
                                                 moe_data_bytes=moe_data_bytes,
                                             )
 
-                                            if cfg.compact and not comm_stubs:
-                                                # Pure compute chain — accumulate into pending fused node
-                                                if gpu not in pending_fused:
-                                                    _fk = [cn.kernel for cn in c_nodes]
-                                                    pending_fused[gpu] = ComputeNode(
-                                                        node_id=c_nodes[0].node_id,
-                                                        gpu_rank=gpu,
-                                                        kernel=f"{len(_fk)} kernels",
-                                                        fused_kernels=_fk,
-                                                        layer_id=c_nodes[0].layer_id,
-                                                        microbatch_id=mb,
-                                                        pipeline_stage=pp_stage,
-                                                        phase=phase,
-                                                    )
-                                                else:
-                                                    pending_fused[gpu].fused_kernels.extend(cn.kernel for cn in c_nodes)
-                                                    pending_fused[gpu].kernel = f"{len(pending_fused[gpu].fused_kernels)} kernels"
-                                                if not slot_first_entry_set:
-                                                    slot_entry_node[(gpu, mb, direction)] = pending_fused[gpu].node_id
-                                                    slot_first_entry_set = True
+                                            if cfg.compact:
+                                                # Process nodes in topological order (by node_id).
+                                                # Rule: fuse a compute node into pending_fused iff
+                                                # its only predecessor is the previous compute node.
+                                                # Flush pending_fused on any comm node.
+                                                ordered = sorted(
+                                                    [("c", n) for n in c_nodes] + [("s", s) for s in comm_stubs],
+                                                    key=lambda x: x[1].node_id,
+                                                )
+                                                for ntype, node in ordered:
+                                                    if ntype == "c":
+                                                        if last_was_compute.get(gpu, False):
+                                                            pending_fused[gpu].fused_kernels.append(node.kernel)
+                                                            pending_fused[gpu].kernel = f"{len(pending_fused[gpu].fused_kernels)} kernels"
+                                                        else:
+                                                            pending_fused[gpu] = ComputeNode(
+                                                                node_id=node.node_id,
+                                                                gpu_rank=gpu,
+                                                                kernel=node.kernel,
+                                                                fused_kernels=[node.kernel],
+                                                                layer_id=node.layer_id,
+                                                                microbatch_id=mb,
+                                                                pipeline_stage=pp_stage,
+                                                                phase=phase,
+                                                            )
+                                                            if not slot_first_entry_set:
+                                                                slot_entry_node[(gpu, mb, direction)] = node.node_id
+                                                                slot_first_entry_set = True
+                                                        last_was_compute[gpu] = True
+                                                    else:  # comm stub
+                                                        if gpu in pending_fused:
+                                                            pf = pending_fused.pop(gpu)
+                                                            dag.compute_nodes.append(pf)
+                                                            prev_id = last_node_per_gpu.get(gpu)
+                                                            if prev_id is not None:
+                                                                dag.edges.append(DAGEdge(src_node_id=prev_id, dst_node_id=pf.node_id))
+                                                            last_node_per_gpu[gpu] = pf.node_id
+                                                        if node.collective_type in ("AllGather", "ReduceScatter", "AllReduce"):
+                                                            group = tp_group
+                                                        elif node.collective_type == "AllToAll":
+                                                            group = ep_group
+                                                        else:
+                                                            group = dp_group
+                                                        result, flow_id_counter = self._ccl.decompose(
+                                                            collective_type=node.collective_type,
+                                                            group_ranks=group,
+                                                            data_size=node.bytes,
+                                                            num_channels=cfg.num_channels,
+                                                            algorithm=cfg.algorithm,
+                                                            flow_id_start=flow_id_counter,
+                                                        )
+                                                        flow_ids: list[int] = []
+                                                        for flow in result.flows:
+                                                            dag.comm_nodes.append(CommNode(
+                                                                node_id=node_id_counter,
+                                                                src_gpu=flow.src,
+                                                                dst_gpu=flow.dst,
+                                                                bytes=flow.flow_size,
+                                                                collective_type=node.collective_type,
+                                                                layer_id=layer_idx,
+                                                                phase=phase,
+                                                                flow_id=flow.flow_id,
+                                                                parent_flow_ids=flow.parent_flow_ids,
+                                                            ))
+                                                            flow_ids.append(node_id_counter)
+                                                            node_id_counter += 1
+                                                        if flow_ids:
+                                                            prev_id = last_node_per_gpu.get(gpu)
+                                                            if prev_id is not None:
+                                                                for fid in flow_ids:
+                                                                    dag.edges.append(DAGEdge(src_node_id=prev_id, dst_node_id=fid))
+                                                            if not slot_first_entry_set:
+                                                                slot_entry_node[(gpu, mb, direction)] = flow_ids[0]
+                                                                slot_first_entry_set = True
+                                                            last_node_per_gpu[gpu] = flow_ids[-1]
+                                                        last_was_compute[gpu] = False
                                             else:
-                                                # Flush pending fused node before this comm-bearing sublayer
-                                                if cfg.compact and gpu in pending_fused:
-                                                    pf = pending_fused.pop(gpu)
-                                                    dag.compute_nodes.append(pf)
-                                                    prev_pf = last_node_per_gpu.get(gpu)
-                                                    if prev_pf is not None:
-                                                        dag.edges.append(DAGEdge(src_node_id=prev_pf, dst_node_id=pf.node_id))
-                                                    last_node_per_gpu[gpu] = pf.node_id
-
                                                 dag.compute_nodes.extend(c_nodes)
 
                                                 stub_to_comm_ids: dict[int, list[int]] = {}
@@ -257,6 +305,7 @@ class MegatronDAGTracer(DAGTracer):
                                     if prev_pf is not None:
                                         dag.edges.append(DAGEdge(src_node_id=prev_pf, dst_node_id=pf.node_id))
                                     last_node_per_gpu[gpu] = pf.node_id
+                                    last_was_compute[gpu] = False
 
                                 last = last_node_per_gpu.get(gpu)
                                 if last is not None:
