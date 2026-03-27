@@ -11,18 +11,19 @@ This file describes the hardware and network topology of the simulated datacente
 2. [Profile References](#profile-references)
 3. [Cost Specification](#cost-specification)
 4. [Power Model](#power-model)
-5. [Top-Level Structure](#top-level-structure)
-6. [`datacenter` Block](#datacenter-block)
-7. [`cluster` Block](#cluster-block)
-8. [`node` Block](#node-block)
+5. [Cost Model](#cost-model)
+6. [Top-Level Structure](#top-level-structure)
+7. [`datacenter` Block](#datacenter-block)
+8. [`cluster` Block](#cluster-block)
+9. [`node` Block](#node-block)
    - [GPU](#gpu)
    - [CPU](#cpu)
    - [Node-Level Cooling](#node-level-cooling)
-9. [`network` Block](#network-block)
-   - [`network.scale_up` (Intra-Node)](#networkscale_up-intra-node)
-   - [`network.scale_out` (Inter-Node)](#networkscale_out-inter-node)
-   - [Topology Templates](#topology-templates)
-10. [Full Example](#full-example)
+10. [`network` Block](#network-block)
+    - [`network.scale_up` (Intra-Node)](#networkscale_up-intra-node)
+    - [`network.scale_out` (Inter-Node)](#networkscale_out-inter-node)
+    - [Topology Templates](#topology-templates)
+11. [Full Example](#full-example)
 
 ---
 
@@ -154,6 +155,88 @@ power_model:
 
 ---
 
+## Cost Model
+
+Cost modeling is driven by `cost` fields on individual hardware components (see
+[Cost Specification](#cost-specification)) and two optional parameters in the `datacenter` block:
+`datacenter_lifetime_years` and `idle_fraction`.
+
+All monetary values are in **USD**.
+
+### CAPEX
+
+Total hardware acquisition cost is summed across all component types, scaled by their
+quantities in the cluster:
+
+| Component | Multiplier |
+|---|---|
+| GPU | `cost × gpus_per_node × num_nodes` |
+| CPU | `cost × sockets × num_nodes` (cost is per socket) |
+| Node-level cooling | `cost × num_nodes` |
+| NIC | `cost × nics_per_node × num_nodes` |
+| NVSwitch (scale-up) | `cost × num_nodes` (one per node) |
+| Leaf switches | `cost × num_leaf_switches` |
+| Spine switches | `cost × num_spine_switches` |
+| Rack hardware | `rack.cost × num_racks` |
+| Rack cooling | `rack.cooling.cost × num_racks` |
+| Datacenter cooling | `datacenter.cooling.cost` |
+
+CAPEX is reported as a breakdown by component type and as a cluster total. If `cost.min` /
+`cost.max` are provided on any component, the range is propagated to the totals.
+
+### OPEX
+
+OPEX is reported per training run:
+
+```
+energy_cost_per_run = energy_per_run_kwh × electricity_cost_per_kwh
+```
+
+where `energy_per_run_kwh` comes from the energy model (see [Power Model](#power-model)).
+
+The `idle_fraction` parameter controls what fraction of cluster lifetime the GPUs are idle.
+During idle periods, each component draws power at 0% utilisation: `idle_power_w` for `linear`
+models, `tdp_w` for `constant` models. This affects both the energy cost of a run and — when
+`datacenter_lifetime_years` is provided — the number of runs that fit in the cluster lifetime.
+
+### Combined cost per training run
+
+When `datacenter_lifetime_years` is provided, the simulator also calculates cost per training run:
+
+```
+runs_per_lifetime = floor(
+    lifetime_years × 8760h × (1 − idle_fraction) / run_duration_hours
+)
+capex_per_run    = total_capex / runs_per_lifetime
+cost_per_run     = capex_per_run + energy_cost_per_run
+```
+
+where `run_duration_hours` is derived from the simulation result — the total simulated wall-clock
+time for the workload. No additional input is required.
+
+### Output format
+
+```
+Cost result
+├── capex
+│   ├── total:           $X,XXX,XXX
+│   ├── range:           [$X,XXX,XXX – $X,XXX,XXX]   (if min/max provided)
+│   └── breakdown
+│       ├── gpu:         $X,XXX,XXX  (XX%)
+│       ├── cpu:           $XXX,XXX  (X%)
+│       ├── nic:           $XXX,XXX  (X%)
+│       ├── switches:      $XXX,XXX  (X%)
+│       ├── rack:          $XXX,XXX  (X%)
+│       └── cooling:       $XXX,XXX  (X%)
+├── opex_per_run
+│   └── energy_cost:         $XX.XX
+└── cost_per_run             $X,XXX   (only if datacenter_lifetime_years provided)
+    ├── capex_component:     $X,XXX
+    └── opex_component:      $XX.XX
+```
+
+---
+
 ## Top-Level Structure
 
 ```yaml
@@ -172,7 +255,6 @@ Datacenter-level infrastructure and operational parameters.
 ```yaml
 datacenter:
   name: "My AI Cluster"         # optional, human-readable label
-  location: "US-East-1"         # optional, geographic label
 
   # Path to hardware profile library.
   # Defaults to the built-in bundled profiles if omitted or empty.
@@ -185,6 +267,16 @@ datacenter:
 
   # Electricity cost in USD per kWh.
   electricity_cost_per_kwh: 0.07
+
+  # Expected operational lifetime of the datacenter in years.
+  # When provided, enables combined CAPEX+OPEX cost-per-run output.
+  # When omitted, only OPEX per run is reported.
+  datacenter_lifetime_years: 4
+
+  # Fraction of cluster lifetime during which the cluster is idle (0.0–1.0).
+  # Affects both energy consumption and the number of training runs that fit
+  # within the cluster lifetime. Default: 0.0 (fully utilised).
+  idle_fraction: 0.10
 
   # Optional facility-level cooling unit (e.g. chillers, CRAC units).
   # When specified, the cooling unit's power draw is included in the hardware
@@ -650,10 +742,11 @@ No generator is invoked. The full topology must be provided via an external desc
 ```yaml
 datacenter:
   name: "Research Cluster A"
-  location: "EU-West"
   profiles_dir: "./templates"
   pue: 1.3
   electricity_cost_per_kwh: 0.08
+  datacenter_lifetime_years: 4
+  idle_fraction: 0.15
   rack:
     nodes_per_rack: 8
     rack_units: 42
