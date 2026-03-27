@@ -38,6 +38,8 @@ def simulate(
     dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
     compact: bool = typer.Option(False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
+    energy: bool = typer.Option(False, "--energy", help="Compute and print per-iteration energy breakdown"),
+    cost: bool = typer.Option(False, "--cost", help="Compute and print cost breakdown (implies --energy)"),
 ):
     """Run simulation and print an iteration summary.
 
@@ -67,6 +69,18 @@ def simulate(
 
     if summary:
         _print_summary(result)
+
+    energy_result = None
+    if energy or cost:
+        from simulon.energy import compute_energy
+        energy_result = compute_energy(dag, sc)
+        if energy_result is not None:
+            _print_energy_summary(energy_result)
+
+    if cost and energy_result is not None:
+        from simulon.cost import compute_cost
+        cost_result = compute_cost(sc, energy_result)
+        _print_cost_summary(cost_result)
 
     if chrome is not None:
         p = sc.workload.parallelism
@@ -110,6 +124,46 @@ def _print_summary(result) -> None:
     typer.echo("")
     typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
                "  (hidden by compute, not in totals above)")
+    typer.echo("")
+
+
+def _print_energy_summary(result) -> None:
+    """Print a human-readable energy summary to stdout."""
+    typer.echo(f"Energy per iteration:  {result.total_wh:.4f} Wh"
+               f"   (avg cluster power: {result.avg_power_kw:.2f} kW)")
+    typer.echo(f"  Hardware subtotal:   {result.hardware_subtotal_wh:.4f} Wh")
+    for comp in result.breakdown:
+        label = comp.component + ":"
+        typer.echo(f"    {label:26s} {comp.wh:10.4f} Wh  ({comp.pct:5.1f}%)")
+    typer.echo(f"  PUE overhead:        {result.pue_overhead_wh:.4f} Wh")
+    typer.echo("")
+
+
+def _print_cost_summary(result) -> None:
+    """Print a human-readable cost summary to stdout."""
+
+    def _fmt(v: float) -> str:
+        return f"${v:,.0f}"
+
+    typer.echo("Cost model")
+    capex = result.capex
+    range_str = ""
+    if capex.min is not None and capex.max is not None:
+        range_str = f"  [{_fmt(capex.min)} \u2013 {_fmt(capex.max)}]"
+    typer.echo(f"  CAPEX total:    {_fmt(capex.total)}{range_str}")
+    for comp in capex.breakdown:
+        label = comp.component + ":"
+        range_comp = ""
+        if comp.min is not None and comp.max is not None:
+            range_comp = f"  [{_fmt(comp.min)} \u2013 {_fmt(comp.max)}]"
+        typer.echo(f"    {label:26s} {_fmt(comp.total):>14s}{range_comp}  ({comp.pct:5.1f}%)")
+    typer.echo(f"  OPEX per run:   {_fmt(result.opex_per_run)}")
+    if result.cost_per_run is not None:
+        cpr = result.cost_per_run
+        typer.echo(
+            f"  Cost per run:   {_fmt(cpr.total)}"
+            f"  (capex {_fmt(cpr.capex_component)} + opex {_fmt(cpr.opex_component)})"
+        )
     typer.echo("")
 
 
@@ -228,14 +282,15 @@ def profile_gpu(
     # Create hardware spec file if it doesn't exist yet (skip for --dry-run).
     _hw_args_provided = any(v is not None for v in [vendor, memory_capacity_gb, tdp_w]) or flops_multiplier != 1.0
     if not dry_run and not spec_path.exists():
-        spec_dict = {
+        spec_dict: dict = {
             "name": name,
             "vendor": vendor,
             "memory_capacity_gb": memory_capacity_gb,
-            "tdp_w": tdp_w,
             "flops_multiplier": flops_multiplier,
         }
         spec_dict = {k: v for k, v in spec_dict.items() if v is not None}
+        if tdp_w is not None:
+            spec_dict["power_model"] = {"type": "constant", "tdp_w": tdp_w}
         with open(spec_path, "w") as f:
             yaml.dump(spec_dict, f, default_flow_style=False, sort_keys=False)
     elif spec_path.exists() and _hw_args_provided:
