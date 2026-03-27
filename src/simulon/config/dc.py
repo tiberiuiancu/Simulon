@@ -3,7 +3,7 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .common import CostField
+from .common import CostField, PowerModel
 
 
 # ---------------------------------------------------------------------------
@@ -60,12 +60,20 @@ class RackSpec(BaseModel):
     cooling: Optional[RackCoolingSpec] = None
 
 
+class DatacenterCoolingSpec(BaseModel):
+    """Optional facility-level cooling unit (e.g. chillers, CRAC units)."""
+    tdp_w: Optional[float] = None
+    cost: Optional[CostField] = None
+
+
 class DatacenterMeta(BaseModel):
     name: Optional[str] = None
-    location: Optional[str] = None
     profiles_dir: Optional[str] = None
     pue: float = 1.0
     electricity_cost_per_kwh: Optional[float] = None
+    datacenter_lifetime_years: Optional[float] = None
+    idle_fraction: float = 0.0
+    cooling: Optional[DatacenterCoolingSpec] = None
     rack: Optional[RackSpec] = None
 
 
@@ -91,7 +99,7 @@ class GPUSpec(BaseModel):
     vendor: Optional[str] = None
     flops_multiplier: float = 1.0
     memory_capacity_gb: Optional[float] = None
-    tdp_w: Optional[float] = None
+    power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None
     # Populated by `simulon profile gpu`; empty when declared inline in a DC config.
     kernel_runs: list[KernelRun] = []
@@ -109,7 +117,7 @@ class CPUSpec(BaseModel):
     sockets: int = 2
     cores_per_socket: Optional[int] = None
     memory_gb: Optional[float] = None
-    tdp_w: Optional[float] = None
+    power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None
     memory_cost_per_gb: Optional[float] = None
 
@@ -146,7 +154,7 @@ class SwitchSpec(BaseModel):
     buffer_per_port: Optional[str] = None
     queue_discipline: Optional[QueueDiscipline] = None
     queue_params: Optional[dict[str, Any]] = None  # discipline-specific; typed later
-    tdp_w: Optional[float] = None
+    power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None
 
 
@@ -163,7 +171,7 @@ class NICSpec(BaseModel):
     vendor: Optional[str] = None
     speed: Optional[str] = None
     latency: Optional[str] = None
-    tdp_w: Optional[float] = None
+    power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None
     bandwidth_efficiency: float = Field(
         default=0.85,

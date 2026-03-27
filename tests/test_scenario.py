@@ -1,6 +1,6 @@
 import yaml
 
-from simulon.config.common import Cost, DType
+from simulon.config.common import ConstantPowerModel, Cost, DType
 from simulon.config.dc import (
     ClusterSpec,
     CPUSpec,
@@ -36,7 +36,6 @@ def make_scenario() -> ScenarioConfig:
         datacenter=DatacenterConfig(
             datacenter=DatacenterMeta(
                 name="Test Cluster",
-                location="EU-West",
                 profiles_dir="./templates",
                 pue=1.3,
                 electricity_cost_per_kwh=0.08,
@@ -60,7 +59,7 @@ def make_scenario() -> ScenarioConfig:
                     name="H100-SXM5-80GB",
                     vendor="nvidia",
                     memory_capacity_gb=80.0,
-                    tdp_w=700.0,
+                    power_model=ConstantPowerModel(tdp_w=700.0),
                     flops_multiplier=1.0,
                     cost=Cost(value=30000, min=25000, max=35000),
                     kernel_runs=[
@@ -82,7 +81,7 @@ def make_scenario() -> ScenarioConfig:
                     sockets=2,
                     cores_per_socket=60,
                     memory_gb=512.0,
-                    tdp_w=350.0,
+                    power_model=ConstantPowerModel(tdp_w=350.0),
                     cost=4000.0,  # scalar cost form
                     memory_cost_per_gb=5.0,
                 ),
@@ -97,7 +96,7 @@ def make_scenario() -> ScenarioConfig:
                         name="NVSwitch3",
                         port_speed="2880Gbps",
                         latency="0.000025ms",
-                        tdp_w=110.0,
+                        power_model=ConstantPowerModel(tdp_w=110.0),
                         cost=Cost(value=3000),
                     ),
                 ),
@@ -107,7 +106,7 @@ def make_scenario() -> ScenarioConfig:
                         vendor="mellanox",
                         speed="400Gbps",
                         latency="0.0005ms",
-                        tdp_w=25.0,
+                        power_model=ConstantPowerModel(tdp_w=25.0),
                         cost=2000.0,  # scalar cost form
                     ),
                     leaf_switch=SwitchSpec(
@@ -118,7 +117,7 @@ def make_scenario() -> ScenarioConfig:
                         buffer_per_port="32MB",
                         queue_discipline=QueueDiscipline.fq_codel,
                         queue_params={"flows": 1024, "target_delay": "5ms"},
-                        tdp_w=300.0,
+                        power_model=ConstantPowerModel(tdp_w=300.0),
                         cost=Cost(value=50000),
                     ),
                     topology=TopologySpec(

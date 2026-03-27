@@ -1,13 +1,11 @@
 import logging
-from pathlib import Path
-
-import yaml
 
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
 from simulon.backend.dag.populate import populate_network
 from simulon.collective import CCLDecomposer, NCCLDecomposer, RCCLDecomposer
 from simulon.config.dc import DatacenterConfig, GPUSpec
+from simulon.config.resolve import load_gpu_template, resolve_gpu_spec
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import MegatronWorkload
 
@@ -35,44 +33,9 @@ def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
     )
 
 
-def _resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
-    gpu = dc.node.gpu
-    if isinstance(gpu, str):
-        return _load_gpu_template(gpu)
-    if isinstance(gpu, GPUSpec) and gpu.from_:
-        base = _load_gpu_template(gpu.from_)
-        if gpu.name:
-            base.name = gpu.name
-        if gpu.flops_multiplier != 1.0:
-            base.flops_multiplier = gpu.flops_multiplier
-        return base
-    return gpu
-
-
-def _load_profile_data(template_path: Path) -> dict:
-    profile_path = template_path.with_suffix('').with_suffix('.profile.yaml')
-    if profile_path.exists():
-        with open(profile_path) as f:
-            return yaml.safe_load(f) or {}
-    return {}
-
-
-def _load_gpu_template(name: str) -> GPUSpec:
-    template_path = Path("templates/gpu") / f"{name}.yaml"
-    if not template_path.exists():
-        candidates = list(Path("templates/gpu").glob("*.yaml")) if Path("templates/gpu").exists() else []
-        for c in candidates:
-            if c.stem.lower() == name.lower():
-                template_path = c
-                break
-        else:
-            raise FileNotFoundError(
-                f"GPU template not found: {name!r}. Expected at templates/gpu/{name}.yaml"
-            )
-    with open(template_path) as f:
-        data = yaml.safe_load(f)
-    data.update(_load_profile_data(template_path))
-    return GPUSpec.model_validate(data)
+# Keep private aliases so call sites inside this module are unchanged.
+_resolve_gpu_spec = resolve_gpu_spec
+_load_gpu_template = load_gpu_template
 
 
 class AnalyticalBackend(Backend):
