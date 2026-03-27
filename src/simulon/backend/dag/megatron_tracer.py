@@ -144,10 +144,30 @@ class MegatronDAGTracer(DAGTracer):
                                 direction = slot.direction
                                 slot_first_entry_set = False
 
-                                for layer_idx in range(num_layers):
-                                    for sublayer in sublayers:
-                                        for phase in _phases_for_direction(direction):
-                                            c_nodes, comm_stubs, edges, node_id_counter = expander.expand_sublayer(
+                                # In compact+bwd mode, process all bwd_ig phases first
+                                # (across all layers), then all bwd_wg phases. This lets
+                                # consecutive bwd_wg sublayers accumulate into a single
+                                # fused node per slot instead of being flushed per sublayer.
+                                if cfg.compact and direction == "bwd":
+                                    _jobs: list[tuple[int, str, str]] = [
+                                        (l, s, "bwd_ig")
+                                        for l in range(num_layers)
+                                        for s in sublayers
+                                    ] + [
+                                        (l, s, "bwd_wg")
+                                        for l in range(num_layers)
+                                        for s in sublayers
+                                    ]
+                                else:
+                                    _jobs = [
+                                        (l, s, p)
+                                        for l in range(num_layers)
+                                        for s in sublayers
+                                        for p in _phases_for_direction(direction)
+                                    ]
+
+                                for layer_idx, sublayer, phase in _jobs:
+                                    c_nodes, comm_stubs, edges, node_id_counter = expander.expand_sublayer(
                                                 sublayer_type=sublayer,
                                                 phase=phase,
                                                 gpu_rank=gpu,
@@ -161,93 +181,93 @@ class MegatronDAGTracer(DAGTracer):
                                                 moe_data_bytes=moe_data_bytes,
                                             )
 
-                                            if cfg.compact and not comm_stubs:
-                                                # Pure compute chain — accumulate into pending fused node
-                                                if gpu not in pending_fused:
-                                                    _fk = [cn.kernel for cn in c_nodes]
-                                                    pending_fused[gpu] = ComputeNode(
-                                                        node_id=c_nodes[0].node_id,
-                                                        gpu_rank=gpu,
-                                                        kernel=f"{len(_fk)} kernels",
-                                                        fused_kernels=_fk,
-                                                        layer_id=c_nodes[0].layer_id,
-                                                        microbatch_id=mb,
-                                                        pipeline_stage=pp_stage,
-                                                        phase=phase,
-                                                    )
-                                                else:
-                                                    pending_fused[gpu].fused_kernels.extend(cn.kernel for cn in c_nodes)
-                                                    pending_fused[gpu].kernel = f"{len(pending_fused[gpu].fused_kernels)} kernels"
-                                                if not slot_first_entry_set:
-                                                    slot_entry_node[(gpu, mb, direction)] = pending_fused[gpu].node_id
-                                                    slot_first_entry_set = True
+                                    if cfg.compact and not comm_stubs:
+                                        # Pure compute chain — accumulate into pending fused node
+                                        if gpu not in pending_fused:
+                                            _fk = [cn.kernel for cn in c_nodes]
+                                            pending_fused[gpu] = ComputeNode(
+                                                node_id=c_nodes[0].node_id,
+                                                gpu_rank=gpu,
+                                                kernel=f"{len(_fk)} kernels",
+                                                fused_kernels=_fk,
+                                                layer_id=c_nodes[0].layer_id,
+                                                microbatch_id=mb,
+                                                pipeline_stage=pp_stage,
+                                                phase=phase,
+                                            )
+                                        else:
+                                            pending_fused[gpu].fused_kernels.extend(cn.kernel for cn in c_nodes)
+                                            pending_fused[gpu].kernel = f"{len(pending_fused[gpu].fused_kernels)} kernels"
+                                        if not slot_first_entry_set:
+                                            slot_entry_node[(gpu, mb, direction)] = pending_fused[gpu].node_id
+                                            slot_first_entry_set = True
+                                    else:
+                                        # Flush pending fused node before this comm-bearing sublayer
+                                        if cfg.compact and gpu in pending_fused:
+                                            pf = pending_fused.pop(gpu)
+                                            dag.compute_nodes.append(pf)
+                                            prev_pf = last_node_per_gpu.get(gpu)
+                                            if prev_pf is not None:
+                                                dag.edges.append(DAGEdge(src_node_id=prev_pf, dst_node_id=pf.node_id))
+                                            last_node_per_gpu[gpu] = pf.node_id
+
+                                        dag.compute_nodes.extend(c_nodes)
+
+                                        stub_to_comm_ids: dict[int, list[int]] = {}
+                                        for stub in comm_stubs:
+                                            if stub.collective_type in ("AllGather", "ReduceScatter", "AllReduce"):
+                                                group = tp_group
+                                            elif stub.collective_type == "AllToAll":
+                                                group = ep_group
                                             else:
-                                                # Flush pending fused node before this comm-bearing sublayer
-                                                if cfg.compact and gpu in pending_fused:
-                                                    pf = pending_fused.pop(gpu)
-                                                    dag.compute_nodes.append(pf)
-                                                    prev_pf = last_node_per_gpu.get(gpu)
-                                                    if prev_pf is not None:
-                                                        dag.edges.append(DAGEdge(src_node_id=prev_pf, dst_node_id=pf.node_id))
-                                                    last_node_per_gpu[gpu] = pf.node_id
+                                                group = dp_group
 
-                                                dag.compute_nodes.extend(c_nodes)
+                                            result, flow_id_counter = self._ccl.decompose(
+                                                collective_type=stub.collective_type,
+                                                group_ranks=group,
+                                                data_size=stub.bytes,
+                                                num_channels=cfg.num_channels,
+                                                algorithm=cfg.algorithm,
+                                                flow_id_start=flow_id_counter,
+                                            )
 
-                                                stub_to_comm_ids: dict[int, list[int]] = {}
-                                                for stub in comm_stubs:
-                                                    if stub.collective_type in ("AllGather", "ReduceScatter", "AllReduce"):
-                                                        group = tp_group
-                                                    elif stub.collective_type == "AllToAll":
-                                                        group = ep_group
-                                                    else:
-                                                        group = dp_group
-
-                                                    result, flow_id_counter = self._ccl.decompose(
-                                                        collective_type=stub.collective_type,
-                                                        group_ranks=group,
-                                                        data_size=stub.bytes,
-                                                        num_channels=cfg.num_channels,
-                                                        algorithm=cfg.algorithm,
-                                                        flow_id_start=flow_id_counter,
-                                                    )
-
-                                                    stub_to_comm_ids[stub.node_id] = []
-                                                    for flow in result.flows:
-                                                        comm_node = CommNode(
-                                                            node_id=node_id_counter,
-                                                            src_gpu=flow.src,
-                                                            dst_gpu=flow.dst,
-                                                            bytes=flow.flow_size,
-                                                            collective_type=stub.collective_type,
-                                                            layer_id=layer_idx,
-                                                            phase=phase,
-                                                            flow_id=flow.flow_id,
-                                                            parent_flow_ids=flow.parent_flow_ids,
-                                                        )
-                                                        dag.comm_nodes.append(comm_node)
-                                                        stub_to_comm_ids[stub.node_id].append(node_id_counter)
-                                                        node_id_counter += 1
-
-                                                for edge in edges:
-                                                    srcs = stub_to_comm_ids.get(edge.src_node_id, [edge.src_node_id])
-                                                    dsts = stub_to_comm_ids.get(edge.dst_node_id, [edge.dst_node_id])
-                                                    for s in srcs:
-                                                        for d in dsts:
-                                                            dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
-
-                                                entry_id, exit_id = _sublayer_entry_exit(
-                                                    c_nodes, comm_stubs, stub_to_comm_ids
+                                            stub_to_comm_ids[stub.node_id] = []
+                                            for flow in result.flows:
+                                                comm_node = CommNode(
+                                                    node_id=node_id_counter,
+                                                    src_gpu=flow.src,
+                                                    dst_gpu=flow.dst,
+                                                    bytes=flow.flow_size,
+                                                    collective_type=stub.collective_type,
+                                                    layer_id=layer_idx,
+                                                    phase=phase,
+                                                    flow_id=flow.flow_id,
+                                                    parent_flow_ids=flow.parent_flow_ids,
                                                 )
+                                                dag.comm_nodes.append(comm_node)
+                                                stub_to_comm_ids[stub.node_id].append(node_id_counter)
+                                                node_id_counter += 1
 
-                                                if not slot_first_entry_set and entry_id is not None:
-                                                    slot_entry_node[(gpu, mb, direction)] = entry_id
-                                                    slot_first_entry_set = True
+                                        for edge in edges:
+                                            srcs = stub_to_comm_ids.get(edge.src_node_id, [edge.src_node_id])
+                                            dsts = stub_to_comm_ids.get(edge.dst_node_id, [edge.dst_node_id])
+                                            for s in srcs:
+                                                for d in dsts:
+                                                    dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
 
-                                                prev = last_node_per_gpu.get(gpu)
-                                                if prev is not None and entry_id is not None:
-                                                    dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
-                                                if exit_id is not None:
-                                                    last_node_per_gpu[gpu] = exit_id
+                                        entry_id, exit_id = _sublayer_entry_exit(
+                                            c_nodes, comm_stubs, stub_to_comm_ids
+                                        )
+
+                                        if not slot_first_entry_set and entry_id is not None:
+                                            slot_entry_node[(gpu, mb, direction)] = entry_id
+                                            slot_first_entry_set = True
+
+                                        prev = last_node_per_gpu.get(gpu)
+                                        if prev is not None and entry_id is not None:
+                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
+                                        if exit_id is not None:
+                                            last_node_per_gpu[gpu] = exit_id
 
                                 # Flush any remaining pending fused node at end of slot
                                 if cfg.compact and gpu in pending_fused:
