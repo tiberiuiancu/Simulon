@@ -201,8 +201,8 @@ class TestCompactNonCompactEquivalence:
         dag_compact = backend.run_trace(sc, compact=True)
 
         reduction = 1.0 - len(dag_compact.compute_nodes) / len(dag_normal.compute_nodes)
-        assert reduction >= 0.15, (
-            f"Expected at least 15% compute-node reduction for tp=2, got {reduction:.1%} "
+        assert reduction >= 0.60, (
+            f"Expected at least 60% compute-node reduction for tp=2, got {reduction:.1%} "
             f"(compact={len(dag_compact.compute_nodes)} vs normal={len(dag_normal.compute_nodes)})"
         )
         # Comm nodes must be identical
