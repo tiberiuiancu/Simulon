@@ -8,7 +8,7 @@ from typing import Literal, Optional
 class ComputeNode:
     node_id: int
     gpu_rank: int
-    kernel: str  # layernorm|attn_qkv|attn_flash|attn_proj|mlp_linear1|mlp_act|mlp_linear2|embedding|logit
+    kernel: str  # layernorm|attn_qkv|attn_flash|attn_proj|mlp_linear1|mlp_act|mlp_linear2|embedding|logit|loss_ce
     layer_id: int
     microbatch_id: int
     pipeline_stage: int
