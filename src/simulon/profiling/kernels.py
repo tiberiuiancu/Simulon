@@ -307,6 +307,26 @@ def _bench_moe_expert(
     return _cuda_time(fn)
 
 
+def _bench_loss_ce(
+    vocab_size: int,
+    seq_len: int,
+    batch_size: int,
+    tp: int,
+    dtype,
+) -> list[float]:
+    import torch
+    import torch.nn.functional as F
+
+    # VocabParallelCrossEntropy: softmax + cross-entropy over sharded vocab
+    logits = torch.randn(batch_size * seq_len, vocab_size // tp, dtype=dtype, device="cuda")
+    targets = torch.randint(0, vocab_size // tp, (batch_size * seq_len,), device="cuda")
+
+    def fn():
+        return F.cross_entropy(logits, targets)
+
+    return _cuda_time(fn)
+
+
 def _bench_logit(
     hidden_size: int,
     vocab_size: int,
@@ -442,6 +462,11 @@ def benchmark_kernels(
     _run(
         "logit",
         lambda: _bench_logit(hidden_size, vocab_size, seq_len, batch_size, tp, tdt),
+        {"vocab_size": vocab_size},
+    )
+    _run(
+        "loss_ce",
+        lambda: _bench_loss_ce(vocab_size, seq_len, batch_size, tp, tdt),
         {"vocab_size": vocab_size},
     )
     if num_experts > 0:

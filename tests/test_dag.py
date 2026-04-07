@@ -12,6 +12,20 @@ from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
 from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.backend.dag.pipeline import OneFOneBScheduler, ScheduleSlot
 from simulon.backend.dag.layer_expander import LayerExpander
+from simulon.config.common import DType
+from simulon.config.dc import (
+    ClusterSpec,
+    DatacenterConfig,
+    DatacenterMeta,
+    GPUSpec,
+    NodeSpec,
+)
+from simulon.config.workload import (
+    LLMSpec,
+    MegatronParallelism,
+    MegatronTraining,
+    MegatronWorkload,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -206,4 +220,279 @@ def test_layer_expander_mlp_kernels():
     )
     kernels = [n.kernel for n in c_nodes]
     assert kernels == ["layernorm", "mlp_linear1", "mlp_act", "mlp_linear2"]
+
+
+# ---------------------------------------------------------------------------
+# Embedding / logit / loss_ce layer node tests (TIB-120)
+# ---------------------------------------------------------------------------
+
+
+def _minimal_dc(num_gpus: int) -> DatacenterConfig:
+    """Minimal datacenter with exactly num_gpus GPUs (single node)."""
+    return DatacenterConfig(
+        datacenter=DatacenterMeta(name="test"),
+        cluster=ClusterSpec(num_nodes=1),
+        node=NodeSpec(
+            gpus_per_node=num_gpus,
+            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
+        ),
+    )
+
+
+def _minimal_workload(
+    tp: int = 1,
+    pp: int = 1,
+    num_layers: int = 2,
+    hidden_size: int = 512,
+    seq_len: int = 128,
+    micro_batch_size: int = 1,
+    global_batch_size: int | None = None,
+    vocab_size: int = 32000,
+) -> MegatronWorkload:
+    num_gpus = tp * pp
+    gbs = global_batch_size if global_batch_size is not None else num_gpus
+    return MegatronWorkload(
+        framework="megatron",
+        model=LLMSpec(
+            name="test-model",
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            num_heads=8,
+            vocab_size=vocab_size,
+        ),
+        parallelism=MegatronParallelism(tp=tp, pp=pp, dp=1),
+        training=MegatronTraining(
+            num_gpus=num_gpus,
+            global_batch_size=gbs,
+            micro_batch_size=micro_batch_size,
+            sequence_length=seq_len,
+            dtype=DType.bf16,
+        ),
+    )
+
+
+def _no_cache_tracer() -> MegatronDAGTracer:
+    return MegatronDAGTracer(config=DAGTracerConfig(cache_dir=None))
+
+
+class TestEmbeddingLossNodes:
+    """Invariants for the embedding, logit, and loss_ce nodes added in TIB-120."""
+
+    def test_pp1_tp1_embedding_count_per_gpu(self):
+        """PP=1 fwd slot gets 1 embedding node; bwd slot gets 1 embedding node per GPU."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        embedding_nodes = [n for n in dag.compute_nodes if n.kernel == "embedding"]
+        # 1 GPU, 1 microbatch → 1 fwd slot + 1 bwd slot → 2 embedding nodes total
+        assert len(embedding_nodes) == 2
+        phases = {n.phase for n in embedding_nodes}
+        assert phases == {"fwd", "bwd_ig"}
+
+    def test_pp1_tp1_logit_and_loss_ce_in_fwd(self):
+        """PP=1 fwd slot gets exactly 1 logit (fwd) and 1 loss_ce (fwd) per microbatch per GPU."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        logit_fwd = [n for n in dag.compute_nodes if n.kernel == "logit" and n.phase == "fwd"]
+        loss_ce = [n for n in dag.compute_nodes if n.kernel == "loss_ce"]
+        assert len(logit_fwd) == 1
+        assert len(loss_ce) == 1
+
+    def test_pp1_tp1_logit_bwd_in_bwd(self):
+        """PP=1 bwd slot gets exactly 1 logit (bwd_ig) per microbatch per GPU."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        logit_bwd = [n for n in dag.compute_nodes if n.kernel == "logit" and n.phase == "bwd_ig"]
+        assert len(logit_bwd) == 1
+
+    def test_pp1_tp1_no_tp_allreduce_for_embedding_bwd(self):
+        """PP=1, tp=1: no TP AllReduce is emitted for the embedding bwd (tp=1 guard)."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        # With tp=1 the ring decomposes to 0 flows, so no comm nodes at all
+        assert len(dag.comm_nodes) == 0
+
+    def test_pp1_tp1_dp_allreduce_for_loss_present(self):
+        """PP=1, dp>1: DP AllReduce for loss averaging is present in the DAG in fwd phase."""
+        # dp=2 so 2 GPUs: tp=1, pp=1, dp=2
+        wl = MegatronWorkload(
+            framework="megatron",
+            model=LLMSpec(name="test-model", hidden_size=512, num_layers=2, num_heads=8, vocab_size=32000),
+            parallelism=MegatronParallelism(tp=1, pp=1, dp=2),
+            training=MegatronTraining(
+                num_gpus=2,
+                global_batch_size=2,
+                micro_batch_size=1,
+                sequence_length=128,
+                dtype=DType.bf16,
+            ),
+        )
+        dc = _minimal_dc(num_gpus=2)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        # The DP AllReduce for loss (data_bytes=4) decomposes to ring chunks of 4//2=2 bytes each.
+        # It is emitted in the fwd phase (distinct from the optimizer step AllReduce).
+        # The step AllReduce carries much larger param-gradient payloads.
+        fwd_ar = [n for n in dag.comm_nodes if n.collective_type == "AllReduce" and n.phase == "fwd"]
+        assert len(fwd_ar) > 0, "DP AllReduce for loss must produce fwd-phase AllReduce comm nodes"
+
+    def test_pp2_stage0_has_embedding_not_logit(self):
+        """PP=2 stage 0 has embedding nodes but no logit or loss_ce compute nodes."""
+        wl = _minimal_workload(tp=1, pp=2, num_layers=2, global_batch_size=2)
+        dc = _minimal_dc(num_gpus=2)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        stage0_gpu = 0  # global_rank(dp=0, pp=0, ep=0, tp=0)
+        stage0_compute = [n for n in dag.compute_nodes if n.gpu_rank == stage0_gpu]
+
+        embedding_nodes = [n for n in stage0_compute if n.kernel == "embedding"]
+        logit_nodes = [n for n in stage0_compute if n.kernel == "logit"]
+        loss_ce_nodes = [n for n in stage0_compute if n.kernel == "loss_ce"]
+
+        assert len(embedding_nodes) > 0, "Stage 0 must have embedding nodes"
+        assert len(logit_nodes) == 0, "Stage 0 must NOT have logit nodes"
+        assert len(loss_ce_nodes) == 0, "Stage 0 must NOT have loss_ce nodes"
+
+    def test_pp2_stage1_has_logit_loss_not_embedding(self):
+        """PP=2 stage 1 has logit and loss_ce nodes but no embedding compute nodes."""
+        wl = _minimal_workload(tp=1, pp=2, num_layers=2, global_batch_size=2)
+        dc = _minimal_dc(num_gpus=2)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        stage1_gpu = 1  # global_rank(dp=0, pp=1, ep=0, tp=0)
+        stage1_compute = [n for n in dag.compute_nodes if n.gpu_rank == stage1_gpu]
+
+        embedding_nodes = [n for n in stage1_compute if n.kernel == "embedding"]
+        logit_fwd_nodes = [n for n in stage1_compute if n.kernel == "logit" and n.phase == "fwd"]
+        logit_bwd_nodes = [n for n in stage1_compute if n.kernel == "logit" and n.phase == "bwd_ig"]
+        loss_ce_nodes = [n for n in stage1_compute if n.kernel == "loss_ce"]
+
+        assert len(embedding_nodes) == 0, "Stage 1 must NOT have embedding nodes"
+        assert len(logit_fwd_nodes) > 0, "Stage 1 must have logit fwd nodes"
+        assert len(logit_bwd_nodes) > 0, "Stage 1 must have logit bwd_ig nodes"
+        assert len(loss_ce_nodes) > 0, "Stage 1 must have loss_ce nodes"
+
+    def test_pp2_stage0_has_embedding_bwd_not_logit_bwd(self):
+        """PP=2 stage 0 bwd has embedding bwd_ig but no logit bwd_ig node."""
+        wl = _minimal_workload(tp=1, pp=2, num_layers=2, global_batch_size=2)
+        dc = _minimal_dc(num_gpus=2)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        stage0_gpu = 0
+        stage0_compute = [n for n in dag.compute_nodes if n.gpu_rank == stage0_gpu]
+
+        embedding_bwd = [n for n in stage0_compute if n.kernel == "embedding" and n.phase == "bwd_ig"]
+        logit_bwd = [n for n in stage0_compute if n.kernel == "logit" and n.phase == "bwd_ig"]
+
+        assert len(embedding_bwd) > 0, "Stage 0 must have embedding bwd_ig nodes"
+        assert len(logit_bwd) == 0, "Stage 0 must NOT have logit bwd_ig nodes"
+
+    def test_tp2_embedding_bwd_tp_allreduce_present(self):
+        """tp=2: embedding bwd emits a TP AllReduce, visible as bwd_ig phase AllReduce comm nodes."""
+        wl = _minimal_workload(
+            tp=2, pp=1, num_layers=2,
+            seq_len=128, micro_batch_size=1, hidden_size=512,
+        )
+        dc = _minimal_dc(num_gpus=2)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        # The embedding bwd AllReduce is the only AllReduce in bwd_ig phase.
+        # (Layer body uses AllGather + ReduceScatter, not AllReduce.)
+        emb_bwd_ar = [
+            n for n in dag.comm_nodes
+            if n.collective_type == "AllReduce" and n.phase == "bwd_ig"
+        ]
+        assert len(emb_bwd_ar) > 0, "Embedding bwd TP AllReduce must be present"
+
+    def test_tp2_no_embedding_bwd_tp_allreduce_when_tp1(self):
+        """tp=1: no TP AllReduce is emitted for the embedding bwd path."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        # With tp=1 the guard `if tp > 1` prevents emission
+        allreduce_bwd = [
+            n for n in dag.comm_nodes
+            if n.collective_type == "AllReduce" and n.phase == "bwd_ig"
+        ]
+        assert len(allreduce_bwd) == 0
+
+    def test_pp1_fwd_embedding_before_body_nodes(self):
+        """PP=1 fwd: embedding node_id < all transformer-body compute node_ids on same GPU."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        gpu = 0
+        gpu_compute = [n for n in dag.compute_nodes if n.gpu_rank == gpu]
+        fwd_compute = [n for n in gpu_compute if n.microbatch_id == 0 and n.phase == "fwd"]
+
+        embedding_fwd = [n for n in fwd_compute if n.kernel == "embedding"]
+        body_fwd = [
+            n for n in fwd_compute
+            if n.kernel not in ("embedding", "logit", "loss_ce")
+        ]
+
+        assert len(embedding_fwd) == 1
+        assert len(body_fwd) > 0
+        assert embedding_fwd[0].node_id < min(n.node_id for n in body_fwd), (
+            "embedding fwd node_id must precede all body nodes"
+        )
+
+    def test_pp1_fwd_logit_loss_after_body_nodes(self):
+        """PP=1 fwd: logit and loss_ce node_ids > all transformer-body compute node_ids on same GPU."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        gpu = 0
+        gpu_compute = [n for n in dag.compute_nodes if n.gpu_rank == gpu]
+        fwd_compute = [n for n in gpu_compute if n.microbatch_id == 0 and n.phase == "fwd"]
+
+        body_fwd = [
+            n for n in fwd_compute
+            if n.kernel not in ("embedding", "logit", "loss_ce")
+        ]
+        logit_loss = [n for n in fwd_compute if n.kernel in ("logit", "loss_ce")]
+
+        assert len(logit_loss) == 2
+        assert len(body_fwd) > 0
+        assert min(n.node_id for n in logit_loss) > max(n.node_id for n in body_fwd), (
+            "logit/loss_ce node_ids must follow all body nodes"
+        )
+
+    def test_pp1_bwd_logit_before_body_embedding_after_body(self):
+        """PP=1 bwd: logit bwd_ig appears before body; embedding bwd_ig appears after body."""
+        wl = _minimal_workload(tp=1, pp=1, num_layers=2)
+        dc = _minimal_dc(num_gpus=1)
+        dag = _no_cache_tracer().trace(wl, dc)
+
+        gpu = 0
+        gpu_compute = [n for n in dag.compute_nodes if n.gpu_rank == gpu]
+        bwd_compute = [n for n in gpu_compute if n.microbatch_id == 0 and n.phase == "bwd_ig"]
+
+        logit_bwd = [n for n in bwd_compute if n.kernel == "logit"]
+        embedding_bwd = [n for n in bwd_compute if n.kernel == "embedding"]
+        body_bwd = [
+            n for n in bwd_compute
+            if n.kernel not in ("embedding", "logit")
+        ]
+
+        assert len(logit_bwd) == 1
+        assert len(embedding_bwd) == 1
+        assert len(body_bwd) > 0
+
+        assert logit_bwd[0].node_id < min(n.node_id for n in body_bwd), (
+            "logit bwd_ig must precede body nodes"
+        )
+        assert embedding_bwd[0].node_id > max(n.node_id for n in body_bwd), (
+            "embedding bwd_ig must follow body nodes"
+        )
 

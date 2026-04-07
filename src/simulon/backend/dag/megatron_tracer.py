@@ -64,6 +64,108 @@ def _params_per_tp_rank(model: LLMSpec, tp: int, ep: int) -> int:
     return num_layers * per_layer + embedding + logit
 
 
+def _emit_compute_node(
+    dag: "ExecutionDAG",
+    node_id_counter: int,
+    gpu: int,
+    kernel: str,
+    microbatch_id: int,
+    pipeline_stage: int,
+    phase: str,
+    last_node_per_gpu: dict,
+    last_was_compute: dict,
+    slot_entry_node: dict[tuple[int, int, str], int],
+    slot_first_entry_set: bool,
+    direction: str,
+) -> tuple[int, bool]:
+    """Emit a single compute node and wire it into the DAG chain.
+
+    Sets last_was_compute[gpu] = False so that the subsequent sublayer's
+    first kernel starts a fresh compact-fused group rather than being merged
+    into this node.
+    """
+    n = ComputeNode(
+        node_id=node_id_counter,
+        gpu_rank=gpu,
+        kernel=kernel,
+        layer_id=-1,
+        microbatch_id=microbatch_id,
+        pipeline_stage=pipeline_stage,
+        phase=phase,
+    )
+    node_id_counter += 1
+    dag.compute_nodes.append(n)
+    prev = last_node_per_gpu.get(gpu)
+    if prev is not None:
+        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=n.node_id))
+    if not slot_first_entry_set:
+        slot_entry_node[(gpu, microbatch_id, direction)] = n.node_id
+        slot_first_entry_set = True
+    last_node_per_gpu[gpu] = n.node_id
+    last_was_compute[gpu] = False
+    return node_id_counter, slot_first_entry_set
+
+
+def _emit_collective_nodes(
+    dag: "ExecutionDAG",
+    ccl: "CCLDecomposer",
+    cfg: "DAGTracerConfig",
+    node_id_counter: int,
+    flow_id_counter: int,
+    gpu: int,
+    collective_type: str,
+    group: list[int],
+    data_bytes: int,
+    phase: str,
+    microbatch_id: int,
+    last_node_per_gpu: dict,
+    last_was_compute: dict,
+    slot_entry_node: dict[tuple[int, int, str], int],
+    slot_first_entry_set: bool,
+    direction: str,
+) -> tuple[int, int, bool]:
+    """Decompose and emit collective flows, wired into the DAG chain.
+
+    Mutates dag, last_node_per_gpu, last_was_compute, and slot_entry_node
+    in-place; returns updated (node_id_counter, flow_id_counter,
+    slot_first_entry_set).
+    """
+    result, flow_id_counter = ccl.decompose(
+        collective_type=collective_type,
+        group_ranks=group,
+        data_size=data_bytes,
+        num_channels=cfg.num_channels,
+        algorithm=cfg.algorithm,
+        flow_id_start=flow_id_counter,
+    )
+    flow_ids: list[int] = []
+    for flow in result.flows:
+        dag.comm_nodes.append(CommNode(
+            node_id=node_id_counter,
+            src_gpu=flow.src,
+            dst_gpu=flow.dst,
+            bytes=flow.flow_size,
+            collective_type=collective_type,
+            layer_id=-1,
+            phase=phase,
+            flow_id=flow.flow_id,
+            parent_flow_ids=flow.parent_flow_ids,
+        ))
+        flow_ids.append(node_id_counter)
+        node_id_counter += 1
+    if flow_ids:
+        prev = last_node_per_gpu.get(gpu)
+        if prev is not None:
+            for fid in flow_ids:
+                dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=fid))
+        if not slot_first_entry_set:
+            slot_entry_node[(gpu, microbatch_id, direction)] = flow_ids[0]
+            slot_first_entry_set = True
+        last_node_per_gpu[gpu] = flow_ids[-1]
+        last_was_compute[gpu] = False
+    return node_id_counter, flow_id_counter, slot_first_entry_set
+
+
 class MegatronDAGTracer(DAGTracer):
     def __init__(self, config: DAGTracerConfig | None = None, ccl: CCLDecomposer | None = None):
         self.config = config or DAGTracerConfig()
@@ -145,6 +247,23 @@ class MegatronDAGTracer(DAGTracer):
                                 mb = slot.microbatch_id
                                 direction = slot.direction
                                 slot_first_entry_set = False
+
+                                # Embedding fwd (PP stage 0, forward pass only)
+                                if pp_stage == 0 and direction == "fwd":
+                                    node_id_counter, slot_first_entry_set = _emit_compute_node(
+                                        dag, node_id_counter, gpu, "embedding", mb, pp_stage, "fwd",
+                                        last_node_per_gpu, last_was_compute,
+                                        slot_entry_node, slot_first_entry_set, direction,
+                                    )
+
+                                # Logit bwd (PP stage pp-1, backward pass only): gradient flows
+                                # loss → logit → last transformer layer, so logit bwd precedes body bwd.
+                                if pp_stage == pp - 1 and direction == "bwd":
+                                    node_id_counter, slot_first_entry_set = _emit_compute_node(
+                                        dag, node_id_counter, gpu, "logit", mb, pp_stage, "bwd_ig",
+                                        last_node_per_gpu, last_was_compute,
+                                        slot_entry_node, slot_first_entry_set, direction,
+                                    )
 
                                 for layer_idx in range(num_layers):
                                     for sublayer in sublayers:
@@ -307,6 +426,51 @@ class MegatronDAGTracer(DAGTracer):
                                         dag.edges.append(DAGEdge(src_node_id=prev_pf, dst_node_id=pf.node_id))
                                     last_node_per_gpu[gpu] = pf.node_id
                                     last_was_compute[gpu] = False
+
+                                # Logit fwd + loss (PP stage pp-1, forward pass only)
+                                if pp_stage == pp - 1 and direction == "fwd":
+                                    node_id_counter, slot_first_entry_set = _emit_compute_node(
+                                        dag, node_id_counter, gpu, "logit", mb, pp_stage, "fwd",
+                                        last_node_per_gpu, last_was_compute,
+                                        slot_entry_node, slot_first_entry_set, direction,
+                                    )
+                                    node_id_counter, slot_first_entry_set = _emit_compute_node(
+                                        dag, node_id_counter, gpu, "loss_ce", mb, pp_stage, "fwd",
+                                        last_node_per_gpu, last_was_compute,
+                                        slot_entry_node, slot_first_entry_set, direction,
+                                    )
+                                    # VocabParallelCrossEntropy: 3x AllReduce over TP (bf16→fp32 cast).
+                                    # See aicb/workload_generator/generate_megatron_workload.py forward().
+                                    loss_tp_bytes = micro_bs * seq_len * 4  # fp32 per token
+                                    for _ in range(3):
+                                        node_id_counter, flow_id_counter, slot_first_entry_set = _emit_collective_nodes(
+                                            dag, self._ccl, cfg, node_id_counter, flow_id_counter,
+                                            gpu, "AllReduce", tp_group, loss_tp_bytes, "fwd", mb,
+                                            last_node_per_gpu, last_was_compute,
+                                            slot_entry_node, slot_first_entry_set, direction,
+                                        )
+                                    # average_losses_across_data_parallel_group: one fp32 scalar per microbatch
+                                    node_id_counter, flow_id_counter, slot_first_entry_set = _emit_collective_nodes(
+                                        dag, self._ccl, cfg, node_id_counter, flow_id_counter,
+                                        gpu, "AllReduce", dp_group, 4, "fwd", mb,
+                                        last_node_per_gpu, last_was_compute,
+                                        slot_entry_node, slot_first_entry_set, direction,
+                                    )
+
+                                # Embedding bwd + AllReduce over TP (PP stage 0, backward pass only)
+                                if pp_stage == 0 and direction == "bwd":
+                                    node_id_counter, slot_first_entry_set = _emit_compute_node(
+                                        dag, node_id_counter, gpu, "embedding", mb, pp_stage, "bwd_ig",
+                                        last_node_per_gpu, last_was_compute,
+                                        slot_entry_node, slot_first_entry_set, direction,
+                                    )
+                                    if tp > 1:
+                                        node_id_counter, flow_id_counter, slot_first_entry_set = _emit_collective_nodes(
+                                            dag, self._ccl, cfg, node_id_counter, flow_id_counter,
+                                            gpu, "AllReduce", tp_group, activation_bytes, "bwd_ig", mb,
+                                            last_node_per_gpu, last_was_compute,
+                                            slot_entry_node, slot_first_entry_set, direction,
+                                        )
 
                                 last = last_node_per_gpu.get(gpu)
                                 if last is not None:
