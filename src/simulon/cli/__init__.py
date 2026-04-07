@@ -59,10 +59,6 @@ def simulate(
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.model_validate(raw)
 
-    if not isinstance(sc.workload, MegatronWorkload):
-        typer.echo("Error: simulate only supports MegatronWorkload scenarios.", err=True)
-        raise typer.Exit(1)
-
     if verbose:
         import logging
         logging.basicConfig(format="%(message)s", level=logging.INFO)
@@ -93,33 +89,38 @@ def simulate(
                 scenario_artifact_path.unlink(missing_ok=True)
 
         if summary:
-            _print_summary(result)
+            from simulon.config.workload import CollectiveWorkload
+            if isinstance(sc.workload, CollectiveWorkload):
+                _print_collective_summary(sc.workload, result, sc.datacenter)
+            else:
+                _print_summary(result)
 
-        energy_result = None
-        if energy or cost:
-            from simulon.energy import compute_energy
-            energy_result = compute_energy(dag, sc)
-            if energy_result is not None:
-                _print_energy_summary(energy_result)
+        if isinstance(sc.workload, MegatronWorkload):
+            energy_result = None
+            if energy or cost:
+                from simulon.energy import compute_energy
+                energy_result = compute_energy(dag, sc)
+                if energy_result is not None:
+                    _print_energy_summary(energy_result)
 
-        if cost and energy_result is not None:
-            from simulon.cost import compute_cost
-            cost_result = compute_cost(sc, energy_result)
-            _print_cost_summary(cost_result)
+            if cost and energy_result is not None:
+                from simulon.cost import compute_cost
+                cost_result = compute_cost(sc, energy_result)
+                _print_cost_summary(cost_result)
 
-        if chrome is not None:
-            p = sc.workload.parallelism
-            t = sc.workload.training
-            tp = p.tp
-            pp_val = p.pp
-            ep = p.ep
-            dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
-            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
-            with open(chrome, "w") as f:
-                json.dump(trace_dict, f)
-            typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
-            for tracker in trackers:
-                tracker.log_artifact(chrome)
+            if chrome is not None:
+                p = sc.workload.parallelism
+                t = sc.workload.training
+                tp = p.tp
+                pp_val = p.pp
+                ep = p.ep
+                dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
+                trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+                with open(chrome, "w") as f:
+                    json.dump(trace_dict, f)
+                typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
+                for tracker in trackers:
+                    tracker.log_artifact(chrome)
 
         if dag_out is not None:
             with open(dag_out, "w") as f:
@@ -157,6 +158,15 @@ def _print_summary(result) -> None:
     typer.echo("")
     typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
                "  (hidden by compute, not in totals above)")
+    typer.echo("")
+
+
+def _print_collective_summary(workload, result, datacenter) -> None:
+    num_ranks = datacenter.cluster.num_nodes * datacenter.node.gpus_per_node
+    typer.echo(f"\nCollective wall time:  {result.total_time_ms:.3f} ms")
+    typer.echo(f"  Type:          {workload.collective_type.value}")
+    typer.echo(f"  Message size:  {workload.message_size_bytes:,} bytes")
+    typer.echo(f"  Ranks:         {num_ranks}")
     typer.echo("")
 
 
