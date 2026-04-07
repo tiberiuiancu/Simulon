@@ -110,10 +110,30 @@ class InferenceWorkload(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Collective workload
+# ---------------------------------------------------------------------------
+
+
+class CollectiveType(str, Enum):
+    AllReduce = "AllReduce"
+    AllGather = "AllGather"
+    ReduceScatter = "ReduceScatter"
+    AllToAll = "AllToAll"
+
+
+class CollectiveWorkload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    framework: Literal["collective"]
+    collective_type: CollectiveType
+    message_size_bytes: int = Field(..., gt=0)
+
+
+# ---------------------------------------------------------------------------
 # Discriminated union
 # ---------------------------------------------------------------------------
 
 WorkloadConfig = Annotated[
-    Union[MegatronWorkload, InferenceWorkload],
+    Union[MegatronWorkload, InferenceWorkload, CollectiveWorkload],
     Field(discriminator="framework"),
 ]
