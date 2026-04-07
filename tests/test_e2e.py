@@ -230,7 +230,7 @@ def test_astra_sim_backend_rejects_non_megatron():
     )
     sc = ScenarioConfig(datacenter=dc, workload=wl)
     backend = AnalyticalBackend()
-    with pytest.raises(ValueError, match="AnalyticalBackend only supports MegatronWorkload"):
+    with pytest.raises(ValueError, match="AnalyticalBackend does not support"):
         backend.run_trace(sc)
 
 

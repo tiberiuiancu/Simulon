@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Union
 
 from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import LLMSpec, MegatronWorkload
+from simulon.config.workload import CollectiveWorkload, LLMSpec, MegatronWorkload
 
 if TYPE_CHECKING:
     from simulon.backend.dag.replayer import SimulationResult
@@ -70,6 +70,11 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, Union[str, int, float,
                 params["model.top_k"] = wl.model.top_k
             params["model.moe"] = wl.model.moe
             params["model.swiglu"] = wl.model.swiglu
+
+    elif isinstance(wl, CollectiveWorkload):
+        params["workload.framework"] = wl.framework
+        params["workload.collective_type"] = wl.collective_type.value
+        params["workload.message_size_bytes"] = wl.message_size_bytes
 
     # --- datacenter: GPU name ---
     from pathlib import Path
