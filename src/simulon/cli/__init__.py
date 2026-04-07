@@ -47,10 +47,13 @@ def simulate(
     timing-populated DAG JSON (--dag) for offline analysis.
     """
     import json
+    import tempfile
     from simulon.backend.analytical import AnalyticalBackend
     from simulon.backend.dag.chrome_trace import to_chrome_trace
     from simulon.config.scenario import ScenarioConfig
     from simulon.config.workload import MegatronWorkload
+    from simulon.tracking import get_trackers
+    from simulon.tracking.params import extract_metrics, extract_params
 
     with open(scenario) as f:
         raw = yaml.safe_load(f)
@@ -64,40 +67,70 @@ def simulate(
         import logging
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
-    backend = AnalyticalBackend()
-    dag, result = backend.simulate(sc, compact=compact)
+    trackers = get_trackers()
 
-    if summary:
-        _print_summary(result)
+    try:
+        for tracker in trackers:
+            tracker.start_run()
 
-    energy_result = None
-    if energy or cost:
-        from simulon.energy import compute_energy
-        energy_result = compute_energy(dag, sc)
-        if energy_result is not None:
-            _print_energy_summary(energy_result)
+        backend = AnalyticalBackend()
+        dag, result = backend.simulate(sc, compact=compact)
 
-    if cost and energy_result is not None:
-        from simulon.cost import compute_cost
-        cost_result = compute_cost(sc, energy_result)
-        _print_cost_summary(cost_result)
+        if trackers:
+            params = extract_params(sc)
+            metrics = extract_metrics(result)
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", prefix="scenario_", delete=False
+            ) as tmp:
+                yaml.dump(raw, tmp)
+                scenario_artifact_path = Path(tmp.name)
+            try:
+                for tracker in trackers:
+                    tracker.log_params(params)
+                    tracker.log_metrics(metrics)
+                    tracker.log_artifact(scenario_artifact_path)
+            finally:
+                scenario_artifact_path.unlink(missing_ok=True)
 
-    if chrome is not None:
-        p = sc.workload.parallelism
-        t = sc.workload.training
-        tp = p.tp
-        pp_val = p.pp
-        ep = p.ep
-        dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
-        trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
-        with open(chrome, "w") as f:
-            json.dump(trace_dict, f)
-        typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
+        if summary:
+            _print_summary(result)
 
-    if dag_out is not None:
-        with open(dag_out, "w") as f:
-            json.dump(dag.to_dict(), f)
-        typer.echo(f"DAG written to {dag_out}")
+        energy_result = None
+        if energy or cost:
+            from simulon.energy import compute_energy
+            energy_result = compute_energy(dag, sc)
+            if energy_result is not None:
+                _print_energy_summary(energy_result)
+
+        if cost and energy_result is not None:
+            from simulon.cost import compute_cost
+            cost_result = compute_cost(sc, energy_result)
+            _print_cost_summary(cost_result)
+
+        if chrome is not None:
+            p = sc.workload.parallelism
+            t = sc.workload.training
+            tp = p.tp
+            pp_val = p.pp
+            ep = p.ep
+            dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
+            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+            with open(chrome, "w") as f:
+                json.dump(trace_dict, f)
+            typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
+            for tracker in trackers:
+                tracker.log_artifact(chrome)
+
+        if dag_out is not None:
+            with open(dag_out, "w") as f:
+                json.dump(dag.to_dict(), f)
+            typer.echo(f"DAG written to {dag_out}")
+            for tracker in trackers:
+                tracker.log_artifact(dag_out)
+
+    finally:
+        for tracker in trackers:
+            tracker.end_run()
 
 
 def _print_summary(result) -> None:
