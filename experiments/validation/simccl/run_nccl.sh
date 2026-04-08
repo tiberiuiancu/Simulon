@@ -5,18 +5,11 @@
 # Output JSON files land in experiments/validation/simccl/results/ and are
 # named nccl_<collective>_<Nn><G>g.json to match sim_ccl.py output names.
 #
-# Submit from repo root:
-#   sbatch experiments/validation/simccl/run_nccl.sh
-#
-# ── SLURM headers ──────────────────────────────────────────────────────────
 #SBATCH --job-name=nccl-validation
 #SBATCH --nodes=4
-#SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
-#SBATCH --cpus-per-task=4
 #SBATCH --time=00:30:00
-#SBATCH --partition=<PARTITION>
-#SBATCH --account=<ACCOUNT>
+#SBATCH --partition=gpu_h100
 #SBATCH --output=experiments/validation/simccl/results/nccl_slurm_%j.log
 #SBATCH --error=experiments/validation/simccl/results/nccl_slurm_%j.err
 # ──────────────────────────────────────────────────────────────────────────
@@ -24,13 +17,8 @@
 set -euo pipefail
 
 # ── Modules ────────────────────────────────────────────────────────────────
-# Adjust to match Snellius module names; run `module avail` to find them.
-module purge
-module load <CUDA_MODULE>       # e.g. CUDA/12.1.1
-module load <NCCL_MODULE>       # e.g. NCCL/2.18.3-GCCcore-12.3.0-CUDA-12.1.1
-module load <OPENMPI_MODULE>    # e.g. OpenMPI/4.1.5-GCC-12.3.0
+module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 
-# ── Paths ──────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NCCL_TESTS_DIR="${SCRIPT_DIR}/nccl-tests"
 RESULT_DIR="${SCRIPT_DIR}/results"
