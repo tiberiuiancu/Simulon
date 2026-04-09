@@ -8,7 +8,7 @@ from typing import Literal, Optional
 class ComputeNode:
     node_id: int
     gpu_rank: int
-    kernel: str  # layernorm|attn_qkv|attn_flash|attn_proj|mlp_linear1|mlp_act|mlp_linear2|embedding|logit|loss_ce
+    kernel: str  # layernorm|attn_qkv|attn_flash|attn_proj|mlp_linear1|mlp_act|mlp_linear2|embedding|logit|loss_ce|adamw
     layer_id: int
     microbatch_id: int
     pipeline_stage: int
@@ -17,6 +17,7 @@ class ComputeNode:
     start_ms: Optional[float] = None
     finish_ms: Optional[float] = None
     fused_kernels: list[str] = field(default_factory=list)  # non-empty when this node fuses multiple kernels
+    extra_params: dict = field(default_factory=dict)  # kernel-specific lookup params (e.g. num_params for adamw)
 
 
 @dataclass

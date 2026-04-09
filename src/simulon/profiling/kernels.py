@@ -307,6 +307,33 @@ def _bench_moe_expert(
     return _cuda_time(fn)
 
 
+def _bench_adamw(num_params: int, dtype) -> list[float]:
+    """Benchmark one AdamW step over a parameter vector of size num_params.
+
+    Allocates FP32 master weights, gradients, and moment buffers regardless of
+    the model dtype, matching Megatron's mixed-precision optimizer practice.
+    Falls back to torch.optim.AdamW if apex FusedAdam is unavailable.
+    """
+    import torch
+
+    # Master weights and optimizer state are always FP32 in mixed-precision training.
+    fp32 = torch.float32
+    params_t = torch.nn.Parameter(torch.randn(num_params, dtype=fp32, device="cuda"))
+    grads = torch.randn(num_params, dtype=fp32, device="cuda")
+
+    try:
+        from apex.optimizers import FusedAdam  # type: ignore
+        opt = FusedAdam([params_t], lr=1e-3)
+    except ImportError:
+        opt = torch.optim.AdamW([params_t], lr=1e-3)
+
+    def fn():
+        params_t.grad = grads.clone()
+        opt.step()
+
+    return _cuda_time(fn)
+
+
 def _bench_loss_ce(
     vocab_size: int,
     seq_len: int,
@@ -376,6 +403,7 @@ def benchmark_kernels(
     num_experts: int = 0,
     ep: int = 1,
     top_k: int = 1,
+    num_layers: int = 0,
     existing_runs: Optional[list[dict]] = None,
 ) -> list[KernelRun]:
     """Benchmark all transformer kernels and return KernelRun measurements.
@@ -397,6 +425,8 @@ def benchmark_kernels(
         num_experts: Total number of MoE experts. If > 0, moe_route and moe_expert are benchmarked.
         ep: Expert Parallelism degree (experts are sharded across ep ranks).
         top_k: Top-k routing (tokens dispatched to k experts each).
+        num_layers: Number of transformer layers. If > 0, the AdamW optimizer step is benchmarked
+            over the parameter count implied by the architecture (TP-sharded, all layers).
 
     Returns:
         List of KernelRun objects with raw per-iteration times in milliseconds.
@@ -482,5 +512,32 @@ def benchmark_kernels(
             ),
             {"num_experts": num_experts, "ep": ep, "top_k": top_k, "ffn_hidden_size": ffn_hidden_size},
         )
+
+    if num_layers > 0:
+        # Compute params per TP rank across all layers (same formula as _params_per_tp_rank
+        # in megatron_tracer.py — keep in sync if that function changes).
+        mlp_factor = 3 if swiglu else 2
+        if num_experts > 0:
+            mlp_per_layer = mlp_factor * hidden_size * ffn_hidden_size * (num_experts // ep) // tp
+        else:
+            mlp_per_layer = mlp_factor * hidden_size * ffn_hidden_size // tp
+        attn_per_layer = 4 * hidden_size * hidden_size // tp
+        ln_per_layer = 2 * hidden_size  # LayerNorm params are not TP-sharded
+        per_layer = attn_per_layer + mlp_per_layer + ln_per_layer
+        embedding = vocab_size * hidden_size // tp
+        logit = vocab_size * hidden_size // tp
+        num_params = num_layers * per_layer + embedding + logit
+        # adamw uses only num_params + dtype as lookup keys — do NOT merge params_base
+        # (which contains seq_len/batch_size/hidden_size that don't affect optimizer timing).
+        adamw_params = {"num_params": num_params, "dtype": dtype_str}
+        sufficient_key = ("adamw", frozenset(adamw_params.items()))
+        already_done = {
+            (run["kernel"], frozenset(run["params"].items()))
+            for run in (existing_runs or [])
+            if len(run["times_ms"]) >= epoch_num
+        }
+        if sufficient_key not in already_done:
+            times = _bench_adamw(num_params, tdt)
+            results.append(KernelRun(kernel="adamw", params=adamw_params, times_ms=times[:epoch_num]))
 
     return results
