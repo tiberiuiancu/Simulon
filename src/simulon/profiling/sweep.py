@@ -85,6 +85,7 @@ def run_sweep(
                 num_experts=kernel_params.get("num_experts", 0),
                 ep=ep,
                 top_k=kernel_params.get("top_k", 1),
+                num_layers=kernel_params.get("num_layers", 0),
                 existing_runs=existing_runs,
             )
             results.append(SweepResult(config=config, runs=runs, oom=False))

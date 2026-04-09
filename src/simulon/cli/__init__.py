@@ -368,6 +368,21 @@ def profile_gpu(
     num_experts_val = kernel_params.get("num_experts", 0)
     top_k_val = kernel_params.get("top_k", 1)
     swiglu_val = kernel_params.get("swiglu", False)
+    num_layers_val = kernel_params.get("num_layers", 0)
+
+    def _adamw_num_params(tp: int, ep: int) -> int:
+        """Compute params per TP rank — mirrors kernels.py benchmark_kernels formula."""
+        mlp_factor = 3 if swiglu_val else 2
+        if num_experts_val > 0:
+            mlp_per_layer = mlp_factor * hidden_size_val * ffn_hidden_size_val * (num_experts_val // ep) // tp
+        else:
+            mlp_per_layer = mlp_factor * hidden_size_val * ffn_hidden_size_val // tp
+        attn_per_layer = 4 * hidden_size_val * hidden_size_val // tp
+        ln_per_layer = 2 * hidden_size_val
+        per_layer = attn_per_layer + mlp_per_layer + ln_per_layer
+        embedding = vocab_size_val * hidden_size_val // tp
+        logit = vocab_size_val * hidden_size_val // tp
+        return num_layers_val * per_layer + embedding + logit
 
     def _config_done(t: int, e: int, b: int, s: int) -> bool:
         if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s}.items()) in _oom_set:
@@ -389,10 +404,16 @@ def profile_gpu(
                 ("moe_route", {"num_experts": num_experts_val}),
                 ("moe_expert", {"num_experts": num_experts_val, "ep": e, "top_k": top_k_val, "ffn_hidden_size": ffn_hidden_size_val}),
             ]
-        return all(
+        if not all(
             (kernel, frozenset({**base, **extra}.items())) in _sufficient
             for kernel, extra in expected
-        )
+        ):
+            return False
+        if num_layers_val > 0:
+            adamw_key = ("adamw", frozenset({"num_params": _adamw_num_params(t, e), "dtype": dtype_str}.items()))
+            if adamw_key not in _sufficient:
+                return False
+        return True
 
     pending = [(t, e, b, s) for t, e, b, s in configs if not _config_done(t, e, b, s)]
     skipped = len(configs) - len(pending)

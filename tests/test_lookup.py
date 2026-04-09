@@ -6,6 +6,15 @@ import pytest
 
 from simulon.config.dc import GPUSpec, KernelRun
 from simulon.profiling.lookup import lookup_kernel_time
+import simulon.profiling.lookup as _lookup_module
+
+
+@pytest.fixture(autouse=True)
+def clear_lookup_cache():
+    """Clear the in-process lookup cache before each test to avoid id() reuse false hits."""
+    _lookup_module._cache.clear()
+    yield
+    _lookup_module._cache.clear()
 
 
 def _gpu(*runs: KernelRun) -> GPUSpec:
@@ -183,3 +192,42 @@ def test_exact_preferred_over_scaling_fallback():
         warn=False,
     )
     assert result == pytest.approx(5.0)
+
+
+# ---------------------------------------------------------------------------
+# AdamW lookup: num_params exact match and proportional scaling
+# ---------------------------------------------------------------------------
+
+
+def test_adamw_exact_match_by_num_params():
+    """lookup_kernel_time returns median of run matching exact num_params and dtype."""
+    gpu = _gpu(_run("adamw", {"num_params": 1_000_000, "dtype": "bf16"}, [3.0, 5.0, 7.0]))
+    result = lookup_kernel_time("adamw", {"num_params": 1_000_000, "dtype": "bf16"}, gpu)
+    assert result == pytest.approx(statistics.median([3.0, 5.0, 7.0]))
+
+
+def test_adamw_exact_match_no_false_hit_on_dtype():
+    """lookup_kernel_time does not match when dtype differs."""
+    gpu = _gpu(_run("adamw", {"num_params": 1_000_000, "dtype": "fp32"}, [3.0]))
+    result = lookup_kernel_time("adamw", {"num_params": 1_000_000, "dtype": "bf16"}, gpu)
+    # dtype differs → no exact or partial match (both keys present, one value differs)
+    assert result is None
+
+
+def test_adamw_proportional_scaling_by_num_params():
+    """A run at num_params=500_000 scales linearly to num_params=1_000_000 (factor 2×)."""
+    gpu = _gpu(_run("adamw", {"num_params": 500_000, "dtype": "bf16"}, [4.0]))
+    result = lookup_kernel_time(
+        "adamw",
+        {"num_params": 1_000_000, "dtype": "bf16"},
+        gpu,
+        warn=False,
+    )
+    assert result == pytest.approx(8.0)
+
+
+def test_adamw_proportional_scaling_emits_warning():
+    """UserWarning is emitted when num_params scaling fallback is used."""
+    gpu = _gpu(_run("adamw", {"num_params": 500_000, "dtype": "bf16"}, [4.0]))
+    with pytest.warns(UserWarning, match="num_params"):
+        lookup_kernel_time("adamw", {"num_params": 1_000_000, "dtype": "bf16"}, gpu)

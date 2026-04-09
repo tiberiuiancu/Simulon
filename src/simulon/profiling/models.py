@@ -57,5 +57,5 @@ def _resolve_model(model: "str | Any") -> "Any":
 def model_to_kernel_params(tmpl: dict[str, Any]) -> dict[str, Any]:
     """Extract kernel parameter fields from a model template dict."""
     keys = ["hidden_size", "num_heads", "ffn_hidden_size", "vocab_size",
-            "num_experts", "top_k", "swiglu"]
+            "num_experts", "top_k", "swiglu", "num_layers"]
     return {k: tmpl[k] for k in keys if k in tmpl and tmpl[k] is not None}
