@@ -15,12 +15,19 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
 #SBATCH --time=00:30:00
+#SBATCH --exclusive
 #SBATCH --partition=gpu_h100
 #SBATCH --output=experiments/validation/simccl/results/nccl_slurm_%j.log
 #SBATCH --error=experiments/validation/simccl/results/nccl_slurm_%j.err
 # ──────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+
+# ── Paths ──────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NCCL_TESTS_DIR="${SCRIPT_DIR}/nccl-tests"
+RESULT_DIR="${SCRIPT_DIR}/results"
+mkdir -p "${RESULT_DIR}"
 
 GPUS_PER_NODE=4
 NUM_NODES="${SLURM_NNODES}"
@@ -32,15 +39,9 @@ echo "Running nccl-tests: ${CONFIG_LABEL} (${NUM_NODES} nodes × ${GPUS_PER_NODE
 # ── Modules ────────────────────────────────────────────────────────────────
 module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 
-# ── Paths ──────────────────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NCCL_TESTS_DIR="${SCRIPT_DIR}/nccl-tests"
-RESULT_DIR="${SCRIPT_DIR}/results"
-mkdir -p "${RESULT_DIR}"
-
 # ── Build nccl-tests (MPI-enabled, once) ───────────────────────────────────
 if [[ ! -f "${NCCL_TESTS_DIR}/build/all_reduce_perf_mpi" ]]; then
-    echo "Building nccl-tests with MPI ..."
+    echo "Building nccl-tests with MPI under ${NCCL_TESTS_DIR}"
     make -C "${NCCL_TESTS_DIR}" -j MPI=1 NAME_SUFFIX=_mpi \
         CUDA_HOME="${CUDA_HOME}" \
         NCCL_HOME="${NCCL_HOME}" \
