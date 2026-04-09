@@ -113,9 +113,14 @@ def populate_dag(
         "tp": p.tp,
     }
 
+    adamw_match_params = {"num_params": None, "dtype": t.dtype.value}
+
     with log_progress("  resolving compute", len(dag.compute_nodes), logger) as advance:
         for node in dag.compute_nodes:
-            if node.fused_kernels:
+            if node.kernel == "adamw":
+                mp = {**adamw_match_params, "num_params": node.extra_params.get("num_params")}
+                node.duration_ms = lookup_kernel_time("adamw", mp, gpu_spec)
+            elif node.fused_kernels:
                 node.duration_ms = sum(lookup_kernel_time(k, match_params, gpu_spec) for k in node.fused_kernels)
             else:
                 node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)

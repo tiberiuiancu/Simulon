@@ -231,6 +231,14 @@ class MegatronDAGTracer(DAGTracer):
         slot_entry_node: dict[tuple[int, int, str], int] = {}
         pending_pp_deps: list[tuple[int, int, int, str]] = []
 
+        # Step-phase invariants (loop-independent).
+        # TODO: only AdamW is modeled; extend here if other optimizers are needed.
+        _step_params = _params_per_tp_rank(model, tp, ep)
+        _dist_opt = p.distributed_optimizer
+        # With distributed optimizer each DP rank owns a 1/dp shard of params.
+        # Without (including dp=1) each rank holds and steps the full PP-stage shard.
+        _opt_num_params = _step_params // pp // dp if (_dist_opt and dp > 1) else _step_params // pp
+
         with log_progress("  building DAG", dp * pp * ep * tp, logger) as advance:
             for dp_rank in range(dp):
                 for pp_stage in range(pp):
@@ -476,94 +484,128 @@ class MegatronDAGTracer(DAGTracer):
                                 if last is not None:
                                     slot_last_node[(gpu, mb, direction)] = last
 
+                            # --- Step phase ---
+                            # Each GPU runs one AdamW optimizer step after gradient sync.
+                            # Invariants (_step_params, _dist_opt, _opt_num_params) are
+                            # computed once above the loop.
+                            prev = last_node_per_gpu.get(gpu)
+
+                            # Append the AdamW ComputeNode for this GPU.
+                            dag.compute_nodes.append(ComputeNode(
+                                node_id=node_id_counter,
+                                gpu_rank=gpu,
+                                kernel="adamw",
+                                layer_id=-1,
+                                microbatch_id=-1,
+                                pipeline_stage=pp_stage,
+                                phase="step",
+                                extra_params={"num_params": _opt_num_params},
+                            ))
+                            opt_id = node_id_counter
+                            node_id_counter += 1
+
                             if dp > 1:
-                                step_params = _params_per_tp_rank(model, tp, ep)
-                                step_ar_bytes = 4 * step_params // pp
-                                dist_opt = p.distributed_optimizer
+                                step_ar_bytes = 4 * _step_params // pp
 
-                                if dist_opt:
-                                    step_stubs = [
-                                        CommNode(
-                                            node_id=node_id_counter,
-                                            src_gpu=gpu,
-                                            dst_gpu=gpu,
-                                            bytes=step_ar_bytes,
-                                            collective_type="ReduceScatter",
-                                            layer_id=0,
-                                            phase="step",
-                                            flow_id=-1,
-                                        ),
-                                        CommNode(
-                                            node_id=node_id_counter + 1,
-                                            src_gpu=gpu,
-                                            dst_gpu=gpu,
-                                            bytes=2 * step_params // pp,
-                                            collective_type="AllGather",
-                                            layer_id=0,
-                                            phase="step",
-                                            flow_id=-1,
-                                        ),
-                                    ]
-                                    node_id_counter += 2
-                                else:
-                                    step_stubs = [
-                                        CommNode(
-                                            node_id=node_id_counter,
-                                            src_gpu=gpu,
-                                            dst_gpu=gpu,
-                                            bytes=step_ar_bytes,
-                                            collective_type="AllReduce",
-                                            layer_id=0,
-                                            phase="step",
-                                            flow_id=-1,
-                                        ),
-                                    ]
-                                    node_id_counter += 1
-
-                                step_stub_to_comm_ids: dict[int, list[int]] = {}
-                                prev_step_stub_ids: list[int] = []
-                                for stub in step_stubs:
-                                    result, flow_id_counter = self._ccl.decompose(
-                                        collective_type=stub.collective_type,
+                                if _dist_opt:
+                                    # ReduceScatter → optimizer → AllGather
+                                    rs_result, flow_id_counter = self._ccl.decompose(
+                                        collective_type="ReduceScatter",
                                         group_ranks=dp_group,
-                                        data_size=stub.bytes,
+                                        data_size=step_ar_bytes,
                                         num_channels=cfg.num_channels,
                                         algorithm=cfg.algorithm,
                                         flow_id_start=flow_id_counter,
                                     )
-                                    step_stub_to_comm_ids[stub.node_id] = []
-                                    for flow in result.flows:
-                                        comm_node = CommNode(
+                                    rs_ids = []
+                                    for flow in rs_result.flows:
+                                        dag.comm_nodes.append(CommNode(
                                             node_id=node_id_counter,
-                                            src_gpu=flow.src,
-                                            dst_gpu=flow.dst,
+                                            src_gpu=flow.src, dst_gpu=flow.dst,
                                             bytes=flow.flow_size,
-                                            collective_type=stub.collective_type,
-                                            layer_id=0,
-                                            phase="step",
+                                            collective_type="ReduceScatter",
+                                            layer_id=-1, phase="step",
                                             flow_id=flow.flow_id,
                                             parent_flow_ids=flow.parent_flow_ids,
-                                        )
-                                        dag.comm_nodes.append(comm_node)
-                                        step_stub_to_comm_ids[stub.node_id].append(node_id_counter)
+                                        ))
+                                        rs_ids.append(node_id_counter)
                                         node_id_counter += 1
 
-                                    cur_ids = step_stub_to_comm_ids[stub.node_id]
-                                    if prev_step_stub_ids:
-                                        for s in prev_step_stub_ids:
-                                            for d in cur_ids:
-                                                dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=d))
-                                    prev_step_stub_ids = cur_ids
+                                    ag_result, flow_id_counter = self._ccl.decompose(
+                                        collective_type="AllGather",
+                                        group_ranks=dp_group,
+                                        data_size=cfg.dtype_bytes * _step_params // pp,
+                                        num_channels=cfg.num_channels,
+                                        algorithm=cfg.algorithm,
+                                        flow_id_start=flow_id_counter,
+                                    )
+                                    ag_ids = []
+                                    for flow in ag_result.flows:
+                                        dag.comm_nodes.append(CommNode(
+                                            node_id=node_id_counter,
+                                            src_gpu=flow.src, dst_gpu=flow.dst,
+                                            bytes=flow.flow_size,
+                                            collective_type="AllGather",
+                                            layer_id=-1, phase="step",
+                                            flow_id=flow.flow_id,
+                                            parent_flow_ids=flow.parent_flow_ids,
+                                        ))
+                                        ag_ids.append(node_id_counter)
+                                        node_id_counter += 1
 
-                                first_stub = step_stubs[0]
-                                first_step_ids = step_stub_to_comm_ids[first_stub.node_id]
-                                prev = last_node_per_gpu.get(gpu)
-                                if prev is not None and first_step_ids:
-                                    for d in first_step_ids:
-                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
+                                    # Wire: prev → rs_ids → opt → ag_ids
+                                    if prev is not None:
+                                        for d in rs_ids:
+                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
+                                    if rs_ids:
+                                        for s in rs_ids:
+                                            dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=opt_id))
+                                    elif prev is not None:
+                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=opt_id))
+                                    for d in ag_ids:
+                                        dag.edges.append(DAGEdge(src_node_id=opt_id, dst_node_id=d))
 
-                                if prev_step_stub_ids:
-                                    last_node_per_gpu[gpu] = prev_step_stub_ids[-1]
+                                    last_node_per_gpu[gpu] = ag_ids[-1] if ag_ids else opt_id
+                                else:
+                                    # AllReduce → optimizer
+                                    ar_result, flow_id_counter = self._ccl.decompose(
+                                        collective_type="AllReduce",
+                                        group_ranks=dp_group,
+                                        data_size=step_ar_bytes,
+                                        num_channels=cfg.num_channels,
+                                        algorithm=cfg.algorithm,
+                                        flow_id_start=flow_id_counter,
+                                    )
+                                    ar_ids = []
+                                    for flow in ar_result.flows:
+                                        dag.comm_nodes.append(CommNode(
+                                            node_id=node_id_counter,
+                                            src_gpu=flow.src, dst_gpu=flow.dst,
+                                            bytes=flow.flow_size,
+                                            collective_type="AllReduce",
+                                            layer_id=-1, phase="step",
+                                            flow_id=flow.flow_id,
+                                            parent_flow_ids=flow.parent_flow_ids,
+                                        ))
+                                        ar_ids.append(node_id_counter)
+                                        node_id_counter += 1
+
+                                    # Wire: prev → ar_ids → opt
+                                    if prev is not None:
+                                        for d in ar_ids:
+                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
+                                    if ar_ids:
+                                        for s in ar_ids:
+                                            dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=opt_id))
+                                    elif prev is not None:
+                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=opt_id))
+
+                                    last_node_per_gpu[gpu] = opt_id
+                            else:
+                                # dp == 1: no gradient sync, just optimizer compute
+                                if prev is not None:
+                                    dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=opt_id))
+                                last_node_per_gpu[gpu] = opt_id
 
                             advance()
 
