@@ -37,7 +37,12 @@ CONFIG_LABEL="${NUM_NODES}n${GPUS_PER_NODE}g"
 echo "Running nccl-tests: ${CONFIG_LABEL} (${NUM_NODES} nodes × ${GPUS_PER_NODE} GPUs = ${NUM_GPUS} GPUs total)"
 
 # ── Modules ────────────────────────────────────────────────────────────────
-module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
+MPI_MODULE=OpenMPI/5.0.7-GCC-14.2.0
+NCCL_MODULE=NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
+MODULE_HOME=/sw/arch/RHEL9/EB_production/2025/software
+export NCCL_HOME=$MODULE_HOME/$NCCL_MODULE
+export MPI_HOME=$MODULE_HOME/$MPI_MODULE
+module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 $NCCL_MODULE $MPI_MODULE
 
 # ── Build nccl-tests (MPI-enabled, once) ───────────────────────────────────
 if [[ ! -f "${NCCL_TESTS_DIR}/build/all_reduce_perf_mpi" ]]; then
@@ -47,6 +52,9 @@ if [[ ! -f "${NCCL_TESTS_DIR}/build/all_reduce_perf_mpi" ]]; then
         NCCL_HOME="${NCCL_HOME}" \
         MPI_HOME="${MPI_HOME}"
 fi
+
+export LD_LIBRARY_PATH=$MPI_HOME/lib:$LD_LIBRARY_PATH
+export NCCL_DEBUG=info
 
 # ── Benchmark parameters ───────────────────────────────────────────────────
 MIN_BYTES="8M"
@@ -69,7 +77,7 @@ for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}.json"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
-    srun --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" \
+    srun --mpi=pmi2 --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-task=1 \
         "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
                  -n "${ITERS}" -w "${WARMUP}" -g 1 \
                  -J "${OUT}"
