@@ -37,7 +37,7 @@ CONFIG_LABEL="${NUM_NODES}n${GPUS_PER_NODE}g"
 echo "Running nccl-tests: ${CONFIG_LABEL} (${NUM_NODES} nodes × ${GPUS_PER_NODE} GPUs = ${NUM_GPUS} GPUs total)"
 
 # ── Modules ────────────────────────────────────────────────────────────────
-MPI_MODULE=OpenMPI/5.0.7-GCC-14.2.0
+MPI_MODULE=OpenMPI/5.0.7-NVHPC-25.3-CUDA-12.8.0
 NCCL_MODULE=NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 MODULE_HOME=/sw/arch/RHEL9/EB_production/2025/software
 export NCCL_HOME=$MODULE_HOME/$NCCL_MODULE
