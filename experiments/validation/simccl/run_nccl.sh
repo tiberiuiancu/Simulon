@@ -77,7 +77,7 @@ for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}.json"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
-    srun --mpi=pmi2 --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-task=1 \
+    srun --mpi=pmi2 --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
         "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
                  -n "${ITERS}" -w "${WARMUP}" -g 1 \
                  -J "${OUT}"
