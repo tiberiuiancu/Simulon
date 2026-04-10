@@ -54,7 +54,7 @@ if [[ ! -f "${NCCL_TESTS_DIR}/build/all_reduce_perf_mpi" ]]; then
 fi
 
 export LD_LIBRARY_PATH=$MPI_HOME/lib:$LD_LIBRARY_PATH
-export NCCL_DEBUG=info
+export NCCL_DEBUG=INFO
 
 # ── Benchmark parameters ───────────────────────────────────────────────────
 MIN_BYTES="8M"
@@ -77,7 +77,7 @@ for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}.json"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
-    srun --mpi=pmi2 --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
+    srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
         "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
                  -n "${ITERS}" -w "${WARMUP}" -g 1 \
                  -J "${OUT}"
