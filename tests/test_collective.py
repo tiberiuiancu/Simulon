@@ -173,13 +173,50 @@ def test_ring_all_to_all_chunk_size():
 
 
 # ---------------------------------------------------------------------------
-# NVLS AllReduce (stub — not yet implemented)
+# NVLS AllReduce
 # ---------------------------------------------------------------------------
 
 
-def test_nvls_all_reduce_not_implemented():
-    with pytest.raises(NotImplementedError):
-        nvls_all_reduce([0, 1, 2, 3], data_size=1024)
+def test_nvls_all_reduce_flow_count():
+    # N GPUs → N reduce flows + N broadcast flows per channel
+    N = 4
+    flows, _ = nvls_all_reduce(list(range(N)), data_size=1024, num_channels=1)
+    assert len(flows) == 2 * N
+
+
+def test_nvls_all_reduce_switch_id():
+    # Virtual switch node uses a high-namespace ID (_SWITCH_BASE), not max(group_ranks)+1
+    from simulon.collective.nvls import _SWITCH_BASE
+    group_ranks = [0, 1, 2, 3]
+    flows, _ = nvls_all_reduce(group_ranks, data_size=1024)
+    switch_id = _SWITCH_BASE
+    reduce_flows = [f for f in flows if f.dst == switch_id]
+    bcast_flows = [f for f in flows if f.src == switch_id]
+    assert len(reduce_flows) == 4
+    assert len(bcast_flows) == 4
+
+
+def test_nvls_all_reduce_bcast_depends_on_all_reduce():
+    # Each broadcast flow must depend on ALL reduce flows
+    from simulon.collective.nvls import _SWITCH_BASE
+    N = 4
+    flows, _ = nvls_all_reduce(list(range(N)), data_size=1024)
+    switch_id = _SWITCH_BASE
+    reduce_fids = {f.flow_id for f in flows if f.dst == switch_id}
+    bcast_flows = [f for f in flows if f.src == switch_id]
+    for bf in bcast_flows:
+        assert set(bf.parent_flow_ids) == reduce_fids
+
+
+def test_nvls_all_reduce_reduce_no_parents():
+    # Reduce phase flows start in parallel
+    from simulon.collective.nvls import _SWITCH_BASE
+    N = 4
+    flows, _ = nvls_all_reduce(list(range(N)), data_size=1024)
+    switch_id = _SWITCH_BASE
+    for f in flows:
+        if f.dst == switch_id:
+            assert f.parent_flow_ids == []
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +253,11 @@ def test_decompose_ring_all_to_all():
     assert len(result.flows) == 12
 
 
-def test_decompose_nvls_not_implemented():
-    with pytest.raises(NotImplementedError):
-        decompose_collective("AllReduce", list(range(8)), data_size=4096, algorithm="nvls")
+def test_decompose_nvls_all_reduce():
+    result, _ = decompose_collective("AllReduce", list(range(8)), data_size=4096, algorithm="nvls")
+    assert isinstance(result, CollectiveResult)
+    # 8 GPUs, 1 channel: 8 reduce + 8 broadcast flows
+    assert len(result.flows) == 16
 
 
 def test_decompose_nvls_non_allreduce_unsupported():
@@ -245,3 +284,29 @@ def test_decompose_flow_id_continuity():
     )
     all_fids = [f.flow_id for f in result1.flows] + [f.flow_id for f in result2.flows]
     assert len(all_fids) == len(set(all_fids)), "Duplicate flow IDs across consecutive calls"
+
+
+def test_decompose_tree_all_reduce():
+    """decompose_collective with algorithm='tree' produces TREE-typed flows."""
+    result, nfid = decompose_collective(
+        "AllReduce", [0, 1, 2, 3], data_size=4096, algorithm="tree", num_channels=1
+    )
+    assert isinstance(result, CollectiveResult)
+    assert len(result.flows) > 0
+    for f in result.flows:
+        assert f.conn_type == "TREE"
+    assert nfid == len(result.flows)
+
+
+def test_decompose_nvls_tree_all_reduce():
+    """decompose_collective with algorithm='nvls_tree' for multi-node produces NET + NVLS flows."""
+    group = list(range(16))
+    result, _ = decompose_collective(
+        "AllReduce", group, data_size=16 * 1024, algorithm="nvls_tree", num_channels=1
+    )
+    assert isinstance(result, CollectiveResult)
+    assert len(result.flows) > 0
+    conn_types = {f.conn_type for f in result.flows}
+    # Multi-node: must have both NVLS (intra) and NET (inter)
+    assert "NVLS" in conn_types
+    assert "NET" in conn_types

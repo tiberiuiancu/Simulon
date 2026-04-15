@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import logging
 import re
+import warnings
 
 from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import ExecutionDAG
 from simulon.config.dc import DatacenterConfig, GPUSpec, NICSpec, SwitchSpec
+from simulon.config.resolve import resolve_node_spec, resolve_scale_out
 from simulon.config.workload import MegatronWorkload
 from simulon.profiling.lookup import lookup_kernel_time
 
@@ -60,23 +62,35 @@ def _get_link_params(
     datacenter: DatacenterConfig,
 ) -> tuple[float, float]:
     """Return (bandwidth_bytes_per_ms, latency_ms) for the logical link src_gpu→dst_gpu."""
-    gpus_per_node = datacenter.node.gpus_per_node
+    node = resolve_node_spec(datacenter)
+    gpus_per_node = node.gpus_per_node
+    if gpus_per_node is None:
+        raise ValueError("node.gpus_per_node must be set after resolution")
     is_intra = (src_gpu // gpus_per_node) == (dst_gpu // gpus_per_node)
-
-    network = datacenter.network
 
     if is_intra:
         switch_spec: SwitchSpec | None = None
-        if network and network.scale_up and network.scale_up.switch:
-            sw = network.scale_up.switch
+        # Prefer node.scale_up (new location), fall back to network.scale_up (deprecated).
+        if node.scale_up and node.scale_up.switch:
+            sw = node.scale_up.switch
+            if isinstance(sw, SwitchSpec):
+                switch_spec = sw
+        elif datacenter.network and datacenter.network.scale_up and datacenter.network.scale_up.switch:
+            warnings.warn(
+                "network.scale_up is deprecated. Move scale_up into the node spec.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            sw = datacenter.network.scale_up.switch
             if isinstance(sw, SwitchSpec):
                 switch_spec = sw
         bw = _parse_speed(switch_spec.port_speed) if (switch_spec and switch_spec.port_speed) else _parse_speed("2880Gbps")
         latency_ms = _parse_latency(switch_spec.latency) if (switch_spec and switch_spec.latency) else 0.0
     else:
         nic_spec: NICSpec | None = None
-        if network and network.scale_out and network.scale_out.nic:
-            nic = network.scale_out.nic
+        scale_out = resolve_scale_out(datacenter)
+        if scale_out and scale_out.nic:
+            nic = scale_out.nic
             if isinstance(nic, NICSpec):
                 nic_spec = nic
         if nic_spec and nic_spec.speed:
@@ -127,17 +141,38 @@ def populate_dag(
 def populate_network(
     dag: ExecutionDAG,
     datacenter: DatacenterConfig,
+    per_step_latency_ms: float = 0.0,
+    bw_override_bytes_per_ms: float | None = None,
+    inter_bw_override_bytes_per_ms: float | None = None,
 ) -> ExecutionDAG:
     """Fill CommNode.duration_ms using the analytical network model (latency + bytes/bandwidth).
 
     No congestion is modeled — each flow's duration is a fixed function of its
     transfer size and the link spec between src_gpu and dst_gpu.
 
+    per_step_latency_ms is an additive collective software overhead per ring step
+    (NCCL kernel launch + sync), on top of the fabric latency in the hardware spec.
+
+    bw_override_bytes_per_ms, when set, replaces the intra-node bandwidth from the
+    datacenter spec. Used to apply per-collective effective NVLink bandwidth calibration.
+
+    inter_bw_override_bytes_per_ms, when set, replaces the inter-node (NIC) bandwidth.
+    Used to apply per-collective NIC efficiency from calbusbw.
+
     Mutates nodes in-place and returns the dag.
     """
-    for node in dag.comm_nodes:
-        bw, latency_ms = _get_link_params(node.src_gpu, node.dst_gpu, datacenter)
-        node.duration_ms = latency_ms + (node.bytes / bw if bw > 0 else 0.0)
+    resolved_node = resolve_node_spec(datacenter)
+    gpus_per_node = resolved_node.gpus_per_node
+    if gpus_per_node is None:
+        raise ValueError("node.gpus_per_node must be set after resolution")
+    for comm_node in dag.comm_nodes:
+        bw, latency_ms = _get_link_params(comm_node.src_gpu, comm_node.dst_gpu, datacenter)
+        is_intra = (comm_node.src_gpu // gpus_per_node) == (comm_node.dst_gpu // gpus_per_node)
+        if is_intra and bw_override_bytes_per_ms is not None:
+            bw = bw_override_bytes_per_ms
+        elif not is_intra and inter_bw_override_bytes_per_ms is not None:
+            bw = inter_bw_override_bytes_per_ms
+        comm_node.duration_ms = latency_ms + per_step_latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
 
     return dag
 

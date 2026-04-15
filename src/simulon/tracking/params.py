@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 from simulon.config.dc import DatacenterConfig, GPUSpec
+from simulon.config.resolve import resolve_node_spec
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import CollectiveWorkload, LLMSpec, MegatronWorkload
 
@@ -81,7 +82,8 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, Union[str, int, float,
     if isinstance(scenario.datacenter, Path):
         params["datacenter.config_path"] = str(scenario.datacenter)
     elif isinstance(scenario.datacenter, DatacenterConfig):
-        gpu = scenario.datacenter.node.gpu
+        node = resolve_node_spec(scenario.datacenter)
+        gpu = node.gpu
         if isinstance(gpu, str):
             params["datacenter.gpu"] = gpu
         elif isinstance(gpu, GPUSpec):

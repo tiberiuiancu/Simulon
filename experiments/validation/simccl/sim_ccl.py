@@ -56,10 +56,14 @@ MESSAGE_SIZES_BYTES = [8 * 1024 * 1024 * (2**i) for i in range(11)]
 # Hardware config
 # ---------------------------------------------------------------------------
 
-# H100 NVLink 4: 900 GB/s bidirectional per GPU → 450 GB/s per direction.
-# Expressed in Gbps for _parse_speed: 450 GB/s × 8 bits/byte = 3600 Gbps.
-_NVSWITCH4_PORT_SPEED = "3600Gbps"
-_NVSWITCH4_LATENCY = "0.000025ms"  # 25 ns
+# H100 NVLink 4: theoretical 450 GB/s per direction, but ring AllReduce on Snellius 1n4g
+# achieves ~319 GB/s effective bandwidth at saturation.  NVSwitch wire latency is ~25 ns;
+# the dominant per-step overhead (~5.95 µs) comes from NCCL kernel launch + sync and is
+# captured in per_step_latency_us below (calibrated via linear fit: time = nsteps*lat + nsteps*S/(N*bw)).
+_NVSWITCH4_PORT_SPEED = "2554Gbps"  # 319.2 GB/s effective (vs 450 GB/s theoretical)
+_NVSWITCH4_LATENCY = (
+    "0.000025ms"  # 25 ns wire latency (NCCL overhead goes in per_step_latency_us)
+)
 
 # InfiniBand HDR100: 100 Gbps per direction per port (× 0.85 efficiency applied by simulon).
 # Snellius nodes have 1 IB port per node (not per GPU).  For ring collectives this is
@@ -97,22 +101,26 @@ def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
 # Bus bandwidth
 # ---------------------------------------------------------------------------
 
+
 # Correction factors from nccl-tests PERFORMANCE.md
 def _bus_bw(collective: str, alg_bw_GBps: float, n: int) -> float:
     factors = {
-        "AllReduce":     2 * (n - 1) / n,
-        "AllGather":     (n - 1) / n,
+        "AllReduce": 2 * (n - 1) / n,
+        "AllGather": (n - 1) / n,
         "ReduceScatter": (n - 1) / n,
-        "AllToAll":      (n - 1) / n,
+        "AllToAll": (n - 1) / n,
     }
     if collective not in factors:
-        raise ValueError(f"No bus-bw correction factor defined for collective {collective!r}")
+        raise ValueError(
+            f"No bus-bw correction factor defined for collective {collective!r}"
+        )
     return alg_bw_GBps * factors[collective]
 
 
 # ---------------------------------------------------------------------------
 # Simulation
 # ---------------------------------------------------------------------------
+
 
 def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict:
     """Run all message-size points for one (collective, cluster) combo."""
@@ -129,7 +137,22 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
                 collective_type=CollectiveType(collective),
                 message_size_bytes=size,
             ),
-            collective=NcclConfig(algorithm="ring", num_channels=1),
+            collective=NcclConfig(
+                algorithm="ring",
+                num_channels=1,
+                per_step_latency_us={
+                    "AllReduce":      4.07,
+                    "AllGather":      9.09,
+                    "ReduceScatter":  8.24,
+                    "AllToAll":       8.37,
+                },
+                per_collective_bw_GBps={
+                    "AllReduce":    316.9,
+                    "AllGather":    305.3,
+                    "ReduceScatter": 297.5,
+                    "AllToAll":     271.3,
+                },
+            ),
         )
         _, result = backend.simulate(scenario)
 
@@ -137,14 +160,16 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
         alg_bw = (size / 1e9) / (result.total_time_ms / 1000)  # GB/s
         bus_bw = _bus_bw(collective, alg_bw, num_ranks)
 
-        results.append({
-            "size": size,
-            "out_of_place": {
-                "time": time_us,
-                "alg_bw": alg_bw,
-                "bus_bw": bus_bw,
-            },
-        })
+        results.append(
+            {
+                "size": size,
+                "out_of_place": {
+                    "time": time_us,
+                    "alg_bw": alg_bw,
+                    "bus_bw": bus_bw,
+                },
+            }
+        )
 
     return {
         "version": 1,
@@ -161,6 +186,7 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])

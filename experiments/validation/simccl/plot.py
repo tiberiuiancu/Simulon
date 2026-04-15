@@ -2,10 +2,12 @@
 """Plot simulon vs nccl-tests bus bandwidth: 3×3 grid (rows=GPU count, cols=collective).
 
 Loads JSON files from a results directory:
-  sim_<collective>_<config>.json   — simulon predictions (from sim_ccl.py)
-  nccl_<collective>_<config>.json  — measured nccl-tests output (from run_nccl.sh)
+  sim_<collective>_<config>.json                — simulon predictions (from sim_ccl.py)
+  nccl_<collective>_<config>.json               — measured nccl-tests output (from run_nccl.sh)
+  simai_analytical_<collective>_<config>.json   — SimAI analytical mode
+  simai_ns3_<collective>_<config>.json          — SimAI NS3 mode
 
-Measured files are optional; missing ones are silently skipped.
+All files are optional; missing ones are silently skipped.
 
 Usage (from repo root):
     uv run python experiments/validation/simccl/plot.py
@@ -20,7 +22,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import numpy as np
 
 # ── Layout ─────────────────────────────────────────────────────────────────
 
@@ -57,24 +58,31 @@ def plot(results_dir: Path, output: Path | None) -> None:
         sharex=True,
     )
 
+    # Track which series appear (for a shared legend)
+    legend_handles: dict[str, object] = {}
+
     for row, cfg in enumerate(CONFIGS):
         for col, collective in enumerate(COLLECTIVES):
             ax = axes[row][col]
             label = cfg["label"]
             cname_lower = collective.lower()
 
-            sim_data = _load(results_dir / f"sim_{cname_lower}_{label}.json")
-            meas_data = _load(results_dir / f"nccl_{cname_lower}_{label}.json")
+            series = [
+                ("nccl-tests",       f"nccl_{cname_lower}_{label}.json",                    "#ff7f0e", "s", "--"),
+                ("simulon",          f"sim_{cname_lower}_{label}.json",                      "#1f77b4", "o", "-"),
+                ("SimAI analytical", f"simai_analytical_{cname_lower}_{label}.json",         "#2ca02c", "^", "-"),
+                ("SimAI NS3",        f"simai_ns3_{cname_lower}_{label}.json",                "#9467bd", "D", "-."),
+            ]
 
-            if sim_data is not None:
-                sizes, bws = sim_data
-                ax.plot(sizes, bws, marker="o", markersize=4, linewidth=1.5,
-                        color="#1f77b4", label="simulon")
-
-            if meas_data is not None:
-                sizes, bws = meas_data
-                ax.plot(sizes, bws, marker="s", markersize=4, linewidth=1.5,
-                        color="#ff7f0e", linestyle="--", label="nccl-tests")
+            for sname, fname, color, marker, ls in series:
+                data = _load(results_dir / fname)
+                if data is None:
+                    continue
+                sizes, bws = data
+                line, = ax.plot(sizes, bws, marker=marker, markersize=4, linewidth=1.5,
+                                color=color, linestyle=ls, label=sname)
+                if sname not in legend_handles:
+                    legend_handles[sname] = line
 
             # Axes formatting
             ax.set_xscale("log", base=2)
@@ -94,12 +102,20 @@ def plot(results_dir: Path, output: Path | None) -> None:
             if row == len(CONFIGS) - 1:
                 ax.set_xlabel("Message size", fontsize=9)
 
-            # Legend only in first subplot
-            if row == 0 and col == 0 and (sim_data is not None or meas_data is not None):
-                ax.legend(fontsize=8, loc="upper left")
-
-    fig.suptitle("Collective Bus Bandwidth: simulon vs nccl-tests\n(H100 · NVSwitch 4 · IB HDR100)",
+    fig.suptitle("Collective Bus Bandwidth: simulon vs nccl-tests vs SimAI\n(H100 · NVSwitch 4 · IB HDR100)",
                  fontsize=13, y=1.01)
+
+    if legend_handles:
+        fig.legend(
+            handles=list(legend_handles.values()),
+            labels=list(legend_handles.keys()),
+            loc="lower center",
+            ncol=len(legend_handles),
+            fontsize=9,
+            frameon=True,
+            bbox_to_anchor=(0.5, -0.02),
+        )
+
     fig.tight_layout()
 
     if output is not None:
