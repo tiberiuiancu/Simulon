@@ -147,7 +147,8 @@ def populate_dag(
                 mp = {**adamw_match_params, "num_params": node.extra_params.get("num_params")}
                 node.duration_ms = lookup_kernel_time("adamw", mp, gpu_spec)
             elif node.fused_kernels:
-                node.duration_ms = sum(lookup_kernel_time(k, match_params, gpu_spec) for k in node.fused_kernels)
+                times = [lookup_kernel_time(k, match_params, gpu_spec) for k in node.fused_kernels]
+                node.duration_ms = None if any(t is None for t in times) else sum(times)
             else:
                 node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
             advance()

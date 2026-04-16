@@ -92,9 +92,11 @@ def simulate(
                 scenario_artifact_path.unlink(missing_ok=True)
 
         if summary:
-            from simulon.config.workload import CollectiveWorkload
+            from simulon.config.workload import CollectiveWorkload, MegatronWorkload as _MW
             if isinstance(sc.workload, CollectiveWorkload):
                 _print_collective_summary(sc.workload, result, sc.datacenter)
+            elif isinstance(sc.workload, _MW):
+                _print_summary(result, sc.workload)
             else:
                 _print_summary(result)
 
@@ -137,11 +139,12 @@ def simulate(
             tracker.end_run()
 
 
-def _print_summary(result) -> None:
+def _print_summary(result, workload=None) -> None:
     """Print a human-readable simulation summary to stdout.
 
     Args:
         result: SimulationResult from AnalyticalBackend.simulate().
+        workload: Optional MegatronWorkload for throughput metrics.
     """
 
     total = result.total_time_ms
@@ -162,6 +165,19 @@ def _print_summary(result) -> None:
     typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
                "  (hidden by compute, not in totals above)")
     typer.echo("")
+
+    if workload is not None and total > 0:
+        from simulon.profiling.models import _resolve_model
+        t = workload.training
+        tokens_per_iter = t.global_batch_size * t.sequence_length
+        iter_time_s = total / 1000.0
+        throughput_tps = tokens_per_iter / iter_time_s
+        typer.echo(f"Throughput:           {throughput_tps:,.1f} tokens/s")
+        resolved = _resolve_model(workload.model)
+        if resolved.gflops_per_train_token is not None:
+            tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
+            typer.echo(f"                      {tflops:.2f} TFLOPs/s")
+        typer.echo("")
 
 
 def _print_collective_summary(workload, result, datacenter) -> None:
@@ -392,7 +408,7 @@ def profile_gpu(
         return num_layers_val * per_layer + embedding + logit
 
     def _config_done(t: int, e: int, b: int, s: int) -> bool:
-        if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s}.items()) in _oom_set:
+        if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s, "hidden_size": hidden_size_val}.items()) in _oom_set:
             return True
         base = {"hidden_size": hidden_size_val, "seq_len": s, "batch_size": b, "dtype": dtype_str, "tp": t}
         expected = [
