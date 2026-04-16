@@ -13,6 +13,8 @@ dependencies = [
     "pyyaml>=6.0",
     "typer>=0.12",
     "rich>=13.0",
+    "numpy>=2.4.4",
+    "matplotlib>=3.10.8",
 ]
 
 [project.scripts]
@@ -25,6 +27,7 @@ packages = ["src/simulon"]
 dev = ["pytest>=8.0"]
 profiling = ["torch"]
 tracking = ["mlflow>=2.0"]
+cpp = ["pybind11>=2.12", "setuptools"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

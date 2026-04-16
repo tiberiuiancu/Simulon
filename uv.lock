@@ -1689,6 +1689,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pybind11"
+version = "3.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/50/b83d65efc1914681f5aded4ce37c703408a9bb74829f27f041560ca52ffb/pybind11-3.0.3.tar.gz", hash = "sha256:00471cdb816882c484708bc5dde80815c8c11cea540ab2cc6410f5ddea434755", size = 587814, upload-time = "2026-03-31T23:42:06.481Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/87/99f21e9b20899d6dc1bf7544cfe53e5fa17acc21bb267971a540425357d3/pybind11-3.0.3-py3-none-any.whl", hash = "sha256:fb5f8e4a64946b4dcc0451c83a8c384f803bc0a62dd1ba02f199e97dbc9aad4c", size = 313717, upload-time = "2026-03-31T23:42:04.814Z" },
+]
+
+[[package]]
 name = "pycparser"
 version = "3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2119,6 +2128,8 @@ name = "simulon"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -2126,6 +2137,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+cpp = [
+    { name = "pybind11" },
+    { name = "setuptools" },
+]
 dev = [
     { name = "pytest" },
 ]
@@ -2143,15 +2158,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "mlflow", marker = "extra == 'tracking'", specifier = ">=2.0" },
+    { name = "numpy", specifier = ">=2.4.4" },
+    { name = "pybind11", marker = "extra == 'cpp'", specifier = ">=2.12" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0" },
+    { name = "setuptools", marker = "extra == 'cpp'" },
     { name = "torch", marker = "extra == 'profiling'" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["dev", "profiling", "tracking"]
+provides-extras = ["dev", "profiling", "tracking", "cpp"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.2" }]

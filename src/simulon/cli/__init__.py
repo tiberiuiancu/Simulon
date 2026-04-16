@@ -1,3 +1,4 @@
+import json
 from itertools import product
 from pathlib import Path
 from typing import Optional
@@ -28,6 +29,8 @@ app.add_typer(profile_app, name="profile")
 
 from simulon.cli.install import app as install_app  # noqa: E402
 app.add_typer(install_app, name="install", help="Install third-party components (apex, deepgemm, m4).")
+
+from simulon.config.resolve import resolve_node_spec
 
 
 @app.command()
@@ -162,7 +165,11 @@ def _print_summary(result) -> None:
 
 
 def _print_collective_summary(workload, result, datacenter) -> None:
-    num_ranks = datacenter.cluster.num_nodes * datacenter.node.gpus_per_node
+    node = resolve_node_spec(datacenter)
+    gpus_per_node = node.gpus_per_node
+    if gpus_per_node is None:
+        gpus_per_node = 0
+    num_ranks = datacenter.cluster.num_nodes * gpus_per_node
     typer.echo(f"\nCollective wall time:  {result.total_time_ms:.3f} ms")
     typer.echo(f"  Type:          {workload.collective_type.value}")
     typer.echo(f"  Message size:  {workload.message_size_bytes:,} bytes")
@@ -498,3 +505,201 @@ def profile_gpu(
     merged.update(profile_data)
     GPUSpec.model_validate(merged)
     typer.echo("Profile validated successfully.")
+
+
+# ---------------------------------------------------------------------------
+# simulon profile node
+# ---------------------------------------------------------------------------
+
+_COLLECTIVE_TYPES = ["allreduce", "allgather", "reducescatter", "alltoall"]
+
+
+def _parse_nccl_json(path: Path) -> list[dict]:
+    """Parse a nccl-tests JSON output file into a list of {size_bytes, bus_bw_GBps}."""
+    data = json.loads(path.read_text())
+    return [
+        {"size_bytes": r["size"], "bus_bw_GBps": round(r["out_of_place"]["bus_bw"], 3)}
+        for r in data.get("results", [])
+        if r.get("out_of_place", {}).get("bus_bw") is not None
+    ]
+
+
+def _gpu_count_from_json(data: dict) -> int | None:
+    """Extract GPU count from nccl-tests JSON config block."""
+    config = data.get("config", {})
+    devices = config.get("devices", [])
+    if devices:
+        return len(devices)
+    ngpus = config.get("ngpus")
+    if ngpus:
+        return int(ngpus)
+    return None
+
+
+@profile_app.command("node")
+def profile_node(
+    gpu: str = typer.Option(..., "--gpu", "-g", help="GPU template name (e.g. h100)"),
+    input_json: Optional[Path] = typer.Option(
+        None,
+        "--input-json",
+        help="Directory containing pre-run nccl-tests JSON files "
+        "(e.g. *allreduce*.json from SLURM runs). Alternative to --nccl-tests-dir.",
+    ),
+    nccl_tests_dir: Optional[Path] = typer.Option(
+        None,
+        "--nccl-tests-dir",
+        help="Path to nccl-tests build directory. Runs tests live (requires MPI environment).",
+    ),
+    gpus_per_node: Optional[int] = typer.Option(
+        None,
+        "--gpus-per-node",
+        "-n",
+        help="GPU count. Detected from JSON config if not provided.",
+    ),
+    port_speed: Optional[str] = typer.Option(
+        None,
+        "--port-speed",
+        help="NVSwitch port speed for scale_up (e.g. 2554Gbps). "
+        "Detected from input JSON if not provided.",
+    ),
+    latency: str = typer.Option(
+        "0.000025ms",
+        "--latency",
+        help="NVSwitch wire latency (e.g. 0.000025ms = 25 ns).",
+    ),
+    name: Optional[str] = typer.Option(
+        None,
+        "--name",
+        help="Node template name. Defaults to <gpu>-<gpus_per_node>g.",
+    ),
+    out: Optional[Path] = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Output path. Defaults to templates/node/<name>.yaml.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print YAML without writing.",
+    ),
+):
+    """Generate a node template from nccl-tests measurements.
+
+    Two modes:
+
+    \b
+    1. --input-json DIR   Parse existing JSON files from SLURM runs.
+       Looks for files matching *allreduce*.json, *allgather*.json,
+       *reduce_scatter*.json, *alltoall*.json in the given directory.
+
+    \b
+    2. --nccl-tests-dir DIR  Run nccl-tests live (requires MPI).
+       Runs allreduce_perf, allgather_perf, reduce_scatter_perf, alltoall_perf.
+
+    The output is a templates/node/<name>.yaml carrying GPU reference, scale_up,
+    and embedded NCCL measurements. Use this template in datacenter.node to
+    skip the network.scale_up + hard-coded per-collective_bw_GBps pattern.
+    """
+    import json
+    from simulon.config.dc import NodeSpec
+    from simulon.config.nccl_profile import NcclAlgoMeasurements, NcclDataPoint, NcclProfile
+
+    if input_json is None and nccl_tests_dir is None:
+        typer.echo("Error: pass --input-json DIR or --nccl-tests-dir DIR", err=True)
+        raise typer.Exit(1)
+    if input_json is not None and nccl_tests_dir is not None:
+        typer.echo("Error: pass only one of --input-json or --nccl-tests-dir", err=True)
+        raise typer.Exit(1)
+
+    measurements: dict[str, list[dict]] = {}
+
+    if input_json is not None:
+        if not input_json.is_dir():
+            typer.echo(f"Error: {input_json} is not a directory", err=True)
+            raise typer.Exit(1)
+        found_any = False
+        for coll in _COLLECTIVE_TYPES:
+            matches = list(input_json.glob(f"*{coll}*.json"))
+            if not matches:
+                matches = list(input_json.glob(f"*{coll.replace('_', '')}*.json"))
+            if len(matches) > 1:
+                typer.echo(
+                    f"  Warning: multiple JSON files match '{coll}': "
+                    f"{[p.name for p in matches]}. Using {matches[0].name}.",
+                    err=True,
+                )
+                matches = matches[:1]
+            for path in matches:
+                try:
+                    data = json.loads(path.read_text())
+                    if gpus_per_node is None:
+                        gpus_per_node = _gpu_count_from_json(data)
+                    key = coll
+                    measurements[key] = _parse_nccl_json(path)
+                    found_any = True
+                    typer.echo(f"  {path.name}: {len(measurements[key])} points")
+                except Exception as exc:
+                    typer.echo(f"  Warning: {path.name}: {exc}", err=True)
+        if not found_any:
+            typer.echo(
+                f"Error: no nccl-tests JSON files found in {input_json}. "
+                "Expected files matching *allreduce*.json, *allgather*.json, etc.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+    elif nccl_tests_dir is not None:
+        typer.echo("Live nccl-tests mode not yet implemented. Use --input-json.", err=True)
+        raise typer.Exit(1)
+
+    if gpus_per_node is None:
+        typer.echo("Error: could not detect gpus_per_node from JSON. Pass --gpus-per-node.", err=True)
+        raise typer.Exit(1)
+
+    detected_name = name or f"{gpu}-{gpus_per_node}g"
+    out_path = out or Path("templates/node") / f"{detected_name}.yaml"
+
+    # Build NcclProfile
+    np_data: dict = {
+        "gpus_per_node": gpus_per_node,
+        "name": detected_name,
+    }
+    _coll_key_map = {
+        "allreduce": "AllReduce",
+        "allgather": "AllGather",
+        "reducescatter": "ReduceScatter",
+        "alltoall": "AllToAll",
+    }
+    for coll, points in measurements.items():
+        key = _coll_key_map.get(coll, coll.capitalize())
+        np_data[key] = {"ring": [{"size_bytes": p["size_bytes"], "bus_bw_GBps": p["bus_bw_GBps"]} for p in points]}
+
+    nccl_profile = NcclProfile.model_validate(np_data)
+
+    # Build NodeSpec — only include switch fields that were explicitly provided.
+    switch_data: dict = {}
+    if port_speed is not None:
+        switch_data["port_speed"] = port_speed
+    switch_data["latency"] = latency  # always include; user controls the value
+
+    node_data: dict = {
+        "name": detected_name,
+        "from": gpu,
+        "gpus_per_node": gpus_per_node,
+        "scale_up": {"switch": switch_data},
+        "nccl": nccl_profile.model_dump(),
+    }
+
+    node_spec = NodeSpec.model_validate(node_data)
+    output_data = node_spec.model_dump(by_alias=True, exclude_unset=True)
+
+    yaml_out = yaml.dump(output_data, default_flow_style=False, sort_keys=False)
+    if dry_run:
+        typer.echo(yaml_out)
+    else:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(yaml_out)
+        typer.echo(f"Written to {out_path}")
+        NodeSpec.model_validate(yaml.safe_load(out_path.read_text()))
+        typer.echo("Validated successfully.")

@@ -2,6 +2,7 @@ from simulon.backend.dag.nodes import CommNode, ExecutionDAG
 from simulon.collective import CCLDecomposer
 from simulon.collective.decompose import decompose_collective
 from simulon.config.dc import DatacenterConfig
+from simulon.config.resolve import resolve_node_spec
 from simulon.config.workload import CollectiveWorkload
 
 
@@ -13,7 +14,11 @@ def build_collective_dag(
     ccl: CCLDecomposer,
 ) -> ExecutionDAG:
     """Build a CommNode-only ExecutionDAG for a single collective operation."""
-    num_ranks = datacenter.cluster.num_nodes * datacenter.node.gpus_per_node
+    node = resolve_node_spec(datacenter)
+    gpus_per_node = node.gpus_per_node
+    if gpus_per_node is None:
+        raise ValueError("node.gpus_per_node must be set after resolution")
+    num_ranks = datacenter.cluster.num_nodes * gpus_per_node
     group_ranks = list(range(num_ranks))
 
     result, _ = decompose_collective(

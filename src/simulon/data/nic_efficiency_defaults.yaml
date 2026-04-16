@@ -1,0 +1,98 @@
+# Default IB/RoCE NIC efficiency curves by number of nodes.
+# Source: SimAI nic_ratio.csv (Alibaba H100 8-GPU node measurements).
+# Efficiency = actual_bus_bw / (nic_bw_GBps x nics_per_node).
+# calbusbw.py interpolates for intermediate message sizes and node counts.
+
+2_nodes:
+  - {size_bytes:    16777216, efficiency: 0.32}
+  - {size_bytes:    33554432, efficiency: 0.47}
+  - {size_bytes:    67108864, efficiency: 0.50}
+  - {size_bytes:   134217728, efficiency: 0.67}
+  - {size_bytes:   268435456, efficiency: 0.85}
+  - {size_bytes:   536870912, efficiency: 0.89}
+  - {size_bytes:  1073741824, efficiency: 0.92}
+  - {size_bytes:  2147483648, efficiency: 0.94}
+  - {size_bytes:  4294967296, efficiency: 0.95}
+  - {size_bytes:  8589934592, efficiency: 0.95}
+  - {size_bytes: 17179869184, efficiency: 0.96}
+
+4_nodes:
+  - {size_bytes:    16777216, efficiency: 0.24}
+  - {size_bytes:    33554432, efficiency: 0.38}
+  - {size_bytes:    67108864, efficiency: 0.53}
+  - {size_bytes:   134217728, efficiency: 0.67}
+  - {size_bytes:   268435456, efficiency: 0.77}
+  - {size_bytes:   536870912, efficiency: 0.85}
+  - {size_bytes:  1073741824, efficiency: 0.93}
+  - {size_bytes:  2147483648, efficiency: 0.94}
+  - {size_bytes:  4294967296, efficiency: 0.95}
+  - {size_bytes:  8589934592, efficiency: 0.96}
+  - {size_bytes: 17179869184, efficiency: 0.96}
+
+8_nodes:
+  - {size_bytes:    16777216, efficiency: 0.13}
+  - {size_bytes:    33554432, efficiency: 0.24}
+  - {size_bytes:    67108864, efficiency: 0.39}
+  - {size_bytes:   134217728, efficiency: 0.54}
+  - {size_bytes:   268435456, efficiency: 0.69}
+  - {size_bytes:   536870912, efficiency: 0.78}
+  - {size_bytes:  1073741824, efficiency: 0.90}
+  - {size_bytes:  2147483648, efficiency: 0.94}
+  - {size_bytes:  4294967296, efficiency: 0.95}
+  - {size_bytes:  8589934592, efficiency: 0.96}
+  - {size_bytes: 17179869184, efficiency: 0.96}
+
+16_nodes:
+  - {size_bytes:    16777216, efficiency: 0.05}
+  - {size_bytes:    33554432, efficiency: 0.11}
+  - {size_bytes:    67108864, efficiency: 0.21}
+  - {size_bytes:   134217728, efficiency: 0.38}
+  - {size_bytes:   268435456, efficiency: 0.57}
+  - {size_bytes:   536870912, efficiency: 0.73}
+  - {size_bytes:  1073741824, efficiency: 0.76}
+  - {size_bytes:  2147483648, efficiency: 0.92}
+  - {size_bytes:  4294967296, efficiency: 0.95}
+  - {size_bytes:  8589934592, efficiency: 0.96}
+  - {size_bytes: 17179869184, efficiency: 0.96}
+
+32_nodes:
+  - {size_bytes:    16777216, efficiency: 0.044}
+  - {size_bytes:    33554432, efficiency: 0.052}
+  - {size_bytes:    67108864, efficiency: 0.106}
+  - {size_bytes:   134217728, efficiency: 0.205}
+  - {size_bytes:   268435456, efficiency: 0.387}
+  - {size_bytes:   536870912, efficiency: 0.562}
+  - {size_bytes:  1073741824, efficiency: 0.740}
+  - {size_bytes:  2147483648, efficiency: 0.758}
+  - {size_bytes:  4294967296, efficiency: 0.923}
+  - {size_bytes:  8589934592, efficiency: 0.953}
+  - {size_bytes: 17179869184, efficiency: 0.957}
+
+64_nodes:
+  - {size_bytes:    16777216, efficiency: 0.021}
+  - {size_bytes:    33554432, efficiency: 0.042}
+  - {size_bytes:    67108864, efficiency: 0.051}
+  - {size_bytes:   134217728, efficiency: 0.107}
+  - {size_bytes:   268435456, efficiency: 0.209}
+  - {size_bytes:   536870912, efficiency: 0.384}
+  - {size_bytes:  1073741824, efficiency: 0.563}
+  - {size_bytes:  2147483648, efficiency: 0.745}
+  - {size_bytes:  4294967296, efficiency: 0.755}
+  - {size_bytes:  8589934592, efficiency: 0.914}
+  - {size_bytes: 17179869184, efficiency: 0.958}
+
+128_nodes:
+  - {size_bytes:    16777216, efficiency: 0.0087}
+  - {size_bytes:    33554432, efficiency: 0.0212}
+  - {size_bytes:    67108864, efficiency: 0.0441}
+  - {size_bytes:   134217728, efficiency: 0.0533}
+  - {size_bytes:   268435456, efficiency: 0.1027}
+  - {size_bytes:   536870912, efficiency: 0.1902}
+  - {size_bytes:  1073741824, efficiency: 0.3146}
+  - {size_bytes:  2147483648, efficiency: 0.5535}
+  - {size_bytes:  4294967296, efficiency: 0.7402}
+  - {size_bytes:  8589934592, efficiency: 0.7648}
+  - {size_bytes: 17179869184, efficiency: 0.9192}
+
+# Node counts not listed: interpolate between nearest entries.
+# Node counts > 128: use 128-node curve (conservative).
