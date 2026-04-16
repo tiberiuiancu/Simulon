@@ -45,7 +45,7 @@ def make_datacenter(num_nodes: int = 2, gpus_per_node: int = 2) -> DatacenterCon
         cluster=ClusterSpec(num_nodes=num_nodes),
         node=NodeSpec(
             gpus_per_node=gpus_per_node,
-            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
+            gpu=GPUSpec(from_="h100", memory_capacity_gb=80.0),
         ),
         network=NetworkSpec(
             scale_up=ScaleUpSpec(
@@ -77,16 +77,9 @@ def make_collective_scenario(
     gpus_per_node: int = 2,
 ) -> ScenarioConfig:
     from simulon.config.scenario import NcclConfig
-    # Use explicit per_collective_bw_GBps to bypass cal_busbw (which requires a
-    # real NCCL profile loaded from disk — not available in unit tests).
     collective = NcclConfig(
-        algorithm="ring",
-        per_collective_bw_GBps={
-            "AllReduce": 200.0,
-            "AllGather": 200.0,
-            "ReduceScatter": 200.0,
-            "AllToAll": 200.0,
-        },
+        algorithm="auto",  # calbusbw drives BW from the nccl profile
+        num_channels=1,
     )
     return ScenarioConfig(
         datacenter=make_datacenter(num_nodes=num_nodes, gpus_per_node=gpus_per_node),

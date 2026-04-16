@@ -162,8 +162,8 @@ def populate_network(
     No congestion is modeled — each flow's duration is a fixed function of its
     transfer size and the link spec between src_gpu and dst_gpu.
 
-    per_step_latency_ms is an additive collective software overhead per ring step
-    (NCCL kernel launch + sync), on top of the fabric latency in the hardware spec.
+    per_step_latency_ms is no longer used — NCCL kernel launch overhead is captured
+    in the effective BW from calbusbw (nccl-tests measurements already include it).
 
     bw_override_bytes_per_ms, when set, replaces the intra-node bandwidth from the
     datacenter spec. Used to apply per-collective effective NVLink bandwidth calibration.

@@ -8,7 +8,7 @@ Key differences from SimAI:
 - For inter-node, uses nic_bw_GBps from datacenter spec scaled by NIC efficiency
   from the bundled nic_efficiency_defaults.yaml table.
 - Returns separate intra and inter-node BWs for populate_network.
-- Fails loudly if no profile AND no explicit per_collective_bw_GBps override.
+- Fails loudly if no profile is available.
 """
 from __future__ import annotations
 
@@ -157,8 +157,7 @@ def cal_busbw(
     nic_bw_GBps:
         Raw NIC bandwidth per port in GB/s (from datacenter spec).
     nccl_profile:
-        Measured nccl-tests profile. Required unless algorithm is explicit and
-        the caller supplies per_collective_bw_GBps overrides externally.
+        Measured nccl-tests profile. Required.
     algorithm:
         "auto" | "ring" | "tree" | "nvls" | "nvls_tree"
 
@@ -177,8 +176,8 @@ def cal_busbw(
     if nccl_profile is None:
         raise ValueError(
             f"No NCCL profile loaded for this GPU. Cannot derive effective bandwidth "
-            f"for {collective_type}. Either provide a <gpu>.nccl.yaml profile or set "
-            f"per_collective_bw_GBps.{collective_type} in your scenario's collective config."
+            f"for {collective_type}. Either provide a <gpu>.nccl.yaml profile or "
+            f"attach an nccl profile to your node template."
         )
 
     algo_measurements: NcclAlgoMeasurements = getattr(nccl_profile, collective_type, None)

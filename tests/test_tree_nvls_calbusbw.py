@@ -215,10 +215,10 @@ class TestNvlsTreeAllReduce:
 
     def test_multi_node_intra_reduce_no_parents(self):
         """Intra-node reduce flows (GPU→switch) in phase 1 have no parent dependencies."""
-        from simulon.collective.nvls import _SWITCH_BASE
         group = list(range(16))
         flows, _ = nvls_tree_all_reduce(group, data_size=16 * 1024, num_channels=1)
-        switch_ids = {_SWITCH_BASE + n for n in range(2)}  # 2 nodes
+        gpu_set = set(group)
+        switch_ids = {f.dst for f in flows if f.src in gpu_set} - gpu_set
 
         reduce_flows = [f for f in flows if f.dst in switch_ids]
         # The very first batch (intra-node reduce) has no parents
@@ -227,10 +227,10 @@ class TestNvlsTreeAllReduce:
 
     def test_multi_node_scatter_has_parents(self):
         """Intra-node scatter flows (switch→GPU) in phase 3 always have dependencies."""
-        from simulon.collective.nvls import _SWITCH_BASE
         group = list(range(16))
         flows, _ = nvls_tree_all_reduce(group, data_size=16 * 1024, num_channels=1)
-        switch_ids = {_SWITCH_BASE + n for n in range(2)}
+        gpu_set = set(group)
+        switch_ids = {f.dst for f in flows if f.src in gpu_set} - gpu_set
 
         scatter_flows = [f for f in flows if f.src in switch_ids]
         for f in scatter_flows:

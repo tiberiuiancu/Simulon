@@ -22,13 +22,10 @@ from simulon.config.dc import (
     ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
-    GPUSpec,
     NICSpec,
     NetworkSpec,
     NodeSpec,
     ScaleOutSpec,
-    ScaleUpSpec,
-    SwitchSpec,
     TopologySpec,
     TopologyType,
 )
@@ -56,39 +53,26 @@ MESSAGE_SIZES_BYTES = [8 * 1024 * 1024 * (2**i) for i in range(11)]
 # Hardware config
 # ---------------------------------------------------------------------------
 
-# H100 NVLink 4: theoretical 450 GB/s per direction, but ring AllReduce on Snellius 1n4g
-# achieves ~319 GB/s effective bandwidth at saturation.  NVSwitch wire latency is ~25 ns;
-# the dominant per-step overhead (~5.95 µs) comes from NCCL kernel launch + sync and is
-# captured in per_step_latency_us below (calibrated via linear fit: time = nsteps*lat + nsteps*S/(N*bw)).
-_NVSWITCH4_PORT_SPEED = "2554Gbps"  # 319.2 GB/s effective (vs 450 GB/s theoretical)
-_NVSWITCH4_LATENCY = (
-    "0.000025ms"  # 25 ns wire latency (NCCL overhead goes in per_step_latency_us)
-)
-
-# InfiniBand HDR100: 100 Gbps per direction per port (× 0.85 efficiency applied by simulon).
-# Snellius nodes have 1 IB port per node (not per GPU).  For ring collectives this is
+# InfiniBand HDR100: 100 Gbps per direction per port.
+# Snellius nodes have 1 IB port per node (not per GPU). For ring collectives this is
 # correct: only one GPU per node uses the inter-node link at a time, so each inter-node
-# P2P flow gets the full 100 Gbps link.  Would need adjustment for algorithms where
-# multiple GPUs communicate inter-node simultaneously (e.g. AllToAll).
+# P2P flow gets the full 100 Gbps link.
 _IB_HDR100_SPEED = "100Gbps"
 _IB_HDR100_LATENCY = "0.005ms"  # 5 µs
 
 
 def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
+    # Use the Snellius node template (real NCCL measurements) for intra-node BW,
+    # and the datacenter spec for inter-node (IB) bandwidth. The node template
+    # provides per-collective bus BW via the nccl profile; calbusbw is used
+    # at runtime to interpolate from it.
     return DatacenterConfig(
         datacenter=DatacenterMeta(name=f"{num_nodes}n{gpus_per_node}g"),
         cluster=ClusterSpec(num_nodes=num_nodes),
         node=NodeSpec(
-            gpus_per_node=gpus_per_node,
-            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
+            from_="snellius-h100-4g",  # loads real Snellius NCCL profile
         ),
         network=NetworkSpec(
-            scale_up=ScaleUpSpec(
-                switch=SwitchSpec(
-                    port_speed=_NVSWITCH4_PORT_SPEED,
-                    latency=_NVSWITCH4_LATENCY,
-                ),
-            ),
             scale_out=ScaleOutSpec(
                 nic=NICSpec(speed=_IB_HDR100_SPEED, latency=_IB_HDR100_LATENCY),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
@@ -138,20 +122,8 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
                 message_size_bytes=size,
             ),
             collective=NcclConfig(
-                algorithm="ring",
+                algorithm="auto",  # calbusbw selects ring and interpolates BW from nccl profile
                 num_channels=1,
-                per_step_latency_us={
-                    "AllReduce":      4.07,
-                    "AllGather":      9.09,
-                    "ReduceScatter":  8.24,
-                    "AllToAll":       8.37,
-                },
-                per_collective_bw_GBps={
-                    "AllReduce":    316.9,
-                    "AllGather":    305.3,
-                    "ReduceScatter": 297.5,
-                    "AllToAll":     271.3,
-                },
             ),
         )
         _, result = backend.simulate(scenario)

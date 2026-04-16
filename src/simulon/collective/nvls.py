@@ -31,9 +31,58 @@ from __future__ import annotations
 
 from simulon.collective.common import P2PFlow
 
-# Virtual switch node IDs start here to avoid colliding with real GPU ranks.
-# No realistic cluster exceeds 1M GPUs.
+# Fallback virtual switch node IDs used when the C++ binding is unavailable.
+# Starting at 1_000_000 avoids colliding with any realistic GPU rank.
 _SWITCH_BASE = 1_000_000
+
+
+def _get_nvls_switch_ids(
+    N: int,
+    num_nodes: int,
+    gpus_per_node: int,
+) -> list[int]:
+    """Return the virtual NVSwitch node ID for each node using MockNcclGroup.
+
+    For single-node groups, uses get_nvls_channels (returns TreeChannels-style dict).
+    For multi-node groups, uses get_nvls_tree_channels (returns flattened tuple with
+    switch_id per entry). Falls back to _SWITCH_BASE + n if the C++ binding is
+    unavailable or the query fails.
+    """
+    try:
+        import simulon._mocknccl as _m
+
+        nvswitches = [N + i for i in range(num_nodes)]
+        g = _m.MockNcclGroup(
+            N, gpus_per_node,
+            N, 1, 1, 1, 1,
+            nvswitches,
+            _m.GPUType.H100,
+        )
+        if num_nodes == 1:
+            # Single-node: get_nvls_channels returns TreeChannels-style dict.
+            # The last entry (key = gpus_per_node) is the virtual switch.
+            raw = g.get_nvls_channels(0, _m.GroupType.TP)
+            ch0 = raw[min(raw.keys())]
+            switch_id = next(
+                (rank for rank in ch0 if rank >= gpus_per_node),
+                _SWITCH_BASE,
+            )
+            return [switch_id]
+        else:
+            # Multi-node: get_nvls_tree_channels returns (depth, rank, switch_id, children).
+            raw = g.get_nvls_tree_channels(0, _m.GroupType.TP)
+            ch0 = raw[min(raw.keys())]
+            switch_ids: list[int] = []
+            for node_idx in range(num_nodes):
+                rep_rank = node_idx * gpus_per_node
+                entry = ch0.get(rep_rank)
+                if entry is not None:
+                    switch_ids.append(entry[2])  # switch_id field
+                else:
+                    switch_ids.append(_SWITCH_BASE + node_idx)
+            return switch_ids
+    except Exception:
+        return [_SWITCH_BASE + n for n in range(num_nodes)]
 
 
 def nvls_all_reduce(
@@ -65,8 +114,8 @@ def nvls_all_reduce(
     if N == 1:
         return [], flow_id_start
 
-    # Use a fixed high-namespace switch ID to avoid colliding with real GPU ranks.
-    switch_id = _SWITCH_BASE
+    # Single-node: one switch for all GPUs. Query switch ID from MockNcclGroup.
+    switch_id = _get_nvls_switch_ids(N, 1, N)[0]
     chunk_size = data_size // num_channels
     chunk_count = num_channels
 
@@ -163,8 +212,8 @@ def nvls_tree_all_reduce(
     for n in range(num_nodes):
         node_groups.append(group_ranks[n * gpus_per_node:(n + 1) * gpus_per_node])
 
-    # One virtual switch per node; use high-namespace IDs to avoid colliding with real ranks.
-    switch_ids = [_SWITCH_BASE + n for n in range(num_nodes)]
+    # One virtual switch per node; IDs from MockNcclGroup (N + node_index).
+    switch_ids = _get_nvls_switch_ids(N, num_nodes, gpus_per_node)
 
     # Inter-node tree: use the first GPU of each node as the node representative
     node_representatives = [node_groups[n][0] for n in range(num_nodes)]

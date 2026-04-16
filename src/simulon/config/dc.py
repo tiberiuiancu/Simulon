@@ -180,6 +180,12 @@ class NICSpec(BaseModel):
     vendor: Optional[str] = None
     speed: Optional[str] = None
     latency: Optional[str] = None
+    nics_per_node: int = Field(
+        default=1,
+        ge=1,
+        description="Number of NICs per node. Used to compute total inter-node bandwidth "
+        "(nic_bw × nics_per_node) for collective operations.",
+    )
     power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None
     bandwidth_efficiency: float = Field(

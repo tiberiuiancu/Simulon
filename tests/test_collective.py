@@ -157,10 +157,17 @@ def test_ring_all_to_all_no_self_flows():
         assert f.src != f.dst
 
 
-def test_ring_all_to_all_no_parents():
-    flows, _ = ring_all_to_all([0, 1, 2, 3], data_size=1024)
-    for f in flows:
-        assert f.parent_flow_ids == []
+def test_ring_all_to_all_serialized_per_gpu():
+    # Each GPU's outgoing sends are serialized: only round-0 flows have no parents.
+    N = 4
+    flows, _ = ring_all_to_all(list(range(N)), data_size=1024)
+    # Round 0: N flows, all with no parents
+    round0 = [f for f in flows if f.parent_flow_ids == []]
+    assert len(round0) == N
+    # All other flows have exactly one parent (the previous send from same GPU)
+    later = [f for f in flows if f.parent_flow_ids != []]
+    assert all(len(f.parent_flow_ids) == 1 for f in later)
+    assert len(later) == N * (N - 2)  # N GPUs × (N-2) rounds after round 0
 
 
 def test_ring_all_to_all_chunk_size():
@@ -185,11 +192,14 @@ def test_nvls_all_reduce_flow_count():
 
 
 def test_nvls_all_reduce_switch_id():
-    # Virtual switch node uses a high-namespace ID (_SWITCH_BASE), not max(group_ranks)+1
-    from simulon.collective.nvls import _SWITCH_BASE
+    # There is exactly one virtual switch node; all GPUs send to it and receive from it.
     group_ranks = [0, 1, 2, 3]
     flows, _ = nvls_all_reduce(group_ranks, data_size=1024)
-    switch_id = _SWITCH_BASE
+    # Derive switch ID from flows: the node that is neither a GPU sender nor a GPU dst-in-group
+    gpu_set = set(group_ranks)
+    switch_ids = {f.dst for f in flows if f.src in gpu_set} - gpu_set
+    assert len(switch_ids) == 1
+    switch_id = switch_ids.pop()
     reduce_flows = [f for f in flows if f.dst == switch_id]
     bcast_flows = [f for f in flows if f.src == switch_id]
     assert len(reduce_flows) == 4
@@ -198,10 +208,11 @@ def test_nvls_all_reduce_switch_id():
 
 def test_nvls_all_reduce_bcast_depends_on_all_reduce():
     # Each broadcast flow must depend on ALL reduce flows
-    from simulon.collective.nvls import _SWITCH_BASE
     N = 4
-    flows, _ = nvls_all_reduce(list(range(N)), data_size=1024)
-    switch_id = _SWITCH_BASE
+    group_ranks = list(range(N))
+    flows, _ = nvls_all_reduce(group_ranks, data_size=1024)
+    gpu_set = set(group_ranks)
+    switch_id = ({f.dst for f in flows if f.src in gpu_set} - gpu_set).pop()
     reduce_fids = {f.flow_id for f in flows if f.dst == switch_id}
     bcast_flows = [f for f in flows if f.src == switch_id]
     for bf in bcast_flows:
@@ -210,10 +221,11 @@ def test_nvls_all_reduce_bcast_depends_on_all_reduce():
 
 def test_nvls_all_reduce_reduce_no_parents():
     # Reduce phase flows start in parallel
-    from simulon.collective.nvls import _SWITCH_BASE
     N = 4
-    flows, _ = nvls_all_reduce(list(range(N)), data_size=1024)
-    switch_id = _SWITCH_BASE
+    group_ranks = list(range(N))
+    flows, _ = nvls_all_reduce(group_ranks, data_size=1024)
+    gpu_set = set(group_ranks)
+    switch_id = ({f.dst for f in flows if f.src in gpu_set} - gpu_set).pop()
     for f in flows:
         if f.dst == switch_id:
             assert f.parent_flow_ids == []

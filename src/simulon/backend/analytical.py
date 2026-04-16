@@ -42,16 +42,36 @@ def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
     )
 
 
-def _nic_bw_GBps(dc: DatacenterConfig) -> float:
-    """Return NIC bandwidth in GB/s from datacenter spec, or default 400 Gbps × 0.85."""
+def _nic_bw_GBps(dc: DatacenterConfig) -> tuple[float, int]:
+    """Return (nic_bw_GBps, nics_per_node) from datacenter spec, or defaults."""
     scale_out = resolve_scale_out(dc)
     if scale_out and scale_out.nic:
         nic = scale_out.nic
         if isinstance(nic, NICSpec) and nic.speed:
             from simulon.backend.dag.populate import _parse_speed
-            # _parse_speed returns bytes/ms; convert to GB/s
-            return _parse_speed(nic.speed) / 1e6
-    return 400e9 / 8 / 1e9  # 400 Gbps → 50 GB/s
+            bw = _parse_speed(nic.speed) / 1e6  # bytes/ms → GB/s
+            return bw, nic.nics_per_node
+    return 400e9 / 8 / 1e9, 1  # 400 Gbps → 50 GB/s, 1 NIC
+
+
+def _dtype_bytes(dtype) -> int:
+    from simulon.config.common import DType
+    return {DType.fp32: 4, DType.fp16: 2, DType.bf16: 2, DType.fp8: 1}.get(dtype, 2)
+
+
+def _tp_message_size(workload: MegatronWorkload) -> int:
+    """Representative TP AllReduce message size in bytes.
+
+    Uses hidden_size × seq_len × micro_batch_size × dtype_bytes — the typical
+    size of the activation tensor passed through a TP AllReduce/ReduceScatter.
+    Falls back to 256 MiB if hidden_size is not resolvable.
+    """
+    from simulon.backend.dag.populate import _model_hidden_size
+    hidden = _model_hidden_size(workload)
+    if hidden is None:
+        return 256 * 1024 * 1024
+    t = workload.training
+    return hidden * t.sequence_length * t.micro_batch_size * _dtype_bytes(t.dtype)
 
 
 # Keep private aliases so call sites inside this module are unchanged.
@@ -77,6 +97,8 @@ class AnalyticalBackend(Backend):
         if isinstance(scenario.workload, MegatronWorkload):
             cfg = _tracer_config_from_scenario(scenario)
             cfg.compact = compact
+            if _resolved_algorithm is not None:
+                cfg.algorithm = _resolved_algorithm
             tracer = MegatronDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
             return tracer.trace(scenario.workload, scenario.datacenter)
         elif isinstance(scenario.workload, CollectiveWorkload):
@@ -104,7 +126,42 @@ class AnalyticalBackend(Backend):
             logger.info("Building DAG  (GPUs=%d  tp=%d  pp=%d  ep=%d  dp=%d) ...",
                         num_gpus, p.tp, p.pp, p.ep,
                         p.dp if p.dp is not None else num_gpus // (p.tp * p.pp * p.ep))
-            dag = self.run_trace(scenario, compact=compact)
+
+            # Resolve algorithm and BW overrides from nccl profile (if available).
+            dc = scenario.datacenter
+            resolved_node = resolve_node_spec(dc)
+            gpus_per_node = resolved_node.gpus_per_node or num_gpus
+            nccl_profile = resolve_nccl_profile(dc)
+            intra_override: float | None = None
+            inter_override: float | None = None
+            resolved_algo: str | None = None
+
+            if nccl_profile is not None:
+                tp_msg_size = _tp_message_size(scenario.workload)
+                nic_bw, nics_per_node = _nic_bw_GBps(dc)
+                try:
+                    selected_algo, intra_bw_GBps, inter_bw_GBps = cal_busbw(
+                        collective_type="AllReduce",
+                        message_size_bytes=tp_msg_size,
+                        num_nodes=dc.cluster.num_nodes,
+                        gpus_per_node=gpus_per_node,
+                        nics_per_node=nics_per_node,
+                        nic_bw_GBps=nic_bw,
+                        nccl_profile=nccl_profile,
+                        algorithm=scenario.collective.algorithm,
+                    )
+                    resolved_algo = selected_algo
+                    intra_override = intra_bw_GBps * 1e6  # GB/s → bytes/ms
+                    inter_override = inter_bw_GBps * 1e6 if inter_bw_GBps is not None else None
+                    logger.info(
+                        "Network calibration from nccl profile (algo=%s, intra=%.1f GB/s, inter=%s) ...",
+                        selected_algo, intra_bw_GBps,
+                        f"{inter_bw_GBps:.1f} GB/s" if inter_bw_GBps is not None else "N/A",
+                    )
+                except ValueError as e:
+                    logger.warning("cal_busbw failed for Megatron workload: %s — using raw link BW.", e)
+
+            dag = self.run_trace(scenario, compact=compact, _resolved_algorithm=resolved_algo)
             logger.info("  DAG built: %d compute nodes, %d comm nodes, %d edges",
                         len(dag.compute_nodes), len(dag.comm_nodes), len(dag.edges))
 
@@ -114,7 +171,11 @@ class AnalyticalBackend(Backend):
             logger.info("  Compute durations resolved")
 
             logger.info("Populating network durations (%d comm nodes) ...", len(dag.comm_nodes))
-            populate_network(dag, scenario.datacenter)
+            populate_network(
+                dag, dc,
+                bw_override_bytes_per_ms=intra_override,
+                inter_bw_override_bytes_per_ms=inter_override,
+            )
             logger.info("  Network durations resolved")
 
             total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes)
@@ -134,45 +195,27 @@ class AnalyticalBackend(Backend):
             num_ranks = dc.cluster.num_nodes * gpus_per_node
             collective_type = wl.collective_type.value
 
-            per_step_latency_ms = (
-                scenario.collective.per_step_latency_us.get(collective_type, 0.0) / 1000.0
+            # Derive BW from nccl profile + NIC efficiency table.
+            nccl_profile = resolve_nccl_profile(dc)
+
+            nic_bw, nics_per_node = _nic_bw_GBps(dc)
+            selected_algo, intra_bw_GBps, inter_bw_GBps = cal_busbw(
+                collective_type=collective_type,
+                message_size_bytes=wl.message_size_bytes,
+                num_nodes=dc.cluster.num_nodes,
+                gpus_per_node=gpus_per_node,
+                nics_per_node=nics_per_node,
+                nic_bw_GBps=nic_bw,
+                nccl_profile=nccl_profile,
+                algorithm=scenario.collective.algorithm,
             )
-
-            # Manual override takes full precedence (backward compat).
-            manual_bw_GBps = scenario.collective.per_collective_bw_GBps.get(collective_type)
-            if manual_bw_GBps is not None:
-                intra_override = manual_bw_GBps * 1e6  # GB/s → bytes/ms
-                inter_override = None
-                c_algo = scenario.collective.algorithm
-                selected_algo = c_algo if c_algo != "auto" else "ring"
-                logger.info(
-                    "Populating network (manual bw override=%.1f GB/s, algo=%s) ...",
-                    manual_bw_GBps, selected_algo,
-                )
-            else:
-                # Derive BW from nccl profile + NIC efficiency table.
-                nccl_profile = resolve_nccl_profile(dc)
-
-                nic_bw = _nic_bw_GBps(dc)
-                # TODO: NICSpec has no nics_per_node field. Hardcoded to 1.0.
-                # Add nics_per_node to NICSpec / ScaleOutSpec and read it here.
-                selected_algo, intra_bw_GBps, inter_bw_GBps = cal_busbw(
-                    collective_type=collective_type,
-                    message_size_bytes=wl.message_size_bytes,
-                    num_nodes=dc.cluster.num_nodes,
-                    gpus_per_node=gpus_per_node,
-                    nics_per_node=1.0,
-                    nic_bw_GBps=nic_bw,
-                    nccl_profile=nccl_profile,
-                    algorithm=scenario.collective.algorithm,
-                )
-                intra_override = intra_bw_GBps * 1e6  # GB/s → bytes/ms
-                inter_override = inter_bw_GBps * 1e6 if inter_bw_GBps is not None else None
-                logger.info(
-                    "Populating network (algo=%s, intra_bw=%.1f GB/s, inter_bw=%s) ...",
-                    selected_algo, intra_bw_GBps,
-                    f"{inter_bw_GBps:.1f} GB/s" if inter_bw_GBps is not None else "N/A",
-                )
+            intra_override = intra_bw_GBps * 1e6  # GB/s → bytes/ms
+            inter_override = inter_bw_GBps * 1e6 if inter_bw_GBps is not None else None
+            logger.info(
+                "Populating network (algo=%s, intra_bw=%.1f GB/s, inter_bw=%s) ...",
+                selected_algo, intra_bw_GBps,
+                f"{inter_bw_GBps:.1f} GB/s" if inter_bw_GBps is not None else "N/A",
+            )
 
             logger.info("Building collective DAG  (type=%s  ranks=%d  size=%d bytes  algo=%s) ...",
                         collective_type, num_ranks, wl.message_size_bytes, selected_algo)
@@ -181,7 +224,6 @@ class AnalyticalBackend(Backend):
 
             populate_network(
                 dag, dc,
-                per_step_latency_ms=per_step_latency_ms,
                 bw_override_bytes_per_ms=intra_override,
                 inter_bw_override_bytes_per_ms=inter_override,
             )

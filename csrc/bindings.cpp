@@ -86,6 +86,10 @@ PYBIND11_MODULE(_mocknccl, m) {
         .def("gettreechannels",
              &MockNcclGroup::gettreechannels,
              py::arg("rank"), py::arg("type"))
+        // Single-node NVLS channels (map<ch_id, map<rank, ncclTree>>)
+        .def("get_nvls_channels",
+             &MockNcclGroup::get_nvls_channels,
+             py::arg("rank"), py::arg("type"))
         // NVLStreechannels flattened: map<ch_id, map<rank, (depth,rank,up_rank,down_ranks)>>
         .def("get_nvls_tree_channels",
              [](MockNcclGroup& self, int rank, GroupType type) {
