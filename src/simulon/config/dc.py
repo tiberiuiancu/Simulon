@@ -1,9 +1,10 @@
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Annotated, Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from .common import CostField, PowerModel
+from .nccl_profile import NcclProfile
 
 
 # ---------------------------------------------------------------------------
@@ -128,11 +129,19 @@ class NodeCoolingSpec(BaseModel):
 
 
 class NodeSpec(BaseModel):
-    gpus_per_node: int
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = None
+    from_: Optional[str] = Field(None, alias="from")
+    gpus_per_node: Optional[int] = None
     gpus_per_nic: int = 1
-    gpu: Union[str, GPUSpec]
+    gpu: Optional[Union[str, GPUSpec]] = None
     cpu: Optional[Union[str, CPUSpec]] = None
     cooling: Optional[NodeCoolingSpec] = None
+    # Intra-node fabric (NVLink/NVSwitch). Moved here from network.scale_up.
+    scale_up: Optional["ScaleUpSpec"] = None
+    # Embedded NCCL measurement profile for this node's GPU + topology combination.
+    nccl: Optional[NcclProfile] = None
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +180,12 @@ class NICSpec(BaseModel):
     vendor: Optional[str] = None
     speed: Optional[str] = None
     latency: Optional[str] = None
+    nics_per_node: int = Field(
+        default=1,
+        ge=1,
+        description="Number of NICs per node. Used to compute total inter-node bandwidth "
+        "(nic_bw × nics_per_node) for collective operations.",
+    )
     power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None
     bandwidth_efficiency: float = Field(
@@ -279,8 +294,16 @@ class NetworkSpec(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _coerce_node(v):
+    if isinstance(v, str):
+        return {"from": v}
+    return v
+
+
 class DatacenterConfig(BaseModel):
     datacenter: DatacenterMeta
     cluster: ClusterSpec
-    node: NodeSpec
-    network: Optional[NetworkSpec] = None
+    node: Annotated[NodeSpec, BeforeValidator(_coerce_node)]
+    network: Optional[NetworkSpec] = None  # deprecated, use scale_out
+    # New top-level scale-out, replacing network.scale_out.
+    scale_out: Optional[ScaleOutSpec] = None

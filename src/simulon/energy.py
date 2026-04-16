@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from simulon.config.common import ConstantPowerModel, LinearPowerModel, PowerModel
-from simulon.config.resolve import resolve_gpu_spec
+from simulon.config.resolve import resolve_gpu_spec, resolve_node_spec
 
 logger = logging.getLogger(__name__)
 
@@ -80,19 +80,22 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
 
     # --- Cluster scale ---
     num_nodes = dc.cluster.num_nodes
-    gpus_per_node = dc.node.gpus_per_node
+    resolved_node = resolve_node_spec(dc)
+    gpus_per_node = resolved_node.gpus_per_node
+    if gpus_per_node is None:
+        raise ValueError("node.gpus_per_node must be set after resolution")
 
     # --- GPU utilisation: active compute time averaged over ALL cluster GPUs ---
     # Ranks absent from the DAG (no compute nodes) contribute 0 active time.
     active_ms_by_rank: dict[int, float] = defaultdict(float)
-    for node in dag.compute_nodes:
-        if node.start_ms is not None and node.finish_ms is not None:
-            active_ms_by_rank[node.gpu_rank] += node.finish_ms - node.start_ms
+    for compute_node in dag.compute_nodes:
+        if compute_node.start_ms is not None and compute_node.finish_ms is not None:
+            active_ms_by_rank[compute_node.gpu_rank] += compute_node.finish_ms - compute_node.start_ms
 
     num_gpus_total = num_nodes * gpus_per_node
     avg_active_ms = sum(active_ms_by_rank.values()) / num_gpus_total if num_gpus_total > 0 else 0.0
     utilisation = avg_active_ms / total_time_ms if total_time_ms > 0 else 0.0
-    gpus_per_nic = dc.node.gpus_per_nic
+    gpus_per_nic = resolved_node.gpus_per_nic
     nics_per_node = gpus_per_node // gpus_per_nic
 
     # nodes_per_rack for rack count derivation

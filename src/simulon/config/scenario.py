@@ -14,7 +14,7 @@ from .workload import WorkloadConfig
 
 class NcclConfig(BaseModel):
     library: Literal["nccl"] = "nccl"
-    algorithm: str = "ring"   # ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
+    algorithm: str = "auto"   # auto | ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
     num_channels: int = 1
 
 

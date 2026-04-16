@@ -45,7 +45,7 @@ def make_datacenter(num_nodes: int = 2, gpus_per_node: int = 2) -> DatacenterCon
         cluster=ClusterSpec(num_nodes=num_nodes),
         node=NodeSpec(
             gpus_per_node=gpus_per_node,
-            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
+            gpu=GPUSpec(from_="h100", memory_capacity_gb=80.0),
         ),
         network=NetworkSpec(
             scale_up=ScaleUpSpec(
@@ -76,9 +76,15 @@ def make_collective_scenario(
     num_nodes: int = 2,
     gpus_per_node: int = 2,
 ) -> ScenarioConfig:
+    from simulon.config.scenario import NcclConfig
+    collective = NcclConfig(
+        algorithm="auto",  # calbusbw drives BW from the nccl profile
+        num_channels=1,
+    )
     return ScenarioConfig(
         datacenter=make_datacenter(num_nodes=num_nodes, gpus_per_node=gpus_per_node),
         workload=make_collective_workload(collective_type, message_size_bytes),
+        collective=collective,
     )
 
 

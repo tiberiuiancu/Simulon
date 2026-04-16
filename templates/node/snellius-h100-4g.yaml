@@ -1,0 +1,65 @@
+# Snellius 4-GPU H100 node (real NCCL measurements from nccl-tests on gcn133)
+# Hardware: H100 SXM 80GB, NVSwitch 4 (partial node), InfiniBand HDR100
+# Source: experiments/validation/simccl/results/nccl_*.json
+name: snellius-h100-4g
+gpus_per_node: 4
+gpu: h100
+scale_up:
+  switch:
+    port_speed: 2554Gbps
+    latency: 0.000025ms
+nccl:
+  name: snellius-h100-4g
+  gpus_per_node: 4
+  AllReduce:
+    ring:
+      - {size_bytes:      8388608, bus_bw_GBps: 199.822}
+      - {size_bytes:     16777216, bus_bw_GBps: 238.926}
+      - {size_bytes:     33554432, bus_bw_GBps: 275.544}
+      - {size_bytes:     67108864, bus_bw_GBps: 294.038}
+      - {size_bytes:    134217728, bus_bw_GBps: 312.929}
+      - {size_bytes:    268435456, bus_bw_GBps: 323.642}
+      - {size_bytes:    536870912, bus_bw_GBps: 330.120}
+      - {size_bytes:   1073741824, bus_bw_GBps: 334.178}
+      - {size_bytes:   2147483648, bus_bw_GBps: 335.253}
+      - {size_bytes:   4294967296, bus_bw_GBps: 335.494}
+      - {size_bytes:   8589934592, bus_bw_GBps: 335.783}
+  AllGather:
+    ring:
+      - {size_bytes:      8388608, bus_bw_GBps: 132.155}
+      - {size_bytes:     16777216, bus_bw_GBps: 187.530}
+      - {size_bytes:     33554432, bus_bw_GBps: 228.688}
+      - {size_bytes:     67108864, bus_bw_GBps: 256.799}
+      - {size_bytes:    134217728, bus_bw_GBps: 278.477}
+      - {size_bytes:    268435456, bus_bw_GBps: 292.074}
+      - {size_bytes:    536870912, bus_bw_GBps: 300.948}
+      - {size_bytes:   1073741824, bus_bw_GBps: 307.393}
+      - {size_bytes:   2147483648, bus_bw_GBps: 312.034}
+      - {size_bytes:   4294967296, bus_bw_GBps: 316.486}
+      - {size_bytes:   8589934592, bus_bw_GBps: 317.807}
+  ReduceScatter:
+    ring:
+      - {size_bytes:      8388608, bus_bw_GBps: 136.642}
+      - {size_bytes:     16777216, bus_bw_GBps: 191.176}
+      - {size_bytes:     33554432, bus_bw_GBps: 229.661}
+      - {size_bytes:     67108864, bus_bw_GBps: 253.242}
+      - {size_bytes:    134217728, bus_bw_GBps: 276.545}
+      - {size_bytes:    268435456, bus_bw_GBps: 286.670}
+      - {size_bytes:    536870912, bus_bw_GBps: 295.612}
+      - {size_bytes:   1073741824, bus_bw_GBps: 302.667}
+      - {size_bytes:   2147483648, bus_bw_GBps: 308.198}
+      - {size_bytes:   4294967296, bus_bw_GBps: 313.446}
+      - {size_bytes:   8589934592, bus_bw_GBps: 315.746}
+  AllToAll:
+    ring:
+      - {size_bytes:      8388608, bus_bw_GBps: 141.368}
+      - {size_bytes:     16777216, bus_bw_GBps: 158.433}
+      - {size_bytes:     33554432, bus_bw_GBps: 192.503}
+      - {size_bytes:     67108864, bus_bw_GBps: 223.905}
+      - {size_bytes:    134217728, bus_bw_GBps: 248.709}
+      - {size_bytes:    268435456, bus_bw_GBps: 264.707}
+      - {size_bytes:    536870912, bus_bw_GBps: 274.523}
+      - {size_bytes:   1073741824, bus_bw_GBps: 271.079}
+      - {size_bytes:   2147483648, bus_bw_GBps: 274.596}
+      - {size_bytes:   4294967296, bus_bw_GBps: 277.952}
+      - {size_bytes:   8589934592, bus_bw_GBps: 279.661}

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from simulon.config.common import CostField
-from simulon.config.resolve import resolve_gpu_spec
+from simulon.config.resolve import resolve_gpu_spec, resolve_node_spec
 from simulon.energy import EnergyResult
 
 
@@ -79,8 +79,11 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
     """
     dc = scenario.datacenter
     num_nodes = dc.cluster.num_nodes
-    gpus_per_node = dc.node.gpus_per_node
-    gpus_per_nic = dc.node.gpus_per_nic
+    node = resolve_node_spec(dc)
+    gpus_per_node = node.gpus_per_node
+    if gpus_per_node is None:
+        raise ValueError("node.gpus_per_node must be set after resolution")
+    gpus_per_nic = node.gpus_per_nic
     nics_per_node = gpus_per_node // gpus_per_nic
 
     rack = dc.datacenter.rack
