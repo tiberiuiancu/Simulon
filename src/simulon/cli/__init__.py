@@ -408,7 +408,7 @@ def profile_gpu(
         return num_layers_val * per_layer + embedding + logit
 
     def _config_done(t: int, e: int, b: int, s: int) -> bool:
-        if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s}.items()) in _oom_set:
+        if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s, "hidden_size": hidden_size_val}.items()) in _oom_set:
             return True
         base = {"hidden_size": hidden_size_val, "seq_len": s, "batch_size": b, "dtype": dtype_str, "tp": t}
         expected = [

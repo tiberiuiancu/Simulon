@@ -69,7 +69,7 @@ def run_sweep(
     results: list[SweepResult] = []
 
     for tp, ep, batch_size, seq_len in product(tp_values, ep_values, batch_sizes, seq_lens):
-        config = {"tp": tp, "ep": ep, "batch_size": batch_size, "seq_len": seq_len}
+        config = {"tp": tp, "ep": ep, "batch_size": batch_size, "seq_len": seq_len, "hidden_size": kernel_params["hidden_size"]}
         try:
             runs = benchmark_kernels(
                 hidden_size=kernel_params["hidden_size"],
