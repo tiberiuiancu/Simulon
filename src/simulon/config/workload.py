@@ -40,6 +40,7 @@ class LLMSpec(BaseModel):
     moe: bool = False
     num_experts: Optional[int] = None
     top_k: Optional[int] = None
+    gflops_per_train_token: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------
