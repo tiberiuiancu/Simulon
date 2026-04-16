@@ -30,6 +30,7 @@ MODELS=(
     deepseek-v3
     qwen3-30b-a3b
     qwen3-235b-a22b
+    gpt-oss-20b
 )
 
 # --- Profile each model ---
