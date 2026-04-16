@@ -1,0 +1,9 @@
+name: gpt-oss-20b
+num_layers: 24
+hidden_size: 2880
+ffn_hidden_size: 2880  # per routed expert
+num_heads: 64  # num_attention_heads; num_query_groups=8 (GQA) not modelled separately
+vocab_size: 128256
+num_experts: 32
+top_k: 4
+swiglu: true
