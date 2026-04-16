@@ -6,6 +6,22 @@ from pathlib import Path
 
 import yaml
 
+
+def _deep_merge(base: dict, overrides: dict) -> dict:
+    """Recursively merge *overrides* into *base*, returning a new dict.
+
+    Nested dicts are merged rather than replaced, so a partial sub-object
+    override (e.g. only changing one field inside scale_up.switch) does not
+    wipe sibling fields that were not explicitly overridden.
+    """
+    result = dict(base)
+    for key, val in overrides.items():
+        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+            result[key] = _deep_merge(result[key], val)
+        else:
+            result[key] = val
+    return result
+
 from simulon.config.dc import (
     DatacenterConfig,
     GPUSpec,
@@ -108,8 +124,7 @@ def resolve_node_spec(dc: DatacenterConfig) -> NodeSpec:
         base_dict = base.model_dump(by_alias=False)
         overrides = node.model_dump(exclude_unset=True, by_alias=False)
         overrides.pop("from_", None)
-        base_dict.update(overrides)
-        return NodeSpec.model_validate(base_dict)
+        return NodeSpec.model_validate(_deep_merge(base_dict, overrides))
     return node
 
 
@@ -134,8 +149,7 @@ def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
         base_dict = base.model_dump(by_alias=False)
         overrides = gpu.model_dump(exclude_unset=True, by_alias=False)
         overrides.pop("from_", None)
-        base_dict.update(overrides)
-        return GPUSpec.model_validate(base_dict)
+        return GPUSpec.model_validate(_deep_merge(base_dict, overrides))
     return gpu
 
 
@@ -145,13 +159,30 @@ def resolve_nccl_profile(dc: DatacenterConfig) -> NcclProfile | None:
     Priority:
     1. Embedded node.nccl (node template carries its own profile)
     2. load_nccl_profile(gpu_name) fallback (companion .nccl.yaml next to GPU template)
+
+    Uses the already-resolved node to avoid loading the node template twice.
     """
     node = resolve_node_spec(dc)
     if node.nccl is not None:
         return node.nccl
-    gpu_spec = resolve_gpu_spec(dc)
-    gpu_name = gpu_spec.name if gpu_spec.name else None
-    return load_nccl_profile(gpu_name) if gpu_name else None
+    # Resolve GPU from the already-resolved node to avoid a second template load.
+    gpu = node.gpu
+    if isinstance(gpu, str):
+        gpu_spec = load_gpu_template(gpu)
+    elif isinstance(gpu, GPUSpec) and gpu.from_:
+        gpu_spec = load_gpu_template(gpu.from_)
+    else:
+        gpu_spec = gpu
+    if gpu_spec is None:
+        return None
+    # Use the template file stem (the 'from_' name or the gpu string) to find the
+    # companion .nccl.yaml, not gpu_spec.name (which may have spaces or differ in case).
+    gpu_template_name: str | None = None
+    if isinstance(node.gpu, str):
+        gpu_template_name = node.gpu
+    elif isinstance(node.gpu, GPUSpec) and node.gpu.from_:
+        gpu_template_name = node.gpu.from_
+    return load_nccl_profile(gpu_template_name) if gpu_template_name else None
 
 
 def resolve_scale_out(dc: DatacenterConfig) -> ScaleOutSpec | None:

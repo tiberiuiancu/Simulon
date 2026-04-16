@@ -1,3 +1,4 @@
+import json
 from itertools import product
 from pathlib import Path
 from typing import Optional
@@ -601,15 +602,18 @@ def profile_node(
             matches = list(input_json.glob(f"*{coll}*.json"))
             if not matches:
                 matches = list(input_json.glob(f"*{coll.replace('_', '')}*.json"))
+            if len(matches) > 1:
+                typer.echo(
+                    f"  Warning: multiple JSON files match '{coll}': "
+                    f"{[p.name for p in matches]}. Using {matches[0].name}.",
+                    err=True,
+                )
+                matches = matches[:1]
             for path in matches:
                 try:
                     data = json.loads(path.read_text())
                     if gpus_per_node is None:
                         gpus_per_node = _gpu_count_from_json(data)
-                    if port_speed is None:
-                        # Try to detect port speed from the nccl-tests env/metadata.
-                        # Not currently embedded in nccl-tests JSON output, so leave as None.
-                        pass
                     key = coll
                     measurements[key] = _parse_nccl_json(path)
                     found_any = True
@@ -640,34 +644,31 @@ def profile_node(
         "gpus_per_node": gpus_per_node,
         "name": detected_name,
     }
+    _coll_key_map = {
+        "allreduce": "AllReduce",
+        "allgather": "AllGather",
+        "reducescatter": "ReduceScatter",
+        "alltoall": "AllToAll",
+    }
     for coll, points in measurements.items():
-        key = coll.capitalize()
-        if key == "Alltoall":
-            key = "AllToAll"
-        elif key == "Reducescatter":
-            key = "ReduceScatter"
+        key = _coll_key_map.get(coll, coll.capitalize())
         np_data[key] = {"ring": [{"size_bytes": p["size_bytes"], "bus_bw_GBps": p["bus_bw_GBps"]} for p in points]}
 
     nccl_profile = NcclProfile.model_validate(np_data)
 
-    # Build NodeSpec
+    # Build NodeSpec — only include switch fields that were explicitly provided.
+    switch_data: dict = {}
+    if port_speed is not None:
+        switch_data["port_speed"] = port_speed
+    switch_data["latency"] = latency  # always include; user controls the value
+
     node_data: dict = {
         "name": detected_name,
         "from": gpu,
         "gpus_per_node": gpus_per_node,
-        "scale_up": {
-            "switch": {
-                "port_speed": port_speed,
-                "latency": latency,
-            },
-        },
+        "scale_up": {"switch": switch_data},
         "nccl": nccl_profile.model_dump(),
     }
-    # Prune None port_speed
-    if node_data["scale_up"]["switch"]["port_speed"] is None:
-        del node_data["scale_up"]["switch"]["port_speed"]
-    if node_data["scale_up"]["switch"]["latency"] == "0.000025ms":
-        del node_data["scale_up"]["switch"]["latency"]
 
     node_spec = NodeSpec.model_validate(node_data)
     output_data = node_spec.model_dump(by_alias=True, exclude_unset=True)

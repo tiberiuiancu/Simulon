@@ -75,6 +75,12 @@ def _get_link_params(
             sw = node.scale_up.switch
             if isinstance(sw, SwitchSpec):
                 switch_spec = sw
+            else:
+                raise ValueError(
+                    f"node.scale_up.switch is a string reference {sw!r} — "
+                    "string switch templates are not yet supported. "
+                    "Specify the switch inline or use a node template with an inline switch spec."
+                )
         elif datacenter.network and datacenter.network.scale_up and datacenter.network.scale_up.switch:
             warnings.warn(
                 "network.scale_up is deprecated. Move scale_up into the node spec.",
@@ -84,6 +90,12 @@ def _get_link_params(
             sw = datacenter.network.scale_up.switch
             if isinstance(sw, SwitchSpec):
                 switch_spec = sw
+            else:
+                raise ValueError(
+                    f"network.scale_up.switch is a string reference {sw!r} — "
+                    "string switch templates are not yet supported. "
+                    "Specify the switch inline or use a node template with an inline switch spec."
+                )
         bw = _parse_speed(switch_spec.port_speed) if (switch_spec and switch_spec.port_speed) else _parse_speed("2880Gbps")
         latency_ms = _parse_latency(switch_spec.latency) if (switch_spec and switch_spec.latency) else 0.0
     else:
