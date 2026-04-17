@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from simulon.backend.dag._progress import log_progress
@@ -41,27 +42,67 @@ def _phases_for_direction(direction: str) -> list[str]:
         return ["bwd_ig", "bwd_wg"]
 
 
-def _params_per_tp_rank(model: LLMSpec, tp: int, ep: int) -> int:
-    """Total trainable parameters visible on one TP rank (fp32 count)."""
+@dataclass
+class ParallelGroups:
+    """Rank lists for each parallelism group on one GPU.
+
+    Mirrors Megatron-Core's two-generator pattern (parallel_state.py):
+      - ``expert_dp``:     EXPERT_DATA_PARALLEL_GROUP — fix TP, EP, PP; vary DP only.
+                           Size = dp.  Used for expert-layer gradient sync.
+      - ``non_expert_dp``: DATA_PARALLEL_GROUP        — fix TP, PP; vary DP × EP.
+                           Size = dp × ep.  Used for non-expert gradient sync.
+
+    When CP is added: extend ``non_expert_dp`` to also vary CP (vary DP × EP × CP),
+    matching Megatron's DATA_PARALLEL_GROUP_WITH_CP.  No other field changes.
+    """
+    tp: list[int]
+    ep: list[int]
+    expert_dp: list[int]
+    non_expert_dp: list[int]
+
+
+def _non_expert_params_per_tp_rank(model: LLMSpec, tp: int) -> int:
+    """Parameters on one TP rank that belong to non-expert sublayers (fp32 count).
+
+    Covers: attention projections, layer-norms, embedding, logit.
+    These params are replicated across the full non-expert DP group (dp × ep).
+    """
     hidden = model.hidden_size or 0
     ffn = model.ffn_hidden_size or (4 * hidden)
     num_layers = model.num_layers or 0
     vocab_size = model.vocab_size or 0
-    num_experts = model.num_experts or 1
 
     attn_per_layer = 4 * hidden * hidden // tp
     mlp_factor = 3 if model.swiglu else 2
-    if model.moe:
-        mlp_per_layer = mlp_factor * hidden * ffn * (num_experts // ep) // tp
-    else:
-        mlp_per_layer = mlp_factor * hidden * ffn // tp
+    # Non-MoE models: the MLP is also non-expert
+    non_expert_mlp = 0 if model.moe else mlp_factor * hidden * ffn // tp
     ln_per_layer = 2 * hidden
 
-    per_layer = attn_per_layer + mlp_per_layer + ln_per_layer
+    per_layer = attn_per_layer + non_expert_mlp + ln_per_layer
     embedding = vocab_size * hidden // tp
     logit = vocab_size * hidden // tp
-
     return num_layers * per_layer + embedding + logit
+
+
+def _expert_params_per_tp_rank(model: LLMSpec, tp: int, ep: int) -> int:
+    """Parameters on one TP rank that belong to expert sublayers (fp32 count).
+
+    Only non-zero for MoE models.  These params are sharded across EP ranks,
+    so gradient sync uses the smaller expert DP group (size = dp).
+    """
+    if not model.moe:
+        return 0
+    hidden = model.hidden_size or 0
+    ffn = model.ffn_hidden_size or (4 * hidden)
+    num_layers = model.num_layers or 0
+    num_experts = model.num_experts or 1
+    mlp_factor = 3 if model.swiglu else 2
+    return num_layers * mlp_factor * hidden * ffn * (num_experts // ep) // tp
+
+
+def _params_per_tp_rank(model: LLMSpec, tp: int, ep: int) -> int:
+    """Total trainable parameters on one TP rank (fp32 count)."""
+    return _non_expert_params_per_tp_rank(model, tp) + _expert_params_per_tp_rank(model, tp, ep)
 
 
 def _emit_compute_node(
@@ -181,6 +222,7 @@ class MegatronDAGTracer(DAGTracer):
         tp = p.tp
         pp = p.pp
         ep = p.ep
+        cp = 1  # Context Parallel — not yet in config; extend global_rank loop here when added
         dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp * ep)
 
         if hasattr(p, "num_microbatches") and p.num_microbatches is not None:
@@ -223,8 +265,17 @@ class MegatronDAGTracer(DAGTracer):
         pending_fused: dict[int, ComputeNode] = {}  # gpu → pending fused node (compact mode)
         last_was_compute: dict[int, bool] = {}  # gpu → was last emitted node compute?
 
-        def global_rank(dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int) -> int:
-            return dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
+        def global_rank(dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int, cp_rank: int = 0) -> int:
+            # Rank order: tp-cp-ep-dp-pp  (tp varies fastest, pp slowest)
+            # When cp=1 (current default) this reduces to the previous formula.
+            # To add CP: introduce a cp loop dimension and pass cp_rank here.
+            return (
+                dp_rank * (pp * ep * cp * tp)
+                + pp_stage * (ep * cp * tp)
+                + ep_rank * (cp * tp)
+                + cp_rank * tp
+                + tp_rank
+            )
 
         last_node_per_gpu: dict[int, int | None] = {}
         slot_last_node: dict[tuple[int, int, str], int] = {}
@@ -233,11 +284,24 @@ class MegatronDAGTracer(DAGTracer):
 
         # Step-phase invariants (loop-independent).
         # TODO: only AdamW is modeled; extend here if other optimizers are needed.
-        _step_params = _params_per_tp_rank(model, tp, ep)
+        _non_expert_params = _non_expert_params_per_tp_rank(model, tp)
+        _expert_params = _expert_params_per_tp_rank(model, tp, ep)
         _dist_opt = p.distributed_optimizer
-        # With distributed optimizer each DP rank owns a 1/dp shard of params.
-        # Without (including dp=1) each rank holds and steps the full PP-stage shard.
-        _opt_num_params = _step_params // pp // dp if (_dist_opt and dp > 1) else _step_params // pp
+        _non_expert_dp_size = dp * ep  # DATA_PARALLEL_GROUP size (non-expert layers)
+        # With distributed optimizer, each rank owns a 1/group_size shard of params.
+        # Non-expert params are sharded across non_expert_dp (dp × ep ranks).
+        # Expert params are sharded across expert_dp (dp ranks).
+        _non_expert_opt_params = (
+            _non_expert_params // pp // _non_expert_dp_size
+            if (_dist_opt and _non_expert_dp_size > 1)
+            else _non_expert_params // pp
+        )
+        _expert_opt_params = (
+            _expert_params // pp // dp
+            if (_dist_opt and dp > 1)
+            else _expert_params // pp
+        )
+        _opt_num_params = (_non_expert_opt_params + _expert_opt_params)
 
         with log_progress("  building DAG", dp * pp * ep * tp, logger) as advance:
             for dp_rank in range(dp):
@@ -245,9 +309,21 @@ class MegatronDAGTracer(DAGTracer):
                     for ep_rank in range(ep):
                         for tp_rank in range(tp):
                             gpu = global_rank(dp_rank, pp_stage, ep_rank, tp_rank)
-                            tp_group = [global_rank(dp_rank, pp_stage, ep_rank, r) for r in range(tp)]
-                            ep_group = [global_rank(dp_rank, pp_stage, r, tp_rank) for r in range(ep)]
-                            dp_group = [global_rank(r, pp_stage, ep_rank, tp_rank) for r in range(dp)]
+                            groups = ParallelGroups(
+                                tp=[global_rank(dp_rank, pp_stage, ep_rank, r) for r in range(tp)],
+                                ep=[global_rank(dp_rank, pp_stage, r, tp_rank) for r in range(ep)],
+                                # EXPERT_DATA_PARALLEL_GROUP: fix TP, EP, PP; vary DP
+                                expert_dp=[global_rank(r, pp_stage, ep_rank, tp_rank) for r in range(dp)],
+                                # DATA_PARALLEL_GROUP: fix TP, PP; vary DP × EP
+                                # When CP is added: also vary cp_rank here (vary DP × EP × CP)
+                                non_expert_dp=[
+                                    global_rank(r, pp_stage, ep_r, tp_rank)
+                                    for r in range(dp)
+                                    for ep_r in range(ep)
+                                ],
+                            )
+                            tp_group = groups.tp
+                            ep_group = groups.ep
 
                             slots = scheduler.schedule_for_stage(pp_stage)
 
@@ -332,7 +408,7 @@ class MegatronDAGTracer(DAGTracer):
                                                         elif node.collective_type == "AllToAll":
                                                             group = ep_group
                                                         else:
-                                                            group = dp_group
+                                                            group = groups.expert_dp
                                                         result, flow_id_counter = self._ccl.decompose(
                                                             collective_type=node.collective_type,
                                                             group_ranks=group,
@@ -376,7 +452,7 @@ class MegatronDAGTracer(DAGTracer):
                                                     elif stub.collective_type == "AllToAll":
                                                         group = ep_group
                                                     else:
-                                                        group = dp_group
+                                                        group = groups.expert_dp
 
                                                     result, flow_id_counter = self._ccl.decompose(
                                                         collective_type=stub.collective_type,
@@ -460,7 +536,7 @@ class MegatronDAGTracer(DAGTracer):
                                     # average_losses_across_data_parallel_group: one fp32 scalar per microbatch
                                     node_id_counter, flow_id_counter, slot_first_entry_set = _emit_collective_nodes(
                                         dag, self._ccl, cfg, node_id_counter, flow_id_counter,
-                                        gpu, "AllReduce", dp_group, 4, "fwd", mb,
+                                        gpu, "AllReduce", groups.non_expert_dp, 4, "fwd", mb,
                                         last_node_per_gpu, last_was_compute,
                                         slot_entry_node, slot_first_entry_set, direction,
                                     )
@@ -485,12 +561,18 @@ class MegatronDAGTracer(DAGTracer):
                                     slot_last_node[(gpu, mb, direction)] = last
 
                             # --- Step phase ---
-                            # Each GPU runs one AdamW optimizer step after gradient sync.
-                            # Invariants (_step_params, _dist_opt, _opt_num_params) are
-                            # computed once above the loop.
+                            # Gradient sync then AdamW.  Two separate param groups:
+                            #   non-expert: synced over non_expert_dp (DATA_PARALLEL_GROUP, size dp×ep)
+                            #   expert:     synced over expert_dp (EXPERT_DATA_PARALLEL_GROUP, size dp)
+                            # Pattern per group:
+                            #   distributed_optimizer=True : ReduceScatter → AdamW → AllGather
+                            #   distributed_optimizer=False: AllReduce → AdamW
+                            # Both groups' pre-opt comms run in parallel (different ranks/data),
+                            # then the single AdamW step, then post-opt comms in parallel.
                             prev = last_node_per_gpu.get(gpu)
 
-                            # Append the AdamW ComputeNode for this GPU.
+                            # AdamW ComputeNode — emitted first so it gets a stable node_id;
+                            # edges enforce ordering regardless of id assignment.
                             dag.compute_nodes.append(ComputeNode(
                                 node_id=node_id_counter,
                                 gpu_rank=gpu,
@@ -504,108 +586,69 @@ class MegatronDAGTracer(DAGTracer):
                             opt_id = node_id_counter
                             node_id_counter += 1
 
-                            if dp > 1:
-                                step_ar_bytes = 4 * _step_params // pp
+                            def _emit_step_flows(collective: str, group: list[int], data_size: int) -> list[int]:
+                                nonlocal flow_id_counter, node_id_counter
+                                result, flow_id_counter = self._ccl.decompose(
+                                    collective_type=collective,
+                                    group_ranks=group,
+                                    data_size=data_size,
+                                    num_channels=cfg.num_channels,
+                                    algorithm=cfg.algorithm,
+                                    flow_id_start=flow_id_counter,
+                                )
+                                ids = []
+                                for flow in result.flows:
+                                    dag.comm_nodes.append(CommNode(
+                                        node_id=node_id_counter,
+                                        src_gpu=flow.src, dst_gpu=flow.dst,
+                                        bytes=flow.flow_size,
+                                        collective_type=collective,
+                                        layer_id=-1, phase="step",
+                                        flow_id=flow.flow_id,
+                                        parent_flow_ids=flow.parent_flow_ids,
+                                    ))
+                                    ids.append(node_id_counter)
+                                    node_id_counter += 1
+                                return ids
 
+                            pre_opt_ids: list[int] = []
+                            post_opt_ids: list[int] = []
+
+                            # Non-expert gradient sync (DATA_PARALLEL_GROUP, size dp×ep)
+                            if _non_expert_dp_size > 1 and _non_expert_params > 0:
+                                ne_bytes = 4 * _non_expert_params // pp
                                 if _dist_opt:
-                                    # ReduceScatter → optimizer → AllGather
-                                    rs_result, flow_id_counter = self._ccl.decompose(
-                                        collective_type="ReduceScatter",
-                                        group_ranks=dp_group,
-                                        data_size=step_ar_bytes,
-                                        num_channels=cfg.num_channels,
-                                        algorithm=cfg.algorithm,
-                                        flow_id_start=flow_id_counter,
+                                    pre_opt_ids += _emit_step_flows("ReduceScatter", groups.non_expert_dp, ne_bytes)
+                                    post_opt_ids += _emit_step_flows(
+                                        "AllGather", groups.non_expert_dp,
+                                        cfg.dtype_bytes * _non_expert_params // pp,
                                     )
-                                    rs_ids = []
-                                    for flow in rs_result.flows:
-                                        dag.comm_nodes.append(CommNode(
-                                            node_id=node_id_counter,
-                                            src_gpu=flow.src, dst_gpu=flow.dst,
-                                            bytes=flow.flow_size,
-                                            collective_type="ReduceScatter",
-                                            layer_id=-1, phase="step",
-                                            flow_id=flow.flow_id,
-                                            parent_flow_ids=flow.parent_flow_ids,
-                                        ))
-                                        rs_ids.append(node_id_counter)
-                                        node_id_counter += 1
-
-                                    ag_result, flow_id_counter = self._ccl.decompose(
-                                        collective_type="AllGather",
-                                        group_ranks=dp_group,
-                                        data_size=cfg.dtype_bytes * _step_params // pp,
-                                        num_channels=cfg.num_channels,
-                                        algorithm=cfg.algorithm,
-                                        flow_id_start=flow_id_counter,
-                                    )
-                                    ag_ids = []
-                                    for flow in ag_result.flows:
-                                        dag.comm_nodes.append(CommNode(
-                                            node_id=node_id_counter,
-                                            src_gpu=flow.src, dst_gpu=flow.dst,
-                                            bytes=flow.flow_size,
-                                            collective_type="AllGather",
-                                            layer_id=-1, phase="step",
-                                            flow_id=flow.flow_id,
-                                            parent_flow_ids=flow.parent_flow_ids,
-                                        ))
-                                        ag_ids.append(node_id_counter)
-                                        node_id_counter += 1
-
-                                    # Wire: prev → rs_ids → opt → ag_ids
-                                    if prev is not None:
-                                        for d in rs_ids:
-                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
-                                    if rs_ids:
-                                        for s in rs_ids:
-                                            dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=opt_id))
-                                    elif prev is not None:
-                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=opt_id))
-                                    for d in ag_ids:
-                                        dag.edges.append(DAGEdge(src_node_id=opt_id, dst_node_id=d))
-
-                                    last_node_per_gpu[gpu] = ag_ids[-1] if ag_ids else opt_id
                                 else:
-                                    # AllReduce → optimizer
-                                    ar_result, flow_id_counter = self._ccl.decompose(
-                                        collective_type="AllReduce",
-                                        group_ranks=dp_group,
-                                        data_size=step_ar_bytes,
-                                        num_channels=cfg.num_channels,
-                                        algorithm=cfg.algorithm,
-                                        flow_id_start=flow_id_counter,
+                                    pre_opt_ids += _emit_step_flows("AllReduce", groups.non_expert_dp, ne_bytes)
+
+                            # Expert gradient sync (EXPERT_DATA_PARALLEL_GROUP, size dp; EP is internal to the group)
+                            if dp > 1 and _expert_params > 0:
+                                exp_bytes = 4 * _expert_params // pp
+                                if _dist_opt:
+                                    pre_opt_ids += _emit_step_flows("ReduceScatter", groups.expert_dp, exp_bytes)
+                                    post_opt_ids += _emit_step_flows(
+                                        "AllGather", groups.expert_dp,
+                                        cfg.dtype_bytes * _expert_params // pp,
                                     )
-                                    ar_ids = []
-                                    for flow in ar_result.flows:
-                                        dag.comm_nodes.append(CommNode(
-                                            node_id=node_id_counter,
-                                            src_gpu=flow.src, dst_gpu=flow.dst,
-                                            bytes=flow.flow_size,
-                                            collective_type="AllReduce",
-                                            layer_id=-1, phase="step",
-                                            flow_id=flow.flow_id,
-                                            parent_flow_ids=flow.parent_flow_ids,
-                                        ))
-                                        ar_ids.append(node_id_counter)
-                                        node_id_counter += 1
+                                else:
+                                    pre_opt_ids += _emit_step_flows("AllReduce", groups.expert_dp, exp_bytes)
 
-                                    # Wire: prev → ar_ids → opt
-                                    if prev is not None:
-                                        for d in ar_ids:
-                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
-                                    if ar_ids:
-                                        for s in ar_ids:
-                                            dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=opt_id))
-                                    elif prev is not None:
-                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=opt_id))
+                            # Wire: prev → pre_opt_ids → opt → post_opt_ids
+                            # When pre_opt_ids is empty, the first block directly wires prev → opt.
+                            if prev is not None:
+                                for d in (pre_opt_ids if pre_opt_ids else [opt_id]):
+                                    dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=d))
+                            for s in pre_opt_ids:
+                                dag.edges.append(DAGEdge(src_node_id=s, dst_node_id=opt_id))
+                            for d in post_opt_ids:
+                                dag.edges.append(DAGEdge(src_node_id=opt_id, dst_node_id=d))
 
-                                    last_node_per_gpu[gpu] = opt_id
-                            else:
-                                # dp == 1: no gradient sync, just optimizer compute
-                                if prev is not None:
-                                    dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=opt_id))
-                                last_node_per_gpu[gpu] = opt_id
+                            last_node_per_gpu[gpu] = post_opt_ids[-1] if post_opt_ids else opt_id
 
                             advance()
 
