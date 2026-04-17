@@ -53,7 +53,6 @@ def make_moe_workload(
             num_layers=num_layers,
             num_heads=8,
             vocab_size=32000,
-            moe=True,
             num_experts=num_experts,
             top_k=top_k,
         ),
@@ -357,3 +356,83 @@ def test_tracer_dense_ep1_unchanged():
     dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
     gpu_ids = {n.gpu_rank for n in dag.compute_nodes}
     assert gpu_ids == {0, 1, 2, 3}  # dp=2, tp=2 → 4 GPUs
+
+
+# ---------------------------------------------------------------------------
+# Bug regression: moe inferred from num_experts (TIB-fix-moe-alltoall-missing)
+# ---------------------------------------------------------------------------
+
+
+def test_llmspec_rejects_explicit_moe_field():
+    """LLMSpec with extra='forbid' must reject the old `moe=True` field."""
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    with _pytest.raises(ValidationError, match="moe"):
+        LLMSpec(
+            name="bad",
+            hidden_size=512,
+            num_layers=1,
+            num_heads=8,
+            vocab_size=32000,
+            **{"moe": True},  # type: ignore[arg-type]
+            num_experts=4,
+        )
+
+
+def test_num_experts_set_ep2_produces_alltoall():
+    """Regression: num_experts alone (no moe= field) must generate AllToAll nodes with ep=2.
+
+    Before the fix, the tracer checked model.moe (which defaulted to False) instead
+    of model.num_experts, so a config with num_experts=4 but no moe=True silently fell
+    back to the MLP path — zero AllToAll nodes in the DAG.
+    """
+    wl = make_moe_workload(tp=1, pp=1, ep=2, num_gpus=2, num_layers=1, global_batch_size=4, num_microbatches=4)
+    # Sanity-check: the workload has no `moe` field (it was removed)
+    assert not hasattr(wl.model, "moe")
+    assert wl.model.num_experts == 4
+
+    dc = make_dc()
+    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+
+    a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
+    assert len(a2a) > 0, (
+        "Expected AllToAll comm nodes for MoE with ep=2 — "
+        "num_experts alone must trigger the MoE code path"
+    )
+
+
+def test_num_experts_set_ep1_no_alltoall():
+    """MoE inferred from num_experts with ep=1 produces no AllToAll (single-rank EP is a no-op)."""
+    wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=1, num_layers=1, global_batch_size=1, num_microbatches=1)
+    assert wl.model.num_experts == 4
+
+    dc = make_dc()
+    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+
+    a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
+    assert a2a == [], "ep=1 MoE should produce no AllToAll regardless of num_experts"
+
+
+def test_dense_model_no_alltoall_has_mlp_kernels():
+    """Dense model (num_experts=None) produces no AllToAll and uses mlp_linear kernels, not moe_expert."""
+    from simulon.config.workload import MegatronParallelism, MegatronTraining
+
+    wl = MegatronWorkload(
+        framework="megatron",
+        model=LLMSpec(name="dense", hidden_size=512, num_layers=1, num_heads=8, vocab_size=32000),
+        parallelism=MegatronParallelism(tp=1, pp=1, ep=1, num_microbatches=1),
+        training=MegatronTraining(num_gpus=1, global_batch_size=1, micro_batch_size=1, sequence_length=64),
+    )
+    assert wl.model.num_experts is None
+
+    dc = make_dc()
+    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+
+    kernels = {n.kernel for n in dag.compute_nodes}
+    a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
+
+    assert a2a == [], "Dense model must not produce AllToAll nodes"
+    assert "mlp_linear1" in kernels, "Dense model must use mlp_linear1 kernel"
+    assert "mlp_linear2" in kernels, "Dense model must use mlp_linear2 kernel"
+    assert "moe_expert" not in kernels, "Dense model must not produce moe_expert kernels"

@@ -60,7 +60,6 @@ def _dense_model(
         vocab_size=vocab_size,
         ffn_hidden_size=ffn_hidden_size,
         swiglu=swiglu,
-        moe=False,
     )
 
 
@@ -76,7 +75,6 @@ def _moe_model(
         num_layers=num_layers,
         num_heads=4,
         vocab_size=vocab_size,
-        moe=True,
         num_experts=num_experts,
         top_k=1,
     )

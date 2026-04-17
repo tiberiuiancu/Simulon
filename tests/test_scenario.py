@@ -137,7 +137,7 @@ def make_scenario() -> ScenarioConfig:
                 vocab_size=32000,
                 ffn_hidden_size=13824,
                 swiglu=True,
-                moe=False,
+
             ),
             parallelism=MegatronParallelism(
                 tp=4,

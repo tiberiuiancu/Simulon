@@ -75,7 +75,7 @@ def _non_expert_params_per_tp_rank(model: LLMSpec, tp: int) -> int:
     attn_per_layer = 4 * hidden * hidden // tp
     mlp_factor = 3 if model.swiglu else 2
     # Non-MoE models: the MLP is also non-expert
-    non_expert_mlp = 0 if model.moe else mlp_factor * hidden * ffn // tp
+    non_expert_mlp = 0 if model.num_experts is not None else mlp_factor * hidden * ffn // tp
     ln_per_layer = 2 * hidden
 
     per_layer = attn_per_layer + non_expert_mlp + ln_per_layer
@@ -90,12 +90,12 @@ def _expert_params_per_tp_rank(model: LLMSpec, tp: int, ep: int) -> int:
     Only non-zero for MoE models.  These params are sharded across EP ranks,
     so gradient sync uses the smaller expert DP group (size = dp).
     """
-    if not model.moe:
+    if model.num_experts is None:
         return 0
     hidden = model.hidden_size or 0
     ffn = model.ffn_hidden_size or (4 * hidden)
     num_layers = model.num_layers or 0
-    num_experts = model.num_experts or 1
+    num_experts = model.num_experts
     mlp_factor = 3 if model.swiglu else 2
     return num_layers * mlp_factor * hidden * ffn * (num_experts // ep) // tp
 
@@ -254,7 +254,7 @@ class MegatronDAGTracer(DAGTracer):
         top_k = model.top_k or 1
         moe_data_bytes = seq_len * micro_bs * hidden_size * top_k * cfg.dtype_bytes // tp
 
-        sublayers = ["attn", "moe" if model.moe else "mlp"]
+        sublayers = ["attn", "moe" if model.num_experts is not None else "mlp"]
 
         scheduler = make_scheduler(p.pipeline_schedule, pp, num_microbatches)
         expander = LayerExpander()
