@@ -43,6 +43,7 @@ def simulate(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
     energy: bool = typer.Option(False, "--energy", help="Compute and print per-iteration energy breakdown"),
     cost: bool = typer.Option(False, "--cost", help="Compute and print cost breakdown (implies --energy)"),
+    ignore_oom: bool = typer.Option(False, "--ignore-oom", help="Suppress errors for configs matching OOM profile entries"),
 ):
     """Run simulation and print an iteration summary.
 
@@ -73,7 +74,7 @@ def simulate(
             tracker.start_run()
 
         backend = AnalyticalBackend()
-        dag, result = backend.simulate(sc, compact=compact)
+        dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom)
 
         if trackers:
             params = extract_params(sc)

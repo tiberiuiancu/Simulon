@@ -8,7 +8,7 @@ import pytest
 
 from simulon.config.common import DType
 from simulon.config.dc import KernelRun
-from simulon.profiling.sweep import SweepResult, parse_sweep, run_sweep
+from simulon.profiling.sweep import SweepResult, _inferred_oom, parse_sweep, run_sweep
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +57,39 @@ def test_sweep_result_with_runs():
 
 
 # ---------------------------------------------------------------------------
+# _inferred_oom
+# ---------------------------------------------------------------------------
+
+
+def test_inferred_oom_exact_match():
+    assert _inferred_oom(1, 1, 1, 512, [(1, 1, 1, 512)]) is True
+
+
+def test_inferred_oom_larger_batch():
+    """Larger batch with same tp/ep/seq also OOMs."""
+    assert _inferred_oom(1, 1, 4, 512, [(1, 1, 1, 512)]) is True
+
+
+def test_inferred_oom_lower_tp():
+    """Lower TP (less sharding) with same other params also OOMs."""
+    assert _inferred_oom(1, 1, 1, 512, [(2, 1, 1, 512)]) is True
+
+
+def test_inferred_oom_higher_tp_is_safe():
+    """Higher TP = more sharding = less memory; should NOT be inferred as OOM."""
+    assert _inferred_oom(4, 1, 1, 512, [(2, 1, 1, 512)]) is False
+
+
+def test_inferred_oom_smaller_batch_is_safe():
+    """Smaller batch = less memory; should NOT be inferred as OOM."""
+    assert _inferred_oom(1, 1, 1, 512, [(1, 1, 4, 512)]) is False
+
+
+def test_inferred_oom_empty_known_ooms():
+    assert _inferred_oom(1, 1, 1, 512, []) is False
+
+
+# ---------------------------------------------------------------------------
 # run_sweep (mocked benchmark_kernels)
 # ---------------------------------------------------------------------------
 
@@ -87,7 +120,7 @@ def test_run_sweep_single_config():
     assert len(results) == 1
     assert not results[0].oom
     assert results[0].runs == _FAKE_RUNS
-    assert results[0].config == {"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}
+    assert results[0].config == {"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512, "hidden_size": 4096}
     mock_bench.assert_called_once()
 
 
@@ -98,8 +131,8 @@ def test_run_sweep_cartesian_product():
     # 2 tp * 1 ep * 2 batch * 1 seq = 4
     assert len(results) == 4
     configs = [r.config for r in results]
-    assert {"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512} in configs
-    assert {"tp": 2, "ep": 1, "batch_size": 2, "seq_len": 512} in configs
+    assert {"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512, "hidden_size": 4096} in configs
+    assert {"tp": 2, "ep": 1, "batch_size": 2, "seq_len": 512, "hidden_size": 4096} in configs
 
 
 def test_run_sweep_oom_caught():
@@ -143,20 +176,76 @@ def test_run_sweep_dtype_passed_through():
     assert mock_bench.call_args.kwargs["dtype"] == DType.fp16
 
 
-def test_run_sweep_partial_oom_continues():
-    """OOM on one config doesn't stop the sweep; remaining configs still run."""
+def test_run_sweep_oom_infers_dominated_configs():
+    """When bs=1 OOMs, bs=2 (same tp/ep/seq) is inferred OOM without running."""
     call_count = 0
 
     def _side_effect(*args, **kwargs):
         nonlocal call_count
         call_count += 1
-        if call_count == 1:
-            raise RuntimeError("out of memory")
-        return _FAKE_RUNS
+        raise RuntimeError("out of memory")
 
     with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
         results = run_sweep(_KERNEL_PARAMS, [1], [1], [1, 2], [512], DType.bf16)
 
     assert len(results) == 2
-    assert results[0].oom
-    assert not results[1].oom
+    assert all(r.oom for r in results)
+    # benchmark_kernels should only be called once (bs=1); bs=2 is inferred
+    assert call_count == 1
+
+
+def test_run_sweep_oom_does_not_block_better_configs():
+    """When bs=2 OOMs, bs=1 (smaller, less memory) is NOT inferred OOM and still runs."""
+    call_count = 0
+
+    def _side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        bs = kwargs.get("batch_size", 1)
+        if bs == 2:
+            raise RuntimeError("out of memory")
+        return _FAKE_RUNS
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        # Sorted order: bs=1 first (best), bs=2 second.
+        # bs=1 succeeds; bs=2 OOMs → but bs=1 was already done, nothing to infer.
+        results = run_sweep(_KERNEL_PARAMS, [1], [1], [1, 2], [512], DType.bf16)
+
+    assert len(results) == 2
+    configs_oom = {r.config["batch_size"]: r.oom for r in results}
+    assert configs_oom[1] is False   # bs=1 ran and succeeded
+    assert configs_oom[2] is True    # bs=2 OOMed
+    assert call_count == 2
+
+
+def test_run_sweep_higher_tp_runs_after_lower_tp_ooms():
+    """If tp=1 OOMs, tp=2 (more sharding, less memory) still runs."""
+    def _side_effect(*args, **kwargs):
+        tp = kwargs.get("tp", 1)
+        if tp == 1:
+            raise RuntimeError("out of memory")
+        return _FAKE_RUNS
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        results = run_sweep(_KERNEL_PARAMS, [1, 2], [1], [1], [512], DType.bf16)
+
+    configs_oom = {r.config["tp"]: r.oom for r in results}
+    assert configs_oom[2] is False   # tp=2 ran fine
+    assert configs_oom[1] is True    # tp=1 OOMed
+
+
+def test_run_sweep_sorted_order_tries_best_config_first():
+    """Configs are tried with highest TP/EP and smallest BS/SL first."""
+    call_order = []
+
+    def _side_effect(*args, **kwargs):
+        call_order.append((kwargs["tp"], kwargs["ep"], kwargs["batch_size"], kwargs["seq_len"]))
+        return _FAKE_RUNS
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        run_sweep(_KERNEL_PARAMS, [1, 2], [1], [1, 2], [512, 1024], DType.bf16)
+
+    # First config tried should have highest TP, smallest BS/SL
+    assert call_order[0] == (2, 1, 1, 512)
+    # Last config tried should have lowest TP, largest BS/SL
+    assert call_order[-1] == (1, 1, 2, 1024)

@@ -474,7 +474,8 @@ def test_dry_run_skips_oom_config(tmp_path):
     out_file = tmp_path / "gpu.yaml"
     base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
-    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True)
+    # config must include hidden_size (as real run_sweep produces) for the CLI's OOM lookup to match
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512, "hidden_size": 4096}, runs=None, oom=True)
     with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
         runner.invoke(app, base_args)
 

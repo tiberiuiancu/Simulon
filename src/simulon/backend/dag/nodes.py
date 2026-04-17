@@ -18,6 +18,7 @@ class ComputeNode:
     finish_ms: Optional[float] = None
     fused_kernels: list[str] = field(default_factory=list)  # non-empty when this node fuses multiple kernels
     extra_params: dict = field(default_factory=dict)  # kernel-specific lookup params (e.g. num_params for adamw)
+    is_extrapolated: bool = False  # True when duration_ms was obtained via extrapolation, not exact/partial match
 
 
 @dataclass

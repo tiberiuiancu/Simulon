@@ -81,7 +81,11 @@ def _get_link_params(
                     "string switch templates are not yet supported. "
                     "Specify the switch inline or use a node template with an inline switch spec."
                 )
-        elif datacenter.network and datacenter.network.scale_up and datacenter.network.scale_up.switch:
+        elif (
+            datacenter.network
+            and datacenter.network.scale_up
+            and datacenter.network.scale_up.switch
+        ):
             warnings.warn(
                 "network.scale_up is deprecated. Move scale_up into the node spec.",
                 DeprecationWarning,
@@ -96,8 +100,16 @@ def _get_link_params(
                     "string switch templates are not yet supported. "
                     "Specify the switch inline or use a node template with an inline switch spec."
                 )
-        bw = _parse_speed(switch_spec.port_speed) if (switch_spec and switch_spec.port_speed) else _parse_speed("2880Gbps")
-        latency_ms = _parse_latency(switch_spec.latency) if (switch_spec and switch_spec.latency) else 0.0
+        bw = (
+            _parse_speed(switch_spec.port_speed)
+            if (switch_spec and switch_spec.port_speed)
+            else _parse_speed("2880Gbps")
+        )
+        latency_ms = (
+            _parse_latency(switch_spec.latency)
+            if (switch_spec and switch_spec.latency)
+            else 0.0
+        )
     else:
         nic_spec: NICSpec | None = None
         scale_out = resolve_scale_out(datacenter)
@@ -109,7 +121,9 @@ def _get_link_params(
             bw = _parse_speed(nic_spec.speed) * nic_spec.bandwidth_efficiency
         else:
             bw = _parse_speed("400Gbps") * 0.85
-        latency_ms = _parse_latency(nic_spec.latency) if (nic_spec and nic_spec.latency) else 0.0
+        latency_ms = (
+            _parse_latency(nic_spec.latency) if (nic_spec and nic_spec.latency) else 0.0
+        )
 
     return bw, latency_ms
 
@@ -123,37 +137,121 @@ def populate_dag(
     dag: ExecutionDAG,
     workload: MegatronWorkload,
     gpu_spec: GPUSpec,
+    ignore_oom: bool = False,
 ) -> ExecutionDAG:
     """Fill ComputeNode.duration_ms by looking up kernel times in gpu_spec.
 
+    Raises RuntimeError if the workload config matches a known OOM entry in
+    gpu_spec.oom_configs, unless ignore_oom=True.
+
+    Sets ComputeNode.is_extrapolated=True when the duration was obtained via
+    linear extrapolation rather than an exact or partial profile match.
+
     Mutates nodes in-place and returns the dag.
     """
+    from simulon.profiling.models import _resolve_model
+
     t = workload.training
     p = workload.parallelism
+    model = _resolve_model(workload.model)
 
-    match_params = {
-        "hidden_size": _model_hidden_size(workload),
+    # OOM guard: raise early if this config was known to OOM during profiling.
+    if not ignore_oom and gpu_spec.oom_configs:
+        _check_oom_configs(
+            gpu_spec.oom_configs,
+            tp=p.tp,
+            ep=p.ep,
+            batch_size=t.micro_batch_size,
+            seq_len=t.sequence_length,
+            hidden_size=model.hidden_size,
+        )
+
+    # Build a comprehensive params dict covering all kernel types.
+    # lookup_kernel_time will filter to only the params relevant to each kernel.
+    all_params: dict = {
+        "hidden_size": model.hidden_size,
+        "num_heads": model.num_heads,
+        "ffn_hidden_size": model.ffn_hidden_size,
+        "vocab_size": model.vocab_size,
         "seq_len": t.sequence_length,
         "batch_size": t.micro_batch_size,
         "dtype": t.dtype.value,
         "tp": p.tp,
+        "ep": p.ep,
     }
+    if model.num_experts is not None:
+        all_params["num_experts"] = model.num_experts
+    if model.top_k is not None:
+        all_params["top_k"] = model.top_k
 
-    adamw_match_params = {"num_params": None, "dtype": t.dtype.value}
+    adamw_base = {"dtype": t.dtype.value}
 
     with log_progress("  resolving compute", len(dag.compute_nodes), logger) as advance:
         for node in dag.compute_nodes:
             if node.kernel == "adamw":
-                mp = {**adamw_match_params, "num_params": node.extra_params.get("num_params")}
-                node.duration_ms = lookup_kernel_time("adamw", mp, gpu_spec)
+                mp = {**adamw_base, "num_params": node.extra_params.get("num_params")}
+                time_ms, extrap = lookup_kernel_time("adamw", mp, gpu_spec)
             elif node.fused_kernels:
-                times = [lookup_kernel_time(k, match_params, gpu_spec) for k in node.fused_kernels]
-                node.duration_ms = None if any(t is None for t in times) else sum(times)
+                results = [lookup_kernel_time(k, all_params, gpu_spec) for k in node.fused_kernels]
+                times = [r[0] for r in results]
+                time_ms = None if any(t is None for t in times) else sum(times)  # type: ignore[arg-type]
+                extrap = any(r[1] for r in results)
             else:
-                node.duration_ms = lookup_kernel_time(node.kernel, match_params, gpu_spec)
+                time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+
+            node.duration_ms = time_ms
+            node.is_extrapolated = extrap
             advance()
 
     return dag
+
+
+def _check_oom_configs(
+    oom_configs: list[dict],
+    tp: int,
+    ep: int,
+    batch_size: int,
+    seq_len: int,
+    hidden_size: int | None,
+) -> None:
+    """Raise RuntimeError if the current config matches or is dominated by a known OOM entry.
+
+    Dominance rule: a known-OOM config (tp_oom, ep_oom, bs_oom, sl_oom) implies the
+    current config also OOMs when:
+      - tp <= tp_oom  (less sharding → more memory per GPU)
+      - ep <= ep_oom  (less expert sharding → more memory per GPU)
+      - batch_size >= bs_oom  (larger batch → more activation memory)
+      - seq_len >= sl_oom     (longer sequence → more activation memory)
+    hidden_size must match exactly when present in the OOM entry (different model = different profile).
+    """
+    for oom in oom_configs:
+        tp_oom = oom.get("tp")
+        ep_oom = oom.get("ep")
+        bs_oom = oom.get("batch_size")
+        sl_oom = oom.get("seq_len")
+        hs_oom = oom.get("hidden_size")
+
+        # If the OOM entry specifies hidden_size, it must match the current model.
+        if hs_oom is not None and hidden_size is not None and hs_oom != hidden_size:
+            continue
+
+        # Check dominance: current config is at least as memory-intensive.
+        dominated = True
+        if tp_oom is not None and tp > tp_oom:
+            dominated = False  # current has more TP sharding → less memory → OK
+        if ep_oom is not None and ep > ep_oom:
+            dominated = False
+        if bs_oom is not None and batch_size < bs_oom:
+            dominated = False  # current has smaller batch → less memory → OK
+        if sl_oom is not None and seq_len < sl_oom:
+            dominated = False
+
+        if dominated:
+            raise RuntimeError(
+                f"Config (tp={tp}, ep={ep}, batch_size={batch_size}, seq_len={seq_len}) "
+                f"matches or exceeds a known OOM profile entry {oom}. "
+                "Pass --ignore-oom to suppress this error and simulate anyway."
+            )
 
 
 def populate_network(
@@ -184,13 +282,19 @@ def populate_network(
     if gpus_per_node is None:
         raise ValueError("node.gpus_per_node must be set after resolution")
     for comm_node in dag.comm_nodes:
-        bw, latency_ms = _get_link_params(comm_node.src_gpu, comm_node.dst_gpu, datacenter)
-        is_intra = (comm_node.src_gpu // gpus_per_node) == (comm_node.dst_gpu // gpus_per_node)
+        bw, latency_ms = _get_link_params(
+            comm_node.src_gpu, comm_node.dst_gpu, datacenter
+        )
+        is_intra = (comm_node.src_gpu // gpus_per_node) == (
+            comm_node.dst_gpu // gpus_per_node
+        )
         if is_intra and bw_override_bytes_per_ms is not None:
             bw = bw_override_bytes_per_ms
         elif not is_intra and inter_bw_override_bytes_per_ms is not None:
             bw = inter_bw_override_bytes_per_ms
-        comm_node.duration_ms = latency_ms + per_step_latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+        comm_node.duration_ms = (
+            latency_ms + per_step_latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+        )
 
     return dag
 

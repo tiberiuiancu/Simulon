@@ -117,7 +117,7 @@ class AnalyticalBackend(Backend):
         else:
             raise ValueError(f"AnalyticalBackend does not support {type(scenario.workload).__name__}")
 
-    def simulate(self, scenario: ScenarioConfig, compact: bool = False) -> tuple[ExecutionDAG, SimulationResult]:
+    def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False) -> tuple[ExecutionDAG, SimulationResult]:
         if isinstance(scenario.workload, MegatronWorkload):
             from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
             p = scenario.workload.parallelism
@@ -167,7 +167,7 @@ class AnalyticalBackend(Backend):
 
             gpu_spec = _resolve_gpu_spec(scenario.datacenter)
             logger.info("Resolving compute durations (%d nodes) ...", len(dag.compute_nodes))
-            populate_dag(dag, scenario.workload, gpu_spec)
+            populate_dag(dag, scenario.workload, gpu_spec, ignore_oom=ignore_oom)
             logger.info("  Compute durations resolved")
 
             logger.info("Populating network durations (%d comm nodes) ...", len(dag.comm_nodes))

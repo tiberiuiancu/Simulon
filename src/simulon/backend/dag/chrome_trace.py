@@ -110,17 +110,19 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
         if n.start_ms is None or n.finish_ms is None:
             continue
         args: dict[str, Any] = {
-            "kernel":          n.kernel,
-            "phase":           n.phase,
-            "layer_id":        n.layer_id,
-            "microbatch_id":   n.microbatch_id,
-            "pipeline_stage":  n.pipeline_stage,
-            "duration_ms":     n.duration_ms,
+            "kernel":           n.kernel,
+            "phase":            n.phase,
+            "layer_id":         n.layer_id,
+            "microbatch_id":    n.microbatch_id,
+            "pipeline_stage":   n.pipeline_stage,
+            "duration_ms":      n.duration_ms,
+            "is_extrapolated":  n.is_extrapolated,
         }
         if n.fused_kernels:
             args["fused_kernels"] = ", ".join(n.fused_kernels)
+        event_name = ("! " + n.kernel) if n.is_extrapolated else n.kernel
         events.append({
-            "name": n.kernel,
+            "name": event_name,
             "ph": "X",
             "pid": 1000 + n.gpu_rank,
             "tid": _TID_COMPUTE,

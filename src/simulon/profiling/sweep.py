@@ -35,6 +35,27 @@ class SweepResult:
     oom: bool = False
 
 
+def _inferred_oom(
+    tp: int,
+    ep: int,
+    batch_size: int,
+    seq_len: int,
+    known_ooms: list[tuple[int, int, int, int]],
+) -> bool:
+    """Return True if a known OOM config implies this config will also OOM.
+
+    Dominance rule: a known-OOM (tp_oom, ep_oom, bs_oom, sl_oom) implies OOM when:
+      - tp <= tp_oom  (less sharding → more memory per GPU)
+      - ep <= ep_oom
+      - batch_size >= bs_oom  (larger batch → more activation memory)
+      - seq_len >= sl_oom
+    """
+    for tp_oom, ep_oom, bs_oom, sl_oom in known_ooms:
+        if tp <= tp_oom and ep <= ep_oom and batch_size >= bs_oom and seq_len >= sl_oom:
+            return True
+    return False
+
+
 def run_sweep(
     kernel_params: dict,
     tp_values: list[int],
@@ -46,6 +67,11 @@ def run_sweep(
     existing_runs: Optional[list[dict]] = None,
 ) -> list[SweepResult]:
     """Run benchmark_kernels for every combination of (tp, ep, batch_size, seq_len).
+
+    Configs are tried in order from most memory-efficient to least, so OOM
+    boundaries are discovered early.  Once a config OOMs, any config that is
+    at least as memory-intensive (lower TP/EP, larger batch/seq) is inferred
+    to also OOM and skipped without running.
 
     OOM errors are caught and recorded as SweepResult(oom=True).
 
@@ -61,15 +87,37 @@ def run_sweep(
 
     Returns:
         List of SweepResult, one per (tp, ep, batch_size, seq_len) combination.
+        Order matches the input product but with inferred OOMs inserted.
     """
     from itertools import product
 
     from simulon.profiling.kernels import benchmark_kernels
 
+    # Sort configs from most memory-efficient (high TP/EP, small BS/SL) to least,
+    # so we discover OOM boundaries as early as possible.
+    sorted_configs = sorted(
+        product(tp_values, ep_values, batch_sizes, seq_lens),
+        key=lambda c: (-c[0], -c[1], c[2], c[3]),
+    )
+
+    # Track confirmed OOM (tp, ep, batch_size, seq_len) tuples for inference.
+    known_ooms: list[tuple[int, int, int, int]] = []
+
     results: list[SweepResult] = []
 
-    for tp, ep, batch_size, seq_len in product(tp_values, ep_values, batch_sizes, seq_lens):
-        config = {"tp": tp, "ep": ep, "batch_size": batch_size, "seq_len": seq_len, "hidden_size": kernel_params["hidden_size"]}
+    for tp, ep, batch_size, seq_len in sorted_configs:
+        config = {
+            "tp": tp,
+            "ep": ep,
+            "batch_size": batch_size,
+            "seq_len": seq_len,
+            "hidden_size": kernel_params["hidden_size"],
+        }
+
+        if _inferred_oom(tp, ep, batch_size, seq_len, known_ooms):
+            results.append(SweepResult(config=config, runs=None, oom=True))
+            continue
+
         try:
             runs = benchmark_kernels(
                 hidden_size=kernel_params["hidden_size"],
@@ -90,8 +138,8 @@ def run_sweep(
             )
             results.append(SweepResult(config=config, runs=runs, oom=False))
         except (RuntimeError, MemoryError) as exc:
-            # Catch CUDA OOM and similar allocation failures
             if "out of memory" in str(exc).lower() or isinstance(exc, MemoryError):
+                known_ooms.append((tp, ep, batch_size, seq_len))
                 results.append(SweepResult(config=config, runs=None, oom=True))
             else:
                 raise
