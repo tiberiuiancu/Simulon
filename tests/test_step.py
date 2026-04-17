@@ -8,6 +8,8 @@ from simulon.backend.dag.megatron_tracer import _params_per_tp_rank
 from simulon.backend.dag.populate import populate_dag
 from simulon.config.common import DType
 from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, KernelRun, NodeSpec
+from typing import Optional
+
 from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
 
 
@@ -19,8 +21,7 @@ def make_workload(
     num_layers: int = 2,
     hidden_size: int = 512,
     vocab_size: int = 32000,
-    num_experts: int = 1,
-    moe: bool = False,
+    num_experts: Optional[int] = None,
     distributed_optimizer: bool = False,
     num_microbatches: int = 2,
 ) -> MegatronWorkload:
@@ -33,8 +34,7 @@ def make_workload(
             num_layers=num_layers,
             num_heads=8,
             vocab_size=vocab_size,
-            moe=moe,
-            num_experts=num_experts if moe else None,
+            num_experts=num_experts,
         ),
         parallelism=MegatronParallelism(
             tp=tp,
@@ -160,7 +160,7 @@ def test_step_bytes_formula_dense():
 def test_step_bytes_formula_moe():
     tp, pp, dp, ep = 1, 1, 2, 2
     num_experts = 4
-    wl = make_workload(tp=tp, pp=pp, dp=dp, ep=ep, moe=True, num_experts=num_experts,
+    wl = make_workload(tp=tp, pp=pp, dp=dp, ep=ep, num_experts=num_experts,
                        num_layers=2, hidden_size=512, vocab_size=32000,
                        num_microbatches=2)
     dag = trace(wl, make_dc(gpus=8))
