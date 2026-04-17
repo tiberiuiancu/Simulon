@@ -27,7 +27,7 @@ class RoutingStrategy(str, Enum):
 
 
 class LLMSpec(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     from_: Optional[str] = Field(None, alias="from")
     name: Optional[str] = None
@@ -37,7 +37,6 @@ class LLMSpec(BaseModel):
     ffn_hidden_size: Optional[int] = None
     vocab_size: Optional[int] = None
     swiglu: bool = False
-    moe: bool = False
     num_experts: Optional[int] = None
     top_k: Optional[int] = None
     gflops_per_train_token: Optional[float] = None

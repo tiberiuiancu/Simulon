@@ -69,7 +69,6 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, Union[str, int, float,
                 params["model.num_experts"] = wl.model.num_experts
             if wl.model.top_k is not None:
                 params["model.top_k"] = wl.model.top_k
-            params["model.moe"] = wl.model.moe
             params["model.swiglu"] = wl.model.swiglu
 
     elif isinstance(wl, CollectiveWorkload):
