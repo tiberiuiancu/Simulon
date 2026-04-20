@@ -178,7 +178,8 @@ def _print_summary(result, workload=None) -> None:
         resolved = _resolve_model(workload.model)
         if resolved.gflops_per_train_token is not None:
             tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
-            typer.echo(f"                      {tflops:.2f} TFLOPs/s")
+        per_gpu_tflops = tflops / n_gpus
+        typer.echo(f"                      {per_gpu_tflops:.2f} TFLOPs/s ({tflops:.2f} TFLOPs/s)")
         typer.echo("")
 
 
