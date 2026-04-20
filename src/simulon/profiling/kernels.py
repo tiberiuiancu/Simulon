@@ -500,6 +500,7 @@ def benchmark_kernels(
         {"vocab_size": vocab_size},
     )
     if num_experts > 0:
+        _run("moe_norm", lambda: _bench_layernorm(hidden_size, seq_len, batch_size, tdt))
         _run(
             "moe_route",
             lambda: _bench_moe_route(hidden_size, num_experts, seq_len, batch_size, tdt),

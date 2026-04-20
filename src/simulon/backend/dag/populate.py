@@ -138,12 +138,14 @@ def _handle_missing(
     params: dict,
     gpu_spec: GPUSpec,
     ignore_oom: bool,
+    ignore_missing: bool,
 ) -> None:
     """Called when lookup_kernel_time returns None.
 
     - If the kernel+params match a known OOM profiling entry: raise RuntimeError
       (unless ignore_oom=True, in which case silently proceed with None timing).
-    - Otherwise: emit a warning that no profiling data exists for this kernel.
+    - Otherwise: raise RuntimeError for missing profiling data (unless
+      ignore_missing=True, in which case emit a warning and proceed with None).
     """
     if is_kernel_oom(kernel, params, gpu_spec):
         if not ignore_oom:
@@ -152,6 +154,11 @@ def _handle_missing(
                 "Pass --ignore-oom to suppress this error and simulate anyway."
             )
     else:
+        if not ignore_missing:
+            raise RuntimeError(
+                f"No profiling data found for kernel '{kernel}' with params {params}. "
+                "Reprofile the GPU or pass --ignore-missing to proceed with 0 timing."
+            )
         warnings.warn(
             f"No profiling data found for kernel '{kernel}'. "
             "Timing will be None — results may be incomplete.",
@@ -165,6 +172,7 @@ def populate_dag(
     workload: MegatronWorkload,
     gpu_spec: GPUSpec,
     ignore_oom: bool = False,
+    ignore_missing: bool = False,
 ) -> ExecutionDAG:
     """Fill ComputeNode.duration_ms by looking up kernel times in gpu_spec.
 
@@ -209,7 +217,7 @@ def populate_dag(
                 mp = {**adamw_base, "num_params": node.extra_params.get("num_params")}
                 time_ms, extrap = lookup_kernel_time("adamw", mp, gpu_spec)
                 if time_ms is None:
-                    _handle_missing("adamw", mp, gpu_spec, ignore_oom)
+                    _handle_missing("adamw", mp, gpu_spec, ignore_oom, ignore_missing)
             elif node.fused_kernels:
                 fused_results = [(k, lookup_kernel_time(k, all_params, gpu_spec)) for k in node.fused_kernels]
                 times = [r[0] for _, r in fused_results]
@@ -218,11 +226,11 @@ def populate_dag(
                 if time_ms is None:
                     for k, (t, _) in fused_results:
                         if t is None:
-                            _handle_missing(k, all_params, gpu_spec, ignore_oom)
+                            _handle_missing(k, all_params, gpu_spec, ignore_oom, ignore_missing)
             else:
                 time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
                 if time_ms is None:
-                    _handle_missing(node.kernel, all_params, gpu_spec, ignore_oom)
+                    _handle_missing(node.kernel, all_params, gpu_spec, ignore_oom, ignore_missing)
 
             node.duration_ms = time_ms
             node.is_extrapolated = extrap

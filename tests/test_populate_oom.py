@@ -41,7 +41,7 @@ def test_handle_missing_raises_runtime_error_on_oom():
     oom_params = {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}
     gpu = _gpu(oom_kernel_runs=[_oom_run("layernorm", oom_params)])
     with pytest.raises(RuntimeError, match="OOM"):
-        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False)
+        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False, ignore_missing=False)
 
 
 def test_handle_missing_ignores_oom_when_flag_set():
@@ -51,7 +51,7 @@ def test_handle_missing_ignores_oom_when_flag_set():
     # Should not raise, and should not emit a warning.
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        _handle_missing("layernorm", oom_params, gpu, ignore_oom=True)
+        _handle_missing("layernorm", oom_params, gpu, ignore_oom=True, ignore_missing=False)
 
 
 def test_handle_missing_oom_error_message_mentions_ignore_oom():
@@ -59,7 +59,7 @@ def test_handle_missing_oom_error_message_mentions_ignore_oom():
     oom_params = {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}
     gpu = _gpu(oom_kernel_runs=[_oom_run("layernorm", oom_params)])
     with pytest.raises(RuntimeError, match="--ignore-oom"):
-        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False)
+        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False, ignore_missing=False)
 
 
 # ---------------------------------------------------------------------------
@@ -67,19 +67,25 @@ def test_handle_missing_oom_error_message_mentions_ignore_oom():
 # ---------------------------------------------------------------------------
 
 
-def test_handle_missing_emits_user_warning_when_no_data():
-    """When no OOM entry matches and no profiling data exists, a UserWarning is emitted."""
+def test_handle_missing_raises_when_no_data():
+    """When no OOM entry matches and no profiling data exists, RuntimeError is raised by default."""
     gpu = _gpu()  # empty — no runs, no OOM entries
-    with pytest.warns(UserWarning, match="No profiling data"):
-        _handle_missing("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, gpu, ignore_oom=False)
+    with pytest.raises(RuntimeError, match="No profiling data"):
+        _handle_missing("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, gpu, ignore_oom=False, ignore_missing=False)
 
 
-def test_handle_missing_no_error_when_no_data_no_oom():
-    """With no OOM entry and no data, _handle_missing only warns — does not raise."""
+def test_handle_missing_emits_warning_when_no_data_and_ignore_missing():
+    """With ignore_missing=True, missing data emits a UserWarning instead of raising."""
     gpu = _gpu()
-    # Should not raise; should only warn.
+    with pytest.warns(UserWarning, match="No profiling data"):
+        _handle_missing("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, gpu, ignore_oom=False, ignore_missing=True)
+
+
+def test_handle_missing_no_error_when_no_data_ignore_missing():
+    """With ignore_missing=True and no OOM entry, _handle_missing only warns — does not raise."""
+    gpu = _gpu()
     with pytest.warns(UserWarning):
-        _handle_missing("attn_qkv", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, gpu, ignore_oom=False)
+        _handle_missing("attn_qkv", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, gpu, ignore_oom=False, ignore_missing=True)
 
 
 def test_handle_missing_oom_takes_priority_over_missing_data():
@@ -88,16 +94,24 @@ def test_handle_missing_oom_takes_priority_over_missing_data():
     gpu = _gpu(kernel_runs=[], oom_kernel_runs=[_oom_run("layernorm", oom_params)])
     # Should raise RuntimeError, not emit a UserWarning.
     with pytest.raises(RuntimeError):
-        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False)
+        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False, ignore_missing=False)
 
 
 def test_handle_missing_wrong_kernel_not_oom():
-    """OOM entry for a different kernel does not trigger RuntimeError for the queried kernel."""
+    """OOM entry for a different kernel does not trigger OOM error for the queried kernel."""
     oom_params = {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}
     gpu = _gpu(oom_kernel_runs=[_oom_run("attn_qkv", oom_params)])
-    # layernorm is not in OOM list → should warn, not raise.
+    # layernorm is not in OOM list → missing-data error with ignore_missing=False.
+    with pytest.raises(RuntimeError, match="No profiling data"):
+        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False, ignore_missing=False)
+
+
+def test_handle_missing_wrong_kernel_not_oom_ignore_missing():
+    """With ignore_missing=True, a non-OOM missing kernel emits a warning rather than raising."""
+    oom_params = {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}
+    gpu = _gpu(oom_kernel_runs=[_oom_run("attn_qkv", oom_params)])
     with pytest.warns(UserWarning):
-        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False)
+        _handle_missing("layernorm", oom_params, gpu, ignore_oom=False, ignore_missing=True)
 
 
 def test_handle_missing_oom_extra_params_stripped_via_canonical_keys():
@@ -112,4 +126,5 @@ def test_handle_missing_oom_extra_params_stripped_via_canonical_keys():
              "tp": 2, "vocab_size": 32000},
             gpu,
             ignore_oom=False,
+            ignore_missing=False,
         )

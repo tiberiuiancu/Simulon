@@ -44,6 +44,7 @@ def simulate(
     energy: bool = typer.Option(False, "--energy", help="Compute and print per-iteration energy breakdown"),
     cost: bool = typer.Option(False, "--cost", help="Compute and print cost breakdown (implies --energy)"),
     ignore_oom: bool = typer.Option(False, "--ignore-oom", help="Suppress errors for configs matching OOM profile entries"),
+    ignore_missing: bool = typer.Option(False, "--ignore-missing", help="Suppress errors for kernels with no profiling data (treat as 0 duration)"),
 ):
     """Run simulation and print an iteration summary.
 
@@ -74,7 +75,7 @@ def simulate(
             tracker.start_run()
 
         backend = AnalyticalBackend()
-        dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom)
+        dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
 
         if trackers:
             params = extract_params(sc)
@@ -443,6 +444,7 @@ def profile_gpu(
         ]
         if num_experts_val > 0:
             expected += [
+                ("moe_norm", {}),
                 ("moe_route", {"num_experts": num_experts_val}),
                 ("moe_expert", {"num_experts": num_experts_val, "ep": e, "top_k": top_k_val, "ffn_hidden_size": ffn_hidden_size_val}),
             ]
