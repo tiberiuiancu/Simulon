@@ -673,40 +673,45 @@ def test_moe_config_done_if_moe_expert_oom_with_matching_ep(tmp_path):
     assert "1 already done" in dry.output
 
 
-def test_moe_config_done_when_ep8_ooms_because_dense_kernels_propagate(tmp_path):
-    """Dense kernels have no ep in their canonical keys, so an ep=8 OOM also marks ep=4 as done.
+def test_moe_ep4_still_runs_after_ep8_partial_oom(tmp_path):
+    """With per-kernel OOM, dense kernels succeed at ep=8 while moe_expert may OOM.
 
-    benchmark_kernels runs all kernels together; if it OOMs, ALL kernels (including dense ones like
-    layernorm) get OOM entries.  Since layernorm's canonical params don't include ep, those OOM
-    entries match ANY ep.  This means _config_done correctly infers ep=4 as done via the
-    dense-kernel OOM entries from the ep=8 run.
+    Since dense-kernel OOM entries no longer exist for ep=8, the ep=4 config is NOT
+    blocked — _config_done sees that layernorm etc. have profiling data at ep=8 and
+    the ep=4 OOM check doesn't match any OOM entry. The profiler therefore runs ep=4.
     """
     from simulon.config.common import DType
-    from simulon.profiling.sweep import _make_oom_kernel_runs
+    from simulon.config.dc import KernelRun
+    from simulon.profiling.sweep import SweepResult
 
     out_file = tmp_path / "gpu.yaml"
     moe_arch_args = _ARCH_ARGS + ["--num-experts", "8", "--top-k", "2"]
 
     kernel_params = {"hidden_size": 4096, "num_heads": 32, "ffn_hidden_size": 11008,
                      "vocab_size": 32000, "num_experts": 8, "top_k": 2}
-    # Record OOM for ep=8.
-    oom_runs_ep8 = _make_oom_kernel_runs(kernel_params, tp=1, ep=8, batch_size=1, seq_len=512, dtype=DType.bf16)
-    oom_result = SweepResult(
+
+    # At ep=8, dense kernels succeeded; only moe_expert OOM'd.
+    dense_runs = [
+        KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, times_ms=[1.0]),
+        KernelRun(kernel="attn_qkv", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, times_ms=[2.0]),
+    ]
+    moe_expert_oom = KernelRun(kernel="moe_expert", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16", "num_experts": 8, "ep": 8, "top_k": 2, "ffn_hidden_size": 11008}, times_ms=[])
+    ep8_result = SweepResult(
         config={"tp": 1, "ep": 8, "batch_size": 1, "seq_len": 512},
-        runs=None, oom=True, oom_runs=oom_runs_ep8,
+        runs=dense_runs, oom=False, oom_runs=[moe_expert_oom],
     )
-    with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[ep8_result]):
         runner.invoke(app, [
             "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
             "--ep", "8", "--seq-len", "512",
         ] + moe_arch_args)
 
-    # Dense-kernel OOM entries (e.g. layernorm) have no ep key, so they also
-    # match the ep=4 config.  _config_done correctly identifies ep=4 as done.
+    # ep=4 is NOT blocked — dense kernels have profiling data at ep=8 (not OOM), and
+    # the OOM entry for moe_expert at ep=8 only matches ep=8 params (it includes ep).
     dry = runner.invoke(app, [
         "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
         "--ep", "4", "--seq-len", "512", "--dry-run",
     ] + moe_arch_args)
     assert dry.exit_code == 0
-    assert "ep=4" not in dry.output
-    assert "1 already done" in dry.output
+    assert "ep=4" in dry.output  # ep=4 must run, not be skipped
+    assert "1 already done" not in dry.output

@@ -448,21 +448,15 @@ def profile_gpu(
                 ("moe_route", {"num_experts": num_experts_val}),
                 ("moe_expert", {"num_experts": num_experts_val, "ep": e, "top_k": top_k_val, "ffn_hidden_size": ffn_hidden_size_val}),
             ]
-        # If any expected kernel has an OOM entry, consider the config OOM-done for that kernel.
-        if any(
-            (kernel, frozenset(_fp(kernel, all_params_for_oom).items())) in _oom_kr_set
-            for kernel, _ in expected
-        ):
-            return True
-        # Otherwise require all expected kernels to have sufficient profiling data.
-        # Use canonical filtered params for matching — same filtering applied during lookup.
+        # A config is done when every expected kernel is either sufficiently profiled or known-OOM.
         for kernel, extra in expected:
             sufficient_key = (kernel, frozenset(_fp(kernel, {**base, **extra, "ep": e}).items()))
-            if sufficient_key not in _sufficient:
+            oom_key = (kernel, frozenset(_fp(kernel, all_params_for_oom).items()))
+            if sufficient_key not in _sufficient and oom_key not in _oom_kr_set:
                 return False
         if num_layers_val > 0:
             adamw_key = ("adamw", frozenset({"num_params": _adamw_num_params(t, e), "dtype": dtype_str}.items()))
-            if adamw_key not in _sufficient:
+            if adamw_key not in _sufficient and adamw_key not in _oom_kr_set:
                 return False
         return True
 
