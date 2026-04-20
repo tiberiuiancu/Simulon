@@ -8,7 +8,7 @@ import pytest
 
 from simulon.config.common import DType
 from simulon.config.dc import KernelRun
-from simulon.profiling.sweep import SweepResult, parse_sweep, run_sweep
+from simulon.profiling.sweep import SweepResult, _inferred_oom, _make_oom_kernel_runs, parse_sweep, run_sweep
 
 
 # ---------------------------------------------------------------------------
@@ -41,12 +41,14 @@ def test_sweep_result_defaults():
     r = SweepResult(config={"tp": 1})
     assert r.runs is None
     assert r.oom is False
+    assert r.oom_runs == []
 
 
 def test_sweep_result_oom():
     r = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True)
     assert r.oom
     assert r.runs is None
+    assert r.oom_runs == []
 
 
 def test_sweep_result_with_runs():
@@ -54,6 +56,39 @@ def test_sweep_result_with_runs():
     r = SweepResult(config={"tp": 1}, runs=[kr], oom=False)
     assert not r.oom
     assert len(r.runs) == 1
+
+
+# ---------------------------------------------------------------------------
+# _inferred_oom
+# ---------------------------------------------------------------------------
+
+
+def test_inferred_oom_exact_match():
+    assert _inferred_oom(1, 1, 1, 512, [(1, 1, 1, 512)]) is True
+
+
+def test_inferred_oom_larger_batch():
+    """Larger batch with same tp/ep/seq also OOMs."""
+    assert _inferred_oom(1, 1, 4, 512, [(1, 1, 1, 512)]) is True
+
+
+def test_inferred_oom_lower_tp():
+    """Lower TP (less sharding) with same other params also OOMs."""
+    assert _inferred_oom(1, 1, 1, 512, [(2, 1, 1, 512)]) is True
+
+
+def test_inferred_oom_higher_tp_is_safe():
+    """Higher TP = more sharding = less memory; should NOT be inferred as OOM."""
+    assert _inferred_oom(4, 1, 1, 512, [(2, 1, 1, 512)]) is False
+
+
+def test_inferred_oom_smaller_batch_is_safe():
+    """Smaller batch = less memory; should NOT be inferred as OOM."""
+    assert _inferred_oom(1, 1, 1, 512, [(1, 1, 4, 512)]) is False
+
+
+def test_inferred_oom_empty_known_ooms():
+    assert _inferred_oom(1, 1, 1, 512, []) is False
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +111,7 @@ _FAKE_RUNS = [
 def _patch_benchmark(return_value=_FAKE_RUNS):
     return patch(
         "simulon.profiling.kernels.benchmark_kernels",
-        return_value=return_value,
+        return_value=(return_value, []),
     )
 
 
@@ -143,20 +178,143 @@ def test_run_sweep_dtype_passed_through():
     assert mock_bench.call_args.kwargs["dtype"] == DType.fp16
 
 
-def test_run_sweep_partial_oom_continues():
-    """OOM on one config doesn't stop the sweep; remaining configs still run."""
+def test_run_sweep_oom_infers_dominated_configs():
+    """When bs=1 OOMs, bs=2 (same tp/ep/seq) is inferred OOM without running."""
     call_count = 0
 
     def _side_effect(*args, **kwargs):
         nonlocal call_count
         call_count += 1
-        if call_count == 1:
-            raise RuntimeError("out of memory")
-        return _FAKE_RUNS
+        raise RuntimeError("out of memory")
 
     with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
         results = run_sweep(_KERNEL_PARAMS, [1], [1], [1, 2], [512], DType.bf16)
 
     assert len(results) == 2
+    assert all(r.oom for r in results)
+    # benchmark_kernels should only be called once (bs=1); bs=2 is inferred
+    assert call_count == 1
+
+
+def test_run_sweep_oom_does_not_block_better_configs():
+    """When bs=2 OOMs, bs=1 (smaller, less memory) is NOT inferred OOM and still runs."""
+    call_count = 0
+
+    def _side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        bs = kwargs.get("batch_size", 1)
+        if bs == 2:
+            raise RuntimeError("out of memory")
+        return _FAKE_RUNS, []
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        # Sorted order: bs=1 first (best), bs=2 second.
+        # bs=1 succeeds; bs=2 OOMs → but bs=1 was already done, nothing to infer.
+        results = run_sweep(_KERNEL_PARAMS, [1], [1], [1, 2], [512], DType.bf16)
+
+    assert len(results) == 2
+    configs_oom = {r.config["batch_size"]: r.oom for r in results}
+    assert configs_oom[1] is False   # bs=1 ran and succeeded
+    assert configs_oom[2] is True    # bs=2 OOMed
+    assert call_count == 2
+
+
+def test_run_sweep_higher_tp_runs_after_lower_tp_ooms():
+    """If tp=1 OOMs, tp=2 (more sharding, less memory) still runs."""
+    def _side_effect(*args, **kwargs):
+        tp = kwargs.get("tp", 1)
+        if tp == 1:
+            raise RuntimeError("out of memory")
+        return _FAKE_RUNS, []
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        results = run_sweep(_KERNEL_PARAMS, [1, 2], [1], [1], [512], DType.bf16)
+
+    configs_oom = {r.config["tp"]: r.oom for r in results}
+    assert configs_oom[2] is False   # tp=2 ran fine
+    assert configs_oom[1] is True    # tp=1 OOMed
+
+
+# ---------------------------------------------------------------------------
+# _make_oom_kernel_runs
+# ---------------------------------------------------------------------------
+
+
+def test_make_oom_kernel_runs_dense_model():
+    """Dense model produces OOM entries for all non-MoE kernels."""
+    from simulon.profiling.lookup import KERNEL_MATCH_KEYS
+    runs = _make_oom_kernel_runs(_KERNEL_PARAMS, tp=1, ep=1, batch_size=1, seq_len=512, dtype=DType.bf16)
+    kernels = {r.kernel for r in runs}
+    # All dense kernels should be present; MoE kernels require num_experts
+    assert "layernorm" in kernels
+    assert "attn_qkv" in kernels
+    assert "mlp_linear1" in kernels
+    # MoE kernels absent when num_experts not in kernel_params
+    assert "moe_expert" not in kernels
+    assert "moe_route" not in kernels
+    # All entries have empty times_ms
+    assert all(r.times_ms == [] for r in runs)
+
+
+def test_make_oom_kernel_runs_moe_model():
+    """MoE model produces OOM entries including moe_expert and moe_route."""
+    moe_params = {**_KERNEL_PARAMS, "num_experts": 8, "top_k": 2}
+    runs = _make_oom_kernel_runs(moe_params, tp=1, ep=4, batch_size=1, seq_len=512, dtype=DType.bf16)
+    kernels = {r.kernel for r in runs}
+    assert "moe_expert" in kernels
+    assert "moe_route" in kernels
+    moe_expert_run = next(r for r in runs if r.kernel == "moe_expert")
+    assert moe_expert_run.params["ep"] == 4
+    assert moe_expert_run.params["num_experts"] == 8
+    assert moe_expert_run.params["top_k"] == 2
+
+
+def test_run_sweep_oom_populates_oom_runs():
+    """OOM results must have oom_runs populated with per-kernel entries."""
+    def _raise_oom(*args, **kwargs):
+        raise RuntimeError("CUDA out of memory.")
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_raise_oom):
+        results = run_sweep(_KERNEL_PARAMS, [1], [1], [1], [512], DType.bf16)
+
     assert results[0].oom
-    assert not results[1].oom
+    assert len(results[0].oom_runs) > 0
+    kernels = {r.kernel for r in results[0].oom_runs}
+    assert "layernorm" in kernels
+    assert "attn_qkv" in kernels
+
+
+def test_run_sweep_inferred_oom_also_has_oom_runs():
+    """Inferred OOM configs must also have oom_runs (generated without running)."""
+    call_count = 0
+
+    def _side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        raise RuntimeError("out of memory")
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        results = run_sweep(_KERNEL_PARAMS, [1], [1], [1, 2], [512], DType.bf16)
+
+    inferred = next(r for r in results if r.config["batch_size"] == 2)
+    assert inferred.oom
+    assert len(inferred.oom_runs) > 0
+    assert call_count == 1  # bs=2 was not actually run
+
+
+def test_run_sweep_sorted_order_tries_best_config_first():
+    """Configs are tried with highest TP/EP and smallest BS/SL first."""
+    call_order = []
+
+    def _side_effect(*args, **kwargs):
+        call_order.append((kwargs["tp"], kwargs["ep"], kwargs["batch_size"], kwargs["seq_len"]))
+        return _FAKE_RUNS, []
+
+    with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
+        run_sweep(_KERNEL_PARAMS, [1, 2], [1], [1, 2], [512, 1024], DType.bf16)
+
+    # First config tried should have highest TP, smallest BS/SL
+    assert call_order[0] == (2, 1, 1, 512)
+    # Last config tried should have lowest TP, largest BS/SL
+    assert call_order[-1] == (1, 1, 2, 1024)
