@@ -37,7 +37,7 @@ _DENSE_KERNELS = {
     "embedding", "layernorm", "attn_qkv", "attn_flash",
     "attn_proj", "mlp_linear1", "mlp_act", "mlp_linear2", "logit",
 }
-_MOE_KERNELS = _DENSE_KERNELS | {"moe_route", "moe_expert"}
+_MOE_KERNELS = _DENSE_KERNELS | {"moe_norm", "moe_route", "moe_expert"}
 
 _FAKE_TIMES = [1.0, 2.0, 3.0, 4.0, 5.0]  # len == 5
 
@@ -77,21 +77,21 @@ def _patch_cuda(fn):
 
 @_patch_cuda
 def test_benchmark_kernels_returns_all_dense_kernels():
-    runs = benchmark_kernels(**_BASE_PARAMS)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS)
     kernel_names = {r.kernel for r in runs}
     assert kernel_names == _DENSE_KERNELS
 
 
 @_patch_cuda
 def test_benchmark_kernels_returns_moe_kernels_when_num_experts_set():
-    runs = benchmark_kernels(**_BASE_PARAMS, num_experts=8, ep=1, top_k=2)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, num_experts=8, ep=1, top_k=2)
     kernel_names = {r.kernel for r in runs}
     assert kernel_names == _MOE_KERNELS
 
 
 @_patch_cuda
 def test_benchmark_kernels_no_moe_kernels_when_num_experts_zero():
-    runs = benchmark_kernels(**_BASE_PARAMS, num_experts=0)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, num_experts=0)
     kernel_names = {r.kernel for r in runs}
     assert "moe_route" not in kernel_names
     assert "moe_expert" not in kernel_names
@@ -100,7 +100,7 @@ def test_benchmark_kernels_no_moe_kernels_when_num_experts_zero():
 @_patch_cuda
 def test_benchmark_kernels_times_truncated_to_epoch_num():
     params = {**_BASE_PARAMS, "epoch_num": 3}
-    runs = benchmark_kernels(**params)
+    runs, _ = benchmark_kernels(**params)
     for r in runs:
         assert len(r.times_ms) == 3
 
@@ -125,7 +125,7 @@ def test_extend_skips_kernels_with_sufficient_timings():
 
     # Build existing_runs with 5 times each (== epoch_num=5).
     existing = _build_existing_runs(epoch_num=5)
-    runs = benchmark_kernels(**_BASE_PARAMS, existing_runs=existing)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, existing_runs=existing)
     assert runs == [], "All kernels already have sufficient timings — nothing should be re-profiled"
 
 
@@ -136,7 +136,7 @@ def test_extend_reprofiles_kernels_with_insufficient_timings():
 
     # Only 2 times per kernel, but we ask for epoch_num=5.
     existing = _build_existing_runs(epoch_num=2)
-    runs = benchmark_kernels(**_BASE_PARAMS, existing_runs=existing)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, existing_runs=existing)
     kernel_names = {r.kernel for r in runs}
     # Every dense kernel should be re-profiled.
     assert kernel_names == _DENSE_KERNELS
@@ -149,7 +149,7 @@ def test_extend_partial_existing_reruns_only_missing():
     # Provide sufficient timings for all except layernorm and attn_qkv.
     skip = {"layernorm", "attn_qkv"}
     existing = _build_existing_runs(epoch_num=5, exclude=skip)
-    runs = benchmark_kernels(**_BASE_PARAMS, existing_runs=existing)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, existing_runs=existing)
     kernel_names = {r.kernel for r in runs}
     assert kernel_names == skip
 
@@ -161,19 +161,19 @@ def test_extend_new_config_treated_as_missing():
 
     existing = _build_existing_runs(epoch_num=5, tp_override=1)
     # Ask for tp=2: params differ, so all kernels should be profiled.
-    runs = benchmark_kernels(**{**_BASE_PARAMS, "tp": 2}, existing_runs=existing)
+    runs, _ = benchmark_kernels(**{**_BASE_PARAMS, "tp": 2}, existing_runs=existing)
     assert len(runs) == len(_DENSE_KERNELS)
 
 
 @_patch_cuda
 def test_extend_empty_existing_runs_profiles_everything():
-    runs = benchmark_kernels(**_BASE_PARAMS, existing_runs=[])
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, existing_runs=[])
     assert {r.kernel for r in runs} == _DENSE_KERNELS
 
 
 @_patch_cuda
 def test_extend_none_existing_runs_profiles_everything():
-    runs = benchmark_kernels(**_BASE_PARAMS, existing_runs=None)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS, existing_runs=None)
     assert {r.kernel for r in runs} == _DENSE_KERNELS
 
 
@@ -184,7 +184,7 @@ def test_extend_none_existing_runs_profiles_everything():
 
 @_patch_cuda
 def test_kernel_run_params_include_tp_seq_batch():
-    runs = benchmark_kernels(**_BASE_PARAMS)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS)
     for r in runs:
         assert r.params["tp"] == _BASE_PARAMS["tp"]
         assert r.params["seq_len"] == _BASE_PARAMS["seq_len"]
@@ -193,7 +193,7 @@ def test_kernel_run_params_include_tp_seq_batch():
 
 @_patch_cuda
 def test_kernel_run_is_kernel_run_instance():
-    runs = benchmark_kernels(**_BASE_PARAMS)
+    runs, _ = benchmark_kernels(**_BASE_PARAMS)
     for r in runs:
         assert isinstance(r, KernelRun)
 

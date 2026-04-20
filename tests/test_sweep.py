@@ -111,7 +111,7 @@ _FAKE_RUNS = [
 def _patch_benchmark(return_value=_FAKE_RUNS):
     return patch(
         "simulon.profiling.kernels.benchmark_kernels",
-        return_value=return_value,
+        return_value=(return_value, []),
     )
 
 
@@ -206,7 +206,7 @@ def test_run_sweep_oom_does_not_block_better_configs():
         bs = kwargs.get("batch_size", 1)
         if bs == 2:
             raise RuntimeError("out of memory")
-        return _FAKE_RUNS
+        return _FAKE_RUNS, []
 
     with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
         # Sorted order: bs=1 first (best), bs=2 second.
@@ -226,7 +226,7 @@ def test_run_sweep_higher_tp_runs_after_lower_tp_ooms():
         tp = kwargs.get("tp", 1)
         if tp == 1:
             raise RuntimeError("out of memory")
-        return _FAKE_RUNS
+        return _FAKE_RUNS, []
 
     with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
         results = run_sweep(_KERNEL_PARAMS, [1, 2], [1], [1], [512], DType.bf16)
@@ -309,7 +309,7 @@ def test_run_sweep_sorted_order_tries_best_config_first():
 
     def _side_effect(*args, **kwargs):
         call_order.append((kwargs["tp"], kwargs["ep"], kwargs["batch_size"], kwargs["seq_len"]))
-        return _FAKE_RUNS
+        return _FAKE_RUNS, []
 
     with patch("simulon.profiling.kernels.benchmark_kernels", side_effect=_side_effect):
         run_sweep(_KERNEL_PARAMS, [1, 2], [1], [1, 2], [512, 1024], DType.bf16)

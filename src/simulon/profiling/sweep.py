@@ -157,7 +157,7 @@ def run_sweep(
             continue
 
         try:
-            runs = benchmark_kernels(
+            runs, oom_runs = benchmark_kernels(
                 hidden_size=kernel_params["hidden_size"],
                 num_heads=kernel_params["num_heads"],
                 ffn_hidden_size=kernel_params["ffn_hidden_size"],
@@ -174,7 +174,11 @@ def run_sweep(
                 num_layers=kernel_params.get("num_layers", 0),
                 existing_runs=existing_runs,
             )
-            results.append(SweepResult(config=config, runs=runs, oom=False))
+            # A config is OOM only if ALL kernels failed; partial OOM is normal.
+            all_oom = len(runs) == 0 and len(oom_runs) > 0
+            if all_oom:
+                known_ooms.append((tp, ep, batch_size, seq_len))
+            results.append(SweepResult(config=config, runs=runs, oom=all_oom, oom_runs=oom_runs))
         except (RuntimeError, MemoryError) as exc:
             if "out of memory" in str(exc).lower() or isinstance(exc, MemoryError):
                 known_ooms.append((tp, ep, batch_size, seq_len))

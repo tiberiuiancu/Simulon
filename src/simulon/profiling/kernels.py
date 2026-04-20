@@ -405,7 +405,7 @@ def benchmark_kernels(
     top_k: int = 1,
     num_layers: int = 0,
     existing_runs: Optional[list[dict]] = None,
-) -> list[KernelRun]:
+) -> tuple[list[KernelRun], list[KernelRun]]:
     """Benchmark all transformer kernels and return KernelRun measurements.
 
     Must be called on a machine with a CUDA GPU. Tensors are pre-allocated with
@@ -429,7 +429,9 @@ def benchmark_kernels(
             over the parameter count implied by the architecture (TP-sharded, all layers).
 
     Returns:
-        List of KernelRun objects with raw per-iteration times in milliseconds.
+        Tuple of (timing_runs, oom_runs). timing_runs contains KernelRun objects with per-iteration
+        times in milliseconds. oom_runs contains KernelRun objects with times_ms=[] for kernels that
+        hit out-of-memory errors during benchmarking.
     """
     import torch
 
@@ -454,13 +456,22 @@ def benchmark_kernels(
             _sufficient.add(key)
 
     results: list[KernelRun] = []
+    oom_results: list[KernelRun] = []
 
     def _run(kernel, fn, extra_params=None):
         p = {**params_base, **(extra_params or {})}
         if (kernel, frozenset(p.items())) in _sufficient:
             return
-        times = fn()
-        results.append(KernelRun(kernel=kernel, params=p, times_ms=times[:epoch_num]))
+        try:
+            times = fn()
+            results.append(KernelRun(kernel=kernel, params=p, times_ms=times[:epoch_num]))
+        except (RuntimeError, MemoryError) as exc:
+            if "out of memory" in str(exc).lower() or isinstance(exc, MemoryError):
+                import torch
+                torch.cuda.empty_cache()
+                oom_results.append(KernelRun(kernel=kernel, params=p, times_ms=[]))
+            else:
+                raise
 
     _run(
         "embedding",
@@ -538,7 +549,15 @@ def benchmark_kernels(
             if len(run["times_ms"]) >= epoch_num
         }
         if sufficient_key not in already_done:
-            times = _bench_adamw(num_params, tdt)
-            results.append(KernelRun(kernel="adamw", params=adamw_params, times_ms=times[:epoch_num]))
+            try:
+                times = _bench_adamw(num_params, tdt)
+                results.append(KernelRun(kernel="adamw", params=adamw_params, times_ms=times[:epoch_num]))
+            except (RuntimeError, MemoryError) as exc:
+                if "out of memory" in str(exc).lower() or isinstance(exc, MemoryError):
+                    import torch
+                    torch.cuda.empty_cache()
+                    oom_results.append(KernelRun(kernel="adamw", params=adamw_params, times_ms=[]))
+                else:
+                    raise
 
-    return results
+    return results, oom_results

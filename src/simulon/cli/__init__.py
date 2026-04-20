@@ -448,8 +448,7 @@ def profile_gpu(
                 ("moe_route", {"num_experts": num_experts_val}),
                 ("moe_expert", {"num_experts": num_experts_val, "ep": e, "top_k": top_k_val, "ffn_hidden_size": ffn_hidden_size_val}),
             ]
-        # If any expected kernel has an OOM entry, the whole config is OOM-done.
-        # benchmark_kernels raises and returns nothing on OOM, so all kernels are lost.
+        # If any expected kernel has an OOM entry, consider the config OOM-done for that kernel.
         if any(
             (kernel, frozenset(_fp(kernel, all_params_for_oom).items())) in _oom_kr_set
             for kernel, _ in expected
