@@ -352,23 +352,36 @@ def test_oom_config_is_skipped_gracefully(tmp_path):
     oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True)
     result, out_file, profile_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
     assert result.exit_code == 0
-    data = yaml.safe_load(profile_file.read_text())
+    data = yaml.safe_load(profile_file.read_text()) or {}
     assert data.get("kernel_runs", []) == []
 
 
 def test_oom_config_saved_to_profile(tmp_path):
-    """OOM configs must be written to oom_configs in the profile YAML."""
-    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
-    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    """OOM entries must be written to oom_kernel_runs in the profile YAML."""
+    oom_run = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 8192, "batch_size": 128, "dtype": "bf16"}, times_ms=[])
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}, runs=None, oom=True, oom_runs=[oom_run])
     _, out_file, profile_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
     data = yaml.safe_load(profile_file.read_text())
-    assert oom_cfg in data.get("oom_configs", [])
+    oom_kr = data.get("oom_kernel_runs", [])
+    assert any(r["kernel"] == "layernorm" and r["params"]["seq_len"] == 8192 for r in oom_kr)
 
 
-def test_oom_configs_deduplicated_across_runs(tmp_path):
-    """Re-running with the same OOM config must not duplicate the entry."""
-    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
-    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+def test_oom_kernel_runs_saved_to_profile(tmp_path):
+    """Per-kernel OOM entries must be written to oom_kernel_runs in the profile YAML."""
+    oom_run = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, times_ms=[])
+    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}
+    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True, oom_runs=[oom_run])
+    _, out_file, profile_file = _run_profile(tmp_path, [], sweep_rv=[oom_result])
+    data = yaml.safe_load(profile_file.read_text())
+    oom_kr = data.get("oom_kernel_runs", [])
+    assert any(r["kernel"] == "layernorm" and r["params"]["seq_len"] == 512 for r in oom_kr)
+
+
+def test_oom_kernel_runs_deduplicated(tmp_path):
+    """Re-running with the same OOM kernel run must not duplicate the entry."""
+    oom_run = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, times_ms=[])
+    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}
+    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True, oom_runs=[oom_run])
     out_file = tmp_path / "gpu.yaml"
     profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
@@ -378,13 +391,31 @@ def test_oom_configs_deduplicated_across_runs(tmp_path):
             runner.invoke(app, base)
 
     data = yaml.safe_load(profile_file.read_text())
-    assert data["oom_configs"].count(oom_cfg) == 1
+    ln_entries = [r for r in data.get("oom_kernel_runs", []) if r["kernel"] == "layernorm"]
+    assert len(ln_entries) == 1
+
+
+def test_oom_configs_deduplicated_across_runs(tmp_path):
+    """Re-running with the same OOM kernel run must not duplicate the entry."""
+    oom_run = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 8192, "batch_size": 128, "dtype": "bf16"}, times_ms=[])
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}, runs=None, oom=True, oom_runs=[oom_run])
+    out_file = tmp_path / "gpu.yaml"
+    profile_file = _profile_path(out_file)
+    base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    for _ in range(2):
+        with _patch_sweep([oom_result]):
+            runner.invoke(app, base)
+
+    data = yaml.safe_load(profile_file.read_text())
+    ln_entries = [r for r in data.get("oom_kernel_runs", []) if r["kernel"] == "layernorm"]
+    assert len(ln_entries) == 1
 
 
 def test_purge_clears_oom_configs(tmp_path):
-    """--purge must also clear previously recorded oom_configs."""
-    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}
-    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    """--purge must also clear previously recorded oom_kernel_runs."""
+    oom_run = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 8192, "batch_size": 128, "dtype": "bf16"}, times_ms=[])
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 8192}, runs=None, oom=True, oom_runs=[oom_run])
     out_file = tmp_path / "gpu.yaml"
     profile_file = _profile_path(out_file)
     base = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
@@ -393,19 +424,19 @@ def test_purge_clears_oom_configs(tmp_path):
     with _patch_sweep([oom_result]):
         runner.invoke(app, base)
     data = yaml.safe_load(profile_file.read_text())
-    assert len(data.get("oom_configs", [])) == 1
+    assert len(data.get("oom_kernel_runs", [])) == 1
 
     # Second run with --purge and a successful result: OOM list should be empty.
     with _patch_sweep([_FAKE_RESULT]):
         runner.invoke(app, base + ["--purge"])
     data = yaml.safe_load(profile_file.read_text())
-    assert data.get("oom_configs", []) == []
+    assert data.get("oom_kernel_runs", []) == []
 
 
 def test_oom_and_success_in_same_sweep(tmp_path):
-    """A sweep with mixed OOM/success results saves both kernel_runs and oom_configs."""
-    oom_cfg = {"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 512}
-    oom_result = SweepResult(config=oom_cfg, runs=None, oom=True)
+    """A sweep with mixed OOM/success results saves both kernel_runs and oom_kernel_runs."""
+    oom_run = KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 128, "dtype": "bf16"}, times_ms=[])
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 128, "seq_len": 512}, runs=None, oom=True, oom_runs=[oom_run])
     out_file = tmp_path / "gpu.yaml"
     profile_file = _profile_path(out_file)
     # Two configs (batch 1 and 128): first succeeds, second OOMs.
@@ -416,7 +447,7 @@ def test_oom_and_success_in_same_sweep(tmp_path):
         ] + _ARCH_ARGS)
     data = yaml.safe_load(profile_file.read_text())
     assert len(data.get("kernel_runs", [])) >= 1
-    assert oom_cfg in data.get("oom_configs", [])
+    assert any(r["kernel"] == "layernorm" and r["params"]["batch_size"] == 128 for r in data.get("oom_kernel_runs", []))
 
 
 # ---------------------------------------------------------------------------
@@ -471,10 +502,15 @@ def test_dry_run_skips_fully_profiled_config(tmp_path):
 
 def test_dry_run_skips_oom_config(tmp_path):
     """Configs recorded as OOM must be omitted from dry-run output."""
+    from simulon.config.common import DType
+    from simulon.profiling.sweep import _make_oom_kernel_runs
+
     out_file = tmp_path / "gpu.yaml"
     base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
 
-    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True)
+    kernel_params = {"hidden_size": 4096, "num_heads": 32, "ffn_hidden_size": 11008, "vocab_size": 32000}
+    oom_runs = _make_oom_kernel_runs(kernel_params, tp=1, ep=1, batch_size=1, seq_len=512, dtype=DType.bf16)
+    oom_result = SweepResult(config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512}, runs=None, oom=True, oom_runs=oom_runs)
     with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
         runner.invoke(app, base_args)
 
@@ -520,3 +556,162 @@ def test_dry_run_overwrite_shows_all_configs(tmp_path):
     assert dry.exit_code == 0
     assert "tp=1 ep=1 bs=1 seq=512" in dry.output
     assert "1 configurations to run" in dry.output
+
+
+# ---------------------------------------------------------------------------
+# _config_done OOM logic
+# ---------------------------------------------------------------------------
+
+
+def _make_oom_runs_for_config(tp=1, ep=1, batch_size=1, seq_len=512):
+    """Generate the OOM kernel_runs that _make_oom_kernel_runs would produce for a dense config."""
+    from simulon.config.common import DType
+    from simulon.profiling.sweep import _make_oom_kernel_runs
+
+    kernel_params = {"hidden_size": 4096, "num_heads": 32, "ffn_hidden_size": 11008, "vocab_size": 32000}
+    return _make_oom_kernel_runs(kernel_params, tp=tp, ep=ep, batch_size=batch_size, seq_len=seq_len, dtype=DType.bf16)
+
+
+def test_config_done_if_any_kernel_oom(tmp_path):
+    """A config is considered done (skipped) if ANY expected kernel has an OOM entry."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    oom_runs = _make_oom_runs_for_config(tp=1, ep=1, batch_size=1, seq_len=512)
+    oom_result = SweepResult(
+        config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512},
+        runs=None, oom=True, oom_runs=oom_runs,
+    )
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
+        runner.invoke(app, base_args)
+
+    # Dry-run for the same config: it should be treated as done.
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "tp=1 ep=1 bs=1 seq=512" not in dry.output
+    assert "1 already done" in dry.output
+
+
+def test_config_not_done_when_only_partial_kernels_profiled(tmp_path):
+    """A config is still pending if only some kernels have data (fewer than all expected)."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = ["profile", "gpu", "--name", "TestGPU", "--output", str(out_file), "--seq-len", "512"] + _ARCH_ARGS
+
+    # Only one kernel run — far fewer than all expected kernels.
+    partial_run = KernelRun(
+        kernel="layernorm",
+        params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        times_ms=[1.0] * 10,
+    )
+    partial_result = SweepResult(
+        config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 512},
+        runs=[partial_run], oom=False,
+    )
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[partial_result]):
+        runner.invoke(app, base_args)
+
+    # Config has only layernorm — should still be pending.
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "tp=1 ep=1 bs=1 seq=512" in dry.output
+    assert "1 configurations to run" in dry.output
+
+
+def test_config_done_different_seq_len_oom_does_not_skip_this_config(tmp_path):
+    """OOM entry for seq=1024 must not cause seq=512 to be skipped."""
+    out_file = tmp_path / "gpu.yaml"
+    base_args = [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--batch-size", "1", "--seq-len", "512",
+    ] + _ARCH_ARGS
+
+    # Record an OOM for seq=1024, which is a different config.
+    oom_runs_1024 = _make_oom_runs_for_config(tp=1, ep=1, batch_size=1, seq_len=1024)
+    oom_result = SweepResult(
+        config={"tp": 1, "ep": 1, "batch_size": 1, "seq_len": 1024},
+        runs=None, oom=True, oom_runs=oom_runs_1024,
+    )
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
+        runner.invoke(app, [
+            "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+            "--batch-size", "1", "--seq-len", "1024",
+        ] + _ARCH_ARGS)
+
+    # Now dry-run for seq=512 — must NOT be skipped.
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "bs=1 seq=512" in dry.output
+    assert "1 configurations to run" in dry.output
+
+
+def test_moe_config_done_if_moe_expert_oom_with_matching_ep(tmp_path):
+    """For MoE, _config_done checks moe_expert with the correct ep — matching ep marks config done."""
+    from simulon.config.common import DType
+    from simulon.profiling.sweep import _make_oom_kernel_runs
+
+    out_file = tmp_path / "gpu.yaml"
+    moe_arch_args = _ARCH_ARGS + ["--num-experts", "8", "--top-k", "2"]
+    base_args = [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--ep", "4", "--seq-len", "512",
+    ] + moe_arch_args
+
+    kernel_params = {"hidden_size": 4096, "num_heads": 32, "ffn_hidden_size": 11008,
+                     "vocab_size": 32000, "num_experts": 8, "top_k": 2}
+    oom_runs = _make_oom_kernel_runs(kernel_params, tp=1, ep=4, batch_size=1, seq_len=512, dtype=DType.bf16)
+    oom_result = SweepResult(
+        config={"tp": 1, "ep": 4, "batch_size": 1, "seq_len": 512},
+        runs=None, oom=True, oom_runs=oom_runs,
+    )
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[oom_result]):
+        runner.invoke(app, base_args)
+
+    # Same config in dry-run should be skipped (OOM-done).
+    dry = runner.invoke(app, base_args + ["--dry-run"])
+    assert dry.exit_code == 0
+    assert "ep=4" not in dry.output
+    assert "1 already done" in dry.output
+
+
+def test_moe_ep4_still_runs_after_ep8_partial_oom(tmp_path):
+    """With per-kernel OOM, dense kernels succeed at ep=8 while moe_expert may OOM.
+
+    Since dense-kernel OOM entries no longer exist for ep=8, the ep=4 config is NOT
+    blocked — _config_done sees that layernorm etc. have profiling data at ep=8 and
+    the ep=4 OOM check doesn't match any OOM entry. The profiler therefore runs ep=4.
+    """
+    from simulon.config.common import DType
+    from simulon.config.dc import KernelRun
+    from simulon.profiling.sweep import SweepResult
+
+    out_file = tmp_path / "gpu.yaml"
+    moe_arch_args = _ARCH_ARGS + ["--num-experts", "8", "--top-k", "2"]
+
+    kernel_params = {"hidden_size": 4096, "num_heads": 32, "ffn_hidden_size": 11008,
+                     "vocab_size": 32000, "num_experts": 8, "top_k": 2}
+
+    # At ep=8, dense kernels succeeded; only moe_expert OOM'd.
+    dense_runs = [
+        KernelRun(kernel="layernorm", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, times_ms=[1.0]),
+        KernelRun(kernel="attn_qkv", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"}, times_ms=[2.0]),
+    ]
+    moe_expert_oom = KernelRun(kernel="moe_expert", params={"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16", "num_experts": 8, "ep": 8, "top_k": 2, "ffn_hidden_size": 11008}, times_ms=[])
+    ep8_result = SweepResult(
+        config={"tp": 1, "ep": 8, "batch_size": 1, "seq_len": 512},
+        runs=dense_runs, oom=False, oom_runs=[moe_expert_oom],
+    )
+    with patch("simulon.profiling.sweep.run_sweep", return_value=[ep8_result]):
+        runner.invoke(app, [
+            "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+            "--ep", "8", "--seq-len", "512",
+        ] + moe_arch_args)
+
+    # ep=4 is NOT blocked — dense kernels have profiling data at ep=8 (not OOM), and
+    # the OOM entry for moe_expert at ep=8 only matches ep=8 params (it includes ep).
+    dry = runner.invoke(app, [
+        "profile", "gpu", "--name", "TestGPU", "--output", str(out_file),
+        "--ep", "4", "--seq-len", "512", "--dry-run",
+    ] + moe_arch_args)
+    assert dry.exit_code == 0
+    assert "ep=4" in dry.output  # ep=4 must run, not be skipped
+    assert "1 already done" not in dry.output

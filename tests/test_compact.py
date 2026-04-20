@@ -129,8 +129,8 @@ class TestCompactNonCompactEquivalence:
             workload=_make_workload(tp=1, pp=1, num_gpus=1, num_layers=2),
         )
         backend = AnalyticalBackend()
-        _, result_normal = backend.simulate(sc, compact=False)
-        _, result_compact = backend.simulate(sc, compact=True)
+        _, result_normal = backend.simulate(sc, compact=False, ignore_missing=True)
+        _, result_compact = backend.simulate(sc, compact=True, ignore_missing=True)
 
         # Compact must actually run and produce a non-zero time
         assert result_normal.total_time_ms > 0
@@ -144,8 +144,8 @@ class TestCompactNonCompactEquivalence:
             workload=_make_workload(tp=2, pp=1, num_gpus=2, num_layers=2),
         )
         backend = AnalyticalBackend()
-        _, result_normal = backend.simulate(sc, compact=False)
-        _, result_compact = backend.simulate(sc, compact=True)
+        _, result_normal = backend.simulate(sc, compact=False, ignore_missing=True)
+        _, result_compact = backend.simulate(sc, compact=True, ignore_missing=True)
 
         assert result_normal.total_time_ms > 0
         assert result_compact.total_time_ms == pytest.approx(result_normal.total_time_ms, rel=1e-5)
@@ -157,8 +157,8 @@ class TestCompactNonCompactEquivalence:
             workload=_make_workload(tp=2, pp=1, num_gpus=2, num_layers=2),
         )
         backend = AnalyticalBackend()
-        _, result_normal = backend.simulate(sc, compact=False)
-        _, result_compact = backend.simulate(sc, compact=True)
+        _, result_normal = backend.simulate(sc, compact=False, ignore_missing=True)
+        _, result_compact = backend.simulate(sc, compact=True, ignore_missing=True)
 
         assert set(result_compact.per_gpu_times_ms) == set(result_normal.per_gpu_times_ms)
         for rank, t_normal in result_normal.per_gpu_times_ms.items():

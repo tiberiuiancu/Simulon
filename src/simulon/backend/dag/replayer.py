@@ -145,17 +145,17 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
 
         compute_ms = sum(e - s for s, e in compute_ivs)
 
-        # Per-type exposed recv: attribute each recv node's exposed duration
-        # individually rather than computing interval-union per type.  This
-        # slightly over-counts if two exposed recv nodes of the same type
-        # overlap each other (two collectives in flight simultaneously on one
-        # GPU), but that is rare in practice and acceptable for a summary.
+        # Per-type exposed comm: group by type, compute union per type,
+        # then subtract hidden portion (overlap with compute).  This avoids
+        # double-counting overlapping recv nodes of the same type.
         exposed_by_type: dict[str, float] = defaultdict(float)
+        by_type: dict[str, list[tuple[float, float]]] = defaultdict(list)
         for start, finish, ctype in recv_entries:
-            raw = finish - start
-            hidden = _intersection_duration([(start, finish)], compute_ivs)
-            exp = max(0.0, raw - hidden)
-            exposed_by_type[ctype] += exp
+            by_type[ctype].append((start, finish))
+        for ctype, ivs in by_type.items():
+            type_union = _merge_intervals(ivs)
+            exp = max(0.0, _union_duration(type_union) - _intersection_duration(type_union, compute_ivs))
+            exposed_by_type[ctype] = exp
 
         # Compute total exposed using the union of all recv intervals to avoid
         # double-counting when two recv nodes overlap on the same GPU.

@@ -4,7 +4,11 @@ import pytest
 
 from simulon.backend.dag import DAGTracerConfig
 from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
-from simulon.backend.dag.megatron_tracer import _params_per_tp_rank
+from simulon.backend.dag.megatron_tracer import (
+    _params_per_tp_rank,
+    _non_expert_params_per_tp_rank,
+    _expert_params_per_tp_rank,
+)
 from simulon.backend.dag.populate import populate_dag
 from simulon.config.common import DType
 from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, KernelRun, NodeSpec
@@ -166,18 +170,23 @@ def test_step_bytes_formula_moe():
     dag = trace(wl, make_dc(gpus=8))
 
     model = wl.model
-    expected_params = _params_per_tp_rank(model, tp=tp, ep=ep)
-    expected_bytes = 4 * expected_params // pp
+    # Non-expert params are synced over non_expert_dp (size dp*ep).
+    # Expert params are synced over expert_dp (size dp).
+    # Ring AllReduce: each CommNode.bytes = (4 * params) // group_size.
+    non_expert_params = _non_expert_params_per_tp_rank(model, tp=tp)
+    expert_params = _expert_params_per_tp_rank(model, tp=tp, ep=ep)
+    non_expert_dp_size = dp * ep
+    ne_chunk = (4 * non_expert_params // pp) // non_expert_dp_size
+    exp_chunk = (4 * expert_params // pp) // dp
 
     step_ar = [n for n in dag.comm_nodes if n.phase == "step" and n.collective_type == "AllReduce"]
     assert len(step_ar) > 0
 
-    # Ring AllReduce with dp=2: each CommNode carries chunk_size = expected_bytes // dp.
-    chunk_size = expected_bytes // dp
+    expected_sizes = {ne_chunk, exp_chunk}
     for node in step_ar:
-        assert node.bytes == chunk_size, (
-            f"MoE: expected each AllReduce CommNode to carry {chunk_size} bytes, "
-            f"got {node.bytes} on flow {node.src_gpu}→{node.dst_gpu}"
+        assert node.bytes in expected_sizes, (
+            f"MoE: AllReduce CommNode bytes {node.bytes} on flow {node.src_gpu}→{node.dst_gpu} "
+            f"not in expected sizes {expected_sizes} (ne_chunk={ne_chunk}, exp_chunk={exp_chunk})"
         )
 
 
@@ -444,8 +453,9 @@ def test_populate_dag_assigns_adamw_duration():
         ],
     )
 
-    # Populate; cache key uses id(gpu_spec) so this fresh object is clean
-    populate_dag(dag, wl, gpu_spec)
+    # Populate; cache key uses id(gpu_spec) so this fresh object is clean.
+    # ignore_missing=True because this sparse spec only covers adamw.
+    populate_dag(dag, wl, gpu_spec, ignore_missing=True)
 
     for node in adamw_nodes:
         assert node.duration_ms == pytest.approx(5.0), (
@@ -462,7 +472,8 @@ def test_populate_dag_adamw_uses_num_params_not_hidden_size():
     adamw_nodes = [n for n in dag.compute_nodes if n.kernel == "adamw"]
     num_params = adamw_nodes[0].extra_params["num_params"]
 
-    # Provide only a run with num_params (no hidden_size), ensure it still matches
+    # Provide only a run with num_params (no hidden_size), ensure it still matches.
+    # ignore_missing=True because this sparse spec only covers adamw.
     gpu_spec = GPUSpec(
         name="test-gpu",
         kernel_runs=[
@@ -473,7 +484,7 @@ def test_populate_dag_adamw_uses_num_params_not_hidden_size():
             )
         ],
     )
-    populate_dag(dag, wl, gpu_spec)
+    populate_dag(dag, wl, gpu_spec, ignore_missing=True)
 
     for node in adamw_nodes:
         assert node.duration_ms == pytest.approx(7.5)
