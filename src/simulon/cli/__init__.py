@@ -173,7 +173,8 @@ def _print_summary(result, workload=None) -> None:
         tokens_per_iter = t.global_batch_size * t.sequence_length
         iter_time_s = total / 1000.0
         throughput_tps = tokens_per_iter / iter_time_s
-        typer.echo(f"Throughput:           {throughput_tps:,.1f} tokens/s")
+        per_gpu_tps = throughput_tps / n_gpus
+        typer.echo(f"Throughput:           {per_gpu_tps:,.1f} tokens/s ({throughput_tps:,.1f} tokens/s)")
         resolved = _resolve_model(workload.model)
         if resolved.gflops_per_train_token is not None:
             tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
