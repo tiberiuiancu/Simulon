@@ -8,7 +8,7 @@ import yaml
 
 def _dump_profile(data: dict, f) -> None:
     """Write a GPU profile YAML with compact one-line-per-entry formatting."""
-    top = {k: v for k, v in data.items() if k not in ("kernel_runs", "oom_configs")}
+    top = {k: v for k, v in data.items() if k not in ("kernel_runs", "oom_kernel_runs")}
     if top:
         f.write(yaml.dump(top, default_flow_style=False, sort_keys=False))
     runs = data.get("kernel_runs", [])
@@ -16,11 +16,11 @@ def _dump_profile(data: dict, f) -> None:
         f.write("kernel_runs:\n")
         for run in runs:
             f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
-    oom = data.get("oom_configs", [])
-    if oom:
-        f.write("oom_configs:\n")
-        for cfg in oom:
-            f.write(f"  - {yaml.dump(cfg, default_flow_style=True, sort_keys=False).strip()}\n")
+    oom_kr = data.get("oom_kernel_runs", [])
+    if oom_kr:
+        f.write("oom_kernel_runs:\n")
+        for run in oom_kr:
+            f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
 
 
 app = typer.Typer(name="simulon", help="AI cluster simulator")
@@ -335,16 +335,16 @@ def profile_gpu(
     profile_path = spec_path.with_suffix('').with_suffix('.profile.yaml')
     spec_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load existing profile data (kernel_runs / oom_configs).
+    # Load existing profile data (kernel_runs / oom_kernel_runs).
     if profile_path.exists():
         with open(profile_path) as f:
             profile_data: dict = yaml.safe_load(f) or {}
         existing_runs: list[dict] = profile_data.get("kernel_runs", [])
-        existing_oom: list[dict] = profile_data.get("oom_configs", [])
+        existing_oom_kr: list[dict] = profile_data.get("oom_kernel_runs", [])
     else:
         profile_data = {}
         existing_runs = []
-        existing_oom = []
+        existing_oom_kr = []
 
     # Create hardware spec file if it doesn't exist yet (skip for --dry-run).
     _hw_args_provided = any(v is not None for v in [vendor, memory_capacity_gb, tdp_w]) or flops_multiplier != 1.0
@@ -369,7 +369,7 @@ def profile_gpu(
 
     if purge:
         existing_runs = []
-        existing_oom = []
+        existing_oom_kr = []
 
     # For skip logic: pass existing_runs unless --overwrite (forces re-profiling).
     runs_for_skip = [] if overwrite else existing_runs
@@ -377,12 +377,17 @@ def profile_gpu(
     label = model or name
 
     # Build skip-filter structures (used for both dry-run output and actual sweep).
-    _oom_set = {frozenset(c.items()) for c in existing_oom}
+    # Use canonical filtered params for both sets so that non-canonical fields stored
+    # in profiling runs (e.g. swiglu in mlp_act) don't break the matching.
+    from simulon.profiling.lookup import _filter_params as _fp
     _sufficient: set[tuple] = set()
     for run in runs_for_skip:
-        key = (run["kernel"], frozenset(run["params"].items()))
+        key = (run["kernel"], frozenset(_fp(run["kernel"], run["params"]).items()))
         if len(run["times_ms"]) >= epoch_num:
             _sufficient.add(key)
+    _oom_kr_set: set[tuple] = {
+        (r["kernel"], frozenset(r["params"].items())) for r in existing_oom_kr
+    }
 
     dtype_str = dtype_enum.value
     ffn_hidden_size_val = kernel_params["ffn_hidden_size"]
@@ -409,9 +414,20 @@ def profile_gpu(
         return num_layers_val * per_layer + embedding + logit
 
     def _config_done(t: int, e: int, b: int, s: int) -> bool:
-        if frozenset({"tp": t, "ep": e, "batch_size": b, "seq_len": s, "hidden_size": hidden_size_val}.items()) in _oom_set:
-            return True
+        # Note: _sufficient and _oom_kr_set are frozen at sweep start and not updated
+        # mid-sweep. Within a single sweep invocation, inferred-OOM skipping is handled
+        # by run_sweep's internal _inferred_oom logic, not by _config_done.
         base = {"hidden_size": hidden_size_val, "seq_len": s, "batch_size": b, "dtype": dtype_str, "tp": t}
+        # Complete params used for OOM key lookup — must match what _make_oom_kernel_runs uses.
+        all_params_for_oom: dict = {
+            "hidden_size": hidden_size_val, "num_heads": num_heads_val,
+            "ffn_hidden_size": ffn_hidden_size_val, "vocab_size": vocab_size_val,
+            "seq_len": s, "batch_size": b, "dtype": dtype_str, "tp": t, "ep": e,
+        }
+        if num_experts_val > 0:
+            all_params_for_oom["num_experts"] = num_experts_val
+        if kernel_params.get("top_k"):
+            all_params_for_oom["top_k"] = top_k_val
         expected = [
             ("embedding", {}),
             ("layernorm", {}),
@@ -428,11 +444,19 @@ def profile_gpu(
                 ("moe_route", {"num_experts": num_experts_val}),
                 ("moe_expert", {"num_experts": num_experts_val, "ep": e, "top_k": top_k_val, "ffn_hidden_size": ffn_hidden_size_val}),
             ]
-        if not all(
-            (kernel, frozenset({**base, **extra}.items())) in _sufficient
-            for kernel, extra in expected
+        # If any expected kernel has an OOM entry, the whole config is OOM-done.
+        # benchmark_kernels raises and returns nothing on OOM, so all kernels are lost.
+        if any(
+            (kernel, frozenset(_fp(kernel, all_params_for_oom).items())) in _oom_kr_set
+            for kernel, _ in expected
         ):
-            return False
+            return True
+        # Otherwise require all expected kernels to have sufficient profiling data.
+        # Use canonical filtered params for matching — same filtering applied during lookup.
+        for kernel, extra in expected:
+            sufficient_key = (kernel, frozenset(_fp(kernel, {**base, **extra, "ep": e}).items()))
+            if sufficient_key not in _sufficient:
+                return False
         if num_layers_val > 0:
             adamw_key = ("adamw", frozenset({"num_params": _adamw_num_params(t, e), "dtype": dtype_str}.items()))
             if adamw_key not in _sufficient:
@@ -465,6 +489,7 @@ def profile_gpu(
             for t, e, b, s in pending:
                 progress.update(task_id, description=f"Profiling {label}  tp={t} ep={e} bs={b} seq={s}")
                 single = run_sweep(kernel_params, [t], [e], [b], [s], dtype_enum, epoch_num, existing_runs=runs_for_skip)
+                # run_sweep always returns exactly one result for a single-config call.
                 r = single[0] if single else SweepResult(
                     config={"tp": t, "ep": e, "batch_size": b, "seq_len": s}, runs=None, oom=True
                 )
@@ -501,15 +526,18 @@ def profile_gpu(
 
     profile_data["kernel_runs"] = existing_runs
 
-    # Merge new OOM configs, deduplicating by config dict.
-    new_oom = [r.config for r in results if r.oom]
-    if new_oom:
-        existing_oom_set = {frozenset(c.items()) for c in existing_oom}
-        for cfg in new_oom:
-            if frozenset(cfg.items()) not in existing_oom_set:
-                existing_oom.append(cfg)
-                existing_oom_set.add(frozenset(cfg.items()))
-    profile_data["oom_configs"] = existing_oom
+    # Merge new per-kernel OOM runs (for simulation-time checking and dry-run skip logic).
+    new_oom_kr = [kr for r in results if r.oom for kr in r.oom_runs]
+    if new_oom_kr:
+        existing_oom_kr_set = {
+            (r["kernel"], frozenset(r["params"].items())) for r in existing_oom_kr
+        }
+        for kr in new_oom_kr:
+            key = (kr.kernel, frozenset(kr.params.items()))
+            if key not in existing_oom_kr_set:
+                existing_oom_kr.append(kr.model_dump())
+                existing_oom_kr_set.add(key)
+    profile_data["oom_kernel_runs"] = existing_oom_kr
 
     with open(profile_path, "w") as f:
         _dump_profile(profile_data, f)

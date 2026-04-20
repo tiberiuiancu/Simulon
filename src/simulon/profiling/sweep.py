@@ -33,6 +33,7 @@ class SweepResult:
     config: dict
     runs: Optional[list[KernelRun]] = field(default=None)
     oom: bool = False
+    oom_runs: list[KernelRun] = field(default_factory=list)
 
 
 def _inferred_oom(
@@ -54,6 +55,48 @@ def _inferred_oom(
         if tp <= tp_oom and ep <= ep_oom and batch_size >= bs_oom and seq_len >= sl_oom:
             return True
     return False
+
+
+def _make_oom_kernel_runs(
+    kernel_params: dict,
+    tp: int,
+    ep: int,
+    batch_size: int,
+    seq_len: int,
+    dtype: DType,
+) -> list[KernelRun]:
+    """Generate per-kernel OOM entries for a failed (tp, ep, batch_size, seq_len) config.
+
+    For each kernel in KERNEL_MATCH_KEYS whose canonical params are fully covered by
+    the current profiling config, produces a KernelRun with times_ms=[] recording that
+    the kernel with these params hit OOM.
+    """
+    from simulon.profiling.lookup import KERNEL_MATCH_KEYS, _filter_params
+
+    all_params = {
+        "hidden_size": kernel_params["hidden_size"],
+        "num_heads": kernel_params["num_heads"],
+        "ffn_hidden_size": kernel_params["ffn_hidden_size"],
+        "vocab_size": kernel_params["vocab_size"],
+        "seq_len": seq_len,
+        "batch_size": batch_size,
+        "dtype": dtype.value,
+        "tp": tp,
+        "ep": ep,
+    }
+    if kernel_params.get("num_experts"):
+        all_params["num_experts"] = kernel_params["num_experts"]
+    if kernel_params.get("top_k"):
+        all_params["top_k"] = kernel_params["top_k"]
+
+    oom_runs: list[KernelRun] = []
+    for kernel, canonical_keys in KERNEL_MATCH_KEYS.items():
+        filtered = _filter_params(kernel, all_params)
+        # Only emit an OOM entry when all canonical params are present (i.e. the kernel
+        # would actually have been benchmarked in this profiling config).
+        if frozenset(filtered.keys()) == canonical_keys:
+            oom_runs.append(KernelRun(kernel=kernel, params=filtered, times_ms=[]))
+    return oom_runs
 
 
 def run_sweep(
@@ -106,16 +149,11 @@ def run_sweep(
     results: list[SweepResult] = []
 
     for tp, ep, batch_size, seq_len in sorted_configs:
-        config = {
-            "tp": tp,
-            "ep": ep,
-            "batch_size": batch_size,
-            "seq_len": seq_len,
-            "hidden_size": kernel_params["hidden_size"],
-        }
+        config = {"tp": tp, "ep": ep, "batch_size": batch_size, "seq_len": seq_len}
 
         if _inferred_oom(tp, ep, batch_size, seq_len, known_ooms):
-            results.append(SweepResult(config=config, runs=None, oom=True))
+            oom_runs = _make_oom_kernel_runs(kernel_params, tp, ep, batch_size, seq_len, dtype)
+            results.append(SweepResult(config=config, runs=None, oom=True, oom_runs=oom_runs))
             continue
 
         try:
@@ -140,7 +178,8 @@ def run_sweep(
         except (RuntimeError, MemoryError) as exc:
             if "out of memory" in str(exc).lower() or isinstance(exc, MemoryError):
                 known_ooms.append((tp, ep, batch_size, seq_len))
-                results.append(SweepResult(config=config, runs=None, oom=True))
+                oom_runs = _make_oom_kernel_runs(kernel_params, tp, ep, batch_size, seq_len, dtype)
+                results.append(SweepResult(config=config, runs=None, oom=True, oom_runs=oom_runs))
             else:
                 raise
 

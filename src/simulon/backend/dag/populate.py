@@ -9,7 +9,7 @@ from simulon.backend.dag.nodes import ExecutionDAG
 from simulon.config.dc import DatacenterConfig, GPUSpec, NICSpec, SwitchSpec
 from simulon.config.resolve import resolve_node_spec, resolve_scale_out
 from simulon.config.workload import MegatronWorkload
-from simulon.profiling.lookup import lookup_kernel_time
+from simulon.profiling.lookup import is_kernel_oom, lookup_kernel_time
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +133,33 @@ def _get_link_params(
 # ---------------------------------------------------------------------------
 
 
+def _handle_missing(
+    kernel: str,
+    params: dict,
+    gpu_spec: GPUSpec,
+    ignore_oom: bool,
+) -> None:
+    """Called when lookup_kernel_time returns None.
+
+    - If the kernel+params match a known OOM profiling entry: raise RuntimeError
+      (unless ignore_oom=True, in which case silently proceed with None timing).
+    - Otherwise: emit a warning that no profiling data exists for this kernel.
+    """
+    if is_kernel_oom(kernel, params, gpu_spec):
+        if not ignore_oom:
+            raise RuntimeError(
+                f"Kernel '{kernel}' matches a known OOM profiling entry. "
+                "Pass --ignore-oom to suppress this error and simulate anyway."
+            )
+    else:
+        warnings.warn(
+            f"No profiling data found for kernel '{kernel}'. "
+            "Timing will be None — results may be incomplete.",
+            UserWarning,
+            stacklevel=4,
+        )
+
+
 def populate_dag(
     dag: ExecutionDAG,
     workload: MegatronWorkload,
@@ -141,8 +168,9 @@ def populate_dag(
 ) -> ExecutionDAG:
     """Fill ComputeNode.duration_ms by looking up kernel times in gpu_spec.
 
-    Raises RuntimeError if the workload config matches a known OOM entry in
-    gpu_spec.oom_configs, unless ignore_oom=True.
+    For each kernel node, if no timing data is found and the kernel+params
+    combination matches a known OOM profiling entry in gpu_spec.oom_kernel_runs,
+    a RuntimeError is raised unless ignore_oom=True.
 
     Sets ComputeNode.is_extrapolated=True when the duration was obtained via
     linear extrapolation rather than an exact or partial profile match.
@@ -154,17 +182,6 @@ def populate_dag(
     t = workload.training
     p = workload.parallelism
     model = _resolve_model(workload.model)
-
-    # OOM guard: raise early if this config was known to OOM during profiling.
-    if not ignore_oom and gpu_spec.oom_configs:
-        _check_oom_configs(
-            gpu_spec.oom_configs,
-            tp=p.tp,
-            ep=p.ep,
-            batch_size=t.micro_batch_size,
-            seq_len=t.sequence_length,
-            hidden_size=model.hidden_size,
-        )
 
     # Build a comprehensive params dict covering all kernel types.
     # lookup_kernel_time will filter to only the params relevant to each kernel.
@@ -191,13 +208,21 @@ def populate_dag(
             if node.kernel == "adamw":
                 mp = {**adamw_base, "num_params": node.extra_params.get("num_params")}
                 time_ms, extrap = lookup_kernel_time("adamw", mp, gpu_spec)
+                if time_ms is None:
+                    _handle_missing("adamw", mp, gpu_spec, ignore_oom)
             elif node.fused_kernels:
-                results = [lookup_kernel_time(k, all_params, gpu_spec) for k in node.fused_kernels]
-                times = [r[0] for r in results]
+                fused_results = [(k, lookup_kernel_time(k, all_params, gpu_spec)) for k in node.fused_kernels]
+                times = [r[0] for _, r in fused_results]
                 time_ms = None if any(t is None for t in times) else sum(times)  # type: ignore[arg-type]
-                extrap = any(r[1] for r in results)
+                extrap = any(r[1] for _, r in fused_results)
+                if time_ms is None:
+                    for k, (t, _) in fused_results:
+                        if t is None:
+                            _handle_missing(k, all_params, gpu_spec, ignore_oom)
             else:
                 time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+                if time_ms is None:
+                    _handle_missing(node.kernel, all_params, gpu_spec, ignore_oom)
 
             node.duration_ms = time_ms
             node.is_extrapolated = extrap
@@ -205,53 +230,6 @@ def populate_dag(
 
     return dag
 
-
-def _check_oom_configs(
-    oom_configs: list[dict],
-    tp: int,
-    ep: int,
-    batch_size: int,
-    seq_len: int,
-    hidden_size: int | None,
-) -> None:
-    """Raise RuntimeError if the current config matches or is dominated by a known OOM entry.
-
-    Dominance rule: a known-OOM config (tp_oom, ep_oom, bs_oom, sl_oom) implies the
-    current config also OOMs when:
-      - tp <= tp_oom  (less sharding → more memory per GPU)
-      - ep <= ep_oom  (less expert sharding → more memory per GPU)
-      - batch_size >= bs_oom  (larger batch → more activation memory)
-      - seq_len >= sl_oom     (longer sequence → more activation memory)
-    hidden_size must match exactly when present in the OOM entry (different model = different profile).
-    """
-    for oom in oom_configs:
-        tp_oom = oom.get("tp")
-        ep_oom = oom.get("ep")
-        bs_oom = oom.get("batch_size")
-        sl_oom = oom.get("seq_len")
-        hs_oom = oom.get("hidden_size")
-
-        # If the OOM entry specifies hidden_size, it must match the current model.
-        if hs_oom is not None and hidden_size is not None and hs_oom != hidden_size:
-            continue
-
-        # Check dominance: current config is at least as memory-intensive.
-        dominated = True
-        if tp_oom is not None and tp > tp_oom:
-            dominated = False  # current has more TP sharding → less memory → OK
-        if ep_oom is not None and ep > ep_oom:
-            dominated = False
-        if bs_oom is not None and batch_size < bs_oom:
-            dominated = False  # current has smaller batch → less memory → OK
-        if sl_oom is not None and seq_len < sl_oom:
-            dominated = False
-
-        if dominated:
-            raise RuntimeError(
-                f"Config (tp={tp}, ep={ep}, batch_size={batch_size}, seq_len={seq_len}) "
-                f"matches or exceeds a known OOM profile entry {oom}. "
-                "Pass --ignore-oom to suppress this error and simulate anyway."
-            )
 
 
 def populate_network(

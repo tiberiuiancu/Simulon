@@ -104,9 +104,11 @@ class GPUSpec(BaseModel):
     cost: Optional[CostField] = None
     # Populated by `simulon profile gpu`; empty when declared inline in a DC config.
     kernel_runs: list[KernelRun] = []
-    # Configs that hit OOM during profiling. Used at runtime to warn when
-    # interpolating for a config known to exceed GPU memory.
-    oom_configs: list[dict] = []
+    # Per-kernel OOM entries: same structure as kernel_runs but with times_ms=[].
+    # Recorded when a profiling config OOMs; also covers inferred-OOM configs
+    # (dominated by a confirmed OOM).  Used at simulation time to raise an early
+    # error, and by the CLI to skip already-attempted configs.
+    oom_kernel_runs: list[KernelRun] = []
 
 
 class CPUSpec(BaseModel):

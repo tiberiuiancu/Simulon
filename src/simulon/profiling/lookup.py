@@ -70,6 +70,28 @@ def _scale_ratio(param: str, req_val: Any, ref_val: Any) -> float:
     return req_val / ref_val
 
 
+def is_kernel_oom(
+    kernel: str,
+    match_params: dict[str, Any],
+    gpu_spec: GPUSpec,
+) -> bool:
+    """Return True if the given kernel+params matches a known OOM entry in gpu_spec.
+
+    Uses the same canonical-key filtering as lookup_kernel_time.  An OOM entry
+    matches when every key in the filtered query params is present in the entry's
+    params with an equal value.  In practice OOM entries are generated with exactly
+    the canonical key set, so this is an equality check; the subset direction
+    handles any hand-edited or legacy entries that carry extra keys.
+    """
+    filtered = _filter_params(kernel, match_params)
+    for run in gpu_spec.oom_kernel_runs:
+        if run.kernel != kernel:
+            continue
+        if all(k in run.params and run.params[k] == v for k, v in filtered.items()):
+            return True
+    return False
+
+
 def lookup_kernel_time(
     kernel: str,
     match_params: dict[str, Any],

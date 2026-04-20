@@ -5,7 +5,7 @@ import statistics
 import pytest
 
 from simulon.config.dc import GPUSpec, KernelRun
-from simulon.profiling.lookup import lookup_kernel_time
+from simulon.profiling.lookup import is_kernel_oom, lookup_kernel_time
 import simulon.profiling.lookup as _lookup_module
 
 
@@ -296,3 +296,113 @@ def test_adamw_proportional_scaling_emits_warning():
     gpu = _gpu(_run("adamw", {"num_params": 500_000, "dtype": "bf16"}, [4.0]))
     with pytest.warns(UserWarning, match="num_params"):
         lookup_kernel_time("adamw", {"num_params": 1_000_000, "dtype": "bf16"}, gpu)
+
+
+# ---------------------------------------------------------------------------
+# is_kernel_oom
+# ---------------------------------------------------------------------------
+
+
+def _gpu_with_oom(*oom_runs: KernelRun, kernel_runs: list[KernelRun] | None = None) -> GPUSpec:
+    return GPUSpec(name="test", kernel_runs=kernel_runs or [], oom_kernel_runs=list(oom_runs))
+
+
+def _oom_run(kernel, params):
+    return KernelRun(kernel=kernel, params=params, times_ms=[])
+
+
+def test_is_kernel_oom_exact_match():
+    """Exact canonical-key match against an oom_kernel_runs entry returns True."""
+    gpu = _gpu_with_oom(
+        _oom_run("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"})
+    )
+    assert is_kernel_oom(
+        "layernorm",
+        {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is True
+
+
+def test_is_kernel_oom_ignores_non_canonical_params():
+    """Extra params in match_params that are not canonical for the kernel are stripped before matching."""
+    # layernorm canonical keys do not include tp or vocab_size — they should be ignored.
+    gpu = _gpu_with_oom(
+        _oom_run("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"})
+    )
+    assert is_kernel_oom(
+        "layernorm",
+        {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16",
+         "tp": 4, "vocab_size": 32000},
+        gpu,
+    ) is True
+
+
+def test_is_kernel_oom_dtype_mismatch_returns_false():
+    """OOM entry with a different dtype does not match."""
+    gpu = _gpu_with_oom(
+        _oom_run("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "fp32"})
+    )
+    assert is_kernel_oom(
+        "layernorm",
+        {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is False
+
+
+def test_is_kernel_oom_wrong_kernel_returns_false():
+    """OOM entry for a different kernel name does not match."""
+    gpu = _gpu_with_oom(
+        _oom_run("layernorm", {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"})
+    )
+    assert is_kernel_oom(
+        "attn_qkv",
+        {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is False
+
+
+def test_is_kernel_oom_empty_oom_kernel_runs():
+    """An empty oom_kernel_runs list always returns False."""
+    gpu = GPUSpec(name="test", kernel_runs=[], oom_kernel_runs=[])
+    assert is_kernel_oom(
+        "layernorm",
+        {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is False
+
+
+def test_is_kernel_oom_moe_expert_includes_ep_num_experts_top_k():
+    """moe_expert OOM entries must match on ep, num_experts, and top_k."""
+    gpu = _gpu_with_oom(
+        _oom_run(
+            "moe_expert",
+            {"hidden_size": 4096, "ffn_hidden_size": 16384, "num_experts": 8, "ep": 4,
+             "top_k": 2, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        )
+    )
+    # Exact match.
+    assert is_kernel_oom(
+        "moe_expert",
+        {"hidden_size": 4096, "ffn_hidden_size": 16384, "num_experts": 8, "ep": 4,
+         "top_k": 2, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is True
+    # Different ep → no match.
+    assert is_kernel_oom(
+        "moe_expert",
+        {"hidden_size": 4096, "ffn_hidden_size": 16384, "num_experts": 8, "ep": 8,
+         "top_k": 2, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is False
+
+
+def test_is_kernel_oom_hidden_size_mismatch_returns_false():
+    """OOM entry with different hidden_size does not match."""
+    gpu = _gpu_with_oom(
+        _oom_run("layernorm", {"hidden_size": 8192, "seq_len": 512, "batch_size": 1, "dtype": "bf16"})
+    )
+    assert is_kernel_oom(
+        "layernorm",
+        {"hidden_size": 4096, "seq_len": 512, "batch_size": 1, "dtype": "bf16"},
+        gpu,
+    ) is False
