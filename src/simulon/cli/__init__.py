@@ -39,6 +39,7 @@ def simulate(
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Print iteration summary to stdout"),
     chrome: Optional[Path] = typer.Option(None, "--chrome", help="Write Chrome/Perfetto trace to this path"),
     dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
+    goal: Optional[Path] = typer.Option(None, "--goal", help="Write GOAL trace to this path for use with ATLAHS/LogGOPSim"),
     compact: bool = typer.Option(False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
     energy: bool = typer.Option(False, "--energy", help="Compute and print per-iteration energy breakdown"),
@@ -135,6 +136,13 @@ def simulate(
             typer.echo(f"DAG written to {dag_out}")
             for tracker in trackers:
                 tracker.log_artifact(dag_out)
+
+        if goal is not None:
+            from simulon.backend.dag.goal_trace import write_goal_trace
+            write_goal_trace(dag, goal)
+            typer.echo(f"GOAL trace written to {goal}  (feed to ATLAHS/LogGOPSim via txt2bin)")
+            for tracker in trackers:
+                tracker.log_artifact(goal)
 
     finally:
         for tracker in trackers:
