@@ -21,17 +21,33 @@ def _sublayer_entry_exit(
     comm_stubs: list[CommNode],
     stub_to_comm_ids: dict[int, list[int]],
 ) -> tuple[int | None, int | None]:
-    """Return (entry_node_id, exit_node_id) for a sublayer after stub patching."""
-    if comm_stubs:
-        first_actual = stub_to_comm_ids.get(comm_stubs[0].node_id, [])
-        entry_id = first_actual[0] if first_actual else (c_nodes[0].node_id if c_nodes else None)
-        last_actual = stub_to_comm_ids.get(comm_stubs[-1].node_id, [])
-        exit_id = last_actual[-1] if last_actual else (c_nodes[-1].node_id if c_nodes else None)
-    elif c_nodes:
-        entry_id = c_nodes[0].node_id
-        exit_id = c_nodes[-1].node_id
-    else:
-        entry_id = exit_id = None
+    all_nodes = sorted(
+        [("c", n.node_id) for n in c_nodes] + [("s", s.node_id) for s in comm_stubs],
+        key=lambda x: x[1],
+    )
+    if not all_nodes:
+        return None, None
+
+    def _resolve(node_type: str, node_id: int, end: bool = False) -> int | None:
+        if node_type == "c":
+            return node_id
+        actual = stub_to_comm_ids.get(node_id, [])
+        if actual:
+            return actual[-1] if end else actual[0]
+        return None
+
+    entry_id = None
+    for node_type, node_id in all_nodes:
+        entry_id = _resolve(node_type, node_id)
+        if entry_id is not None:
+            break
+
+    exit_id = None
+    for node_type, node_id in reversed(all_nodes):
+        exit_id = _resolve(node_type, node_id, end=True)
+        if exit_id is not None:
+            break
+
     return entry_id, exit_id
 
 
@@ -496,8 +512,12 @@ class MegatronDAGTracer(DAGTracer):
                                                     slot_first_entry_set = True
 
                                                 prev = last_node_per_gpu.get(gpu)
-                                                if prev is not None and entry_id is not None:
-                                                    dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=entry_id))
+                                                if prev is not None:
+                                                    for cn in c_nodes:
+                                                        dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=cn.node_id))
+                                                    for stub in comm_stubs:
+                                                        for fid in stub_to_comm_ids.get(stub.node_id, []):
+                                                            dag.edges.append(DAGEdge(src_node_id=prev, dst_node_id=fid))
                                                 if exit_id is not None:
                                                     last_node_per_gpu[gpu] = exit_id
 

@@ -436,3 +436,38 @@ def test_dense_model_no_alltoall_has_mlp_kernels():
     assert "mlp_linear1" in kernels, "Dense model must use mlp_linear1 kernel"
     assert "mlp_linear2" in kernels, "Dense model must use mlp_linear2 kernel"
     assert "moe_expert" not in kernels, "Dense model must not produce moe_expert kernels"
+
+
+def test_moe_bwd_ig_compute_nodes_are_sequential_per_gpu():
+    from simulon.backend.dag.populate import populate_dag, populate_network
+    from simulon.backend.dag.replayer import replay
+    from simulon.config.dc import GPUSpec
+
+    wl = make_moe_workload(
+        tp=1, pp=1, ep=2, num_gpus=2, num_layers=2,
+        global_batch_size=2, num_microbatches=2,
+    )
+    dc = make_dc()
+    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+
+    for n in dag.compute_nodes:
+        if n.kernel == "moe_expert":
+            n.duration_ms = 1.0
+        else:
+            n.duration_ms = 0.1
+    populate_network(dag, dc)
+    replay(dag)
+
+    by_gpu = {}
+    for n in dag.compute_nodes:
+        by_gpu.setdefault(n.gpu_rank, []).append(n)
+
+    for gpu, nodes in by_gpu.items():
+        nodes_sorted = sorted(nodes, key=lambda n: n.start_ms)
+        for i in range(len(nodes_sorted) - 1):
+            a = nodes_sorted[i]
+            b = nodes_sorted[i + 1]
+            assert a.finish_ms <= b.start_ms, (
+                f"GPU {gpu}: {a.kernel}[{a.layer_id}] ({a.start_ms:.3f}-{a.finish_ms:.3f}) "
+                f"overlaps {b.kernel}[{b.layer_id}] ({b.start_ms:.3f}-{b.finish_ms:.3f})"
+            )
