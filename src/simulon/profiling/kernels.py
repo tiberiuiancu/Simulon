@@ -476,6 +476,7 @@ def benchmark_kernels(
     _run(
         "embedding",
         lambda: _bench_embedding(vocab_size, hidden_size, seq_len, batch_size, tp, tdt),
+        {"vocab_size": vocab_size},
     )
     _run("layernorm", lambda: _bench_layernorm(hidden_size, seq_len, batch_size, tdt))
     _run("attn_qkv", lambda: _bench_attn_qkv(hidden_size, seq_len, batch_size, tp, tdt))
