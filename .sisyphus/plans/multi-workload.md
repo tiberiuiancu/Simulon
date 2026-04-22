@@ -415,7 +415,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(config): add greedy node placement engine`
   - Files: `src/simulon/config/placement.py`
 
-- [ ] 5. **GPU budget validation + dependency cycle detection**
+- [x] 5. **GPU budget validation + dependency cycle detection**
 
   **What to do**:
   - Add Pydantic `model_validator(mode='after')` on `ScenarioConfig` for:
@@ -513,7 +513,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(config): add num_gpus to CollectiveWorkload`
   - Files: `src/simulon/config/workload.py`
 
-- [ ] 7. **AnalyticalBackend._resolve_workloads() helper**
+- [x] 7. **AnalyticalBackend._resolve_workloads() helper**
 
   **What to do**:
   - Add `_resolve_workloads(scenario: ScenarioConfig) -> list[tuple[str, WorkloadConfig, NodeSlice]]` to `AnalyticalBackend`

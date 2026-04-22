@@ -8,3 +8,7 @@ Greedy node placement is simplest as a running `current_node` pointer; `NodeSlic
 `ScenarioConfig` now accepts `workloads: list[WorkloadInstance]` and still expands legacy singular `workload:` input into a default-named instance with an empty `StartConfig`.
 Cross-workload validation lives in a model validator: duplicate names, missing `after_finish` dependencies, dependency cycles, and GPU budget overflow all fail at parse time.
 `ScenarioConfig.workload` remains as a compatibility property for single-workload callers; YAML LSP diagnostics were unavailable here because `basedpyright` is not installed.
+Verified `_validate_workloads()` rejects duplicate names, missing dependencies, `after_finish` cycles, and GPU over-allocation with `ValueError`/`ValidationError`, while a valid workload still parses successfully.
+GPU budget validation uses node-aligned demand: `max(gpus_per_node, ceil(raw_num_gpus / gpus_per_node) * gpus_per_node)`; 513 raw GPUs on 8-GPU nodes round to 520 and exceed a 512-GPU cluster.
+13: `AnalyticalBackend` can resolve YAML-backed workload paths with `TypeAdapter(WorkloadConfig).validate_python()` after `yaml.safe_load()`.
+14: `DatacenterConfig.model_dump()` + `DatacenterConfig.model_validate()` is the safest way to slice `cluster.num_nodes` without dropping nested network settings.

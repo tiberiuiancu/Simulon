@@ -1,4 +1,8 @@
 import logging
+from pathlib import Path
+
+import yaml
+from pydantic import TypeAdapter
 
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
@@ -6,6 +10,7 @@ from simulon.backend.dag.populate import populate_network
 from simulon.collective import CCLDecomposer, NCCLDecomposer, RCCLDecomposer
 from simulon.collective.calbusbw import cal_busbw
 from simulon.config.dc import DatacenterConfig, GPUSpec, NICSpec
+from simulon.config.placement import NodeSlice, place_workloads
 from simulon.config.resolve import (
     resolve_gpu_spec,
     resolve_nccl_profile,
@@ -13,7 +18,7 @@ from simulon.config.resolve import (
     resolve_scale_out,
 )
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import CollectiveWorkload, MegatronWorkload
+from simulon.config.workload import CollectiveWorkload, MegatronWorkload, WorkloadConfig
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +81,41 @@ def _tp_message_size(workload: MegatronWorkload) -> int:
 
 # Keep private aliases so call sites inside this module are unchanged.
 _resolve_gpu_spec = resolve_gpu_spec
+_workload_adapter = TypeAdapter(WorkloadConfig)
+
+
+def _load_datacenter(dc: DatacenterConfig | Path) -> DatacenterConfig:
+    if isinstance(dc, DatacenterConfig):
+        return dc
+    with open(dc) as f:
+        return DatacenterConfig.model_validate(yaml.safe_load(f))
+
+
+def _load_workload(workload: WorkloadConfig | Path) -> WorkloadConfig:
+    if not isinstance(workload, Path):
+        return workload
+    with open(workload) as f:
+        return _workload_adapter.validate_python(yaml.safe_load(f))
 
 
 class AnalyticalBackend(Backend):
     """Python analytical backend that produces a GPU-agnostic execution DAG."""
+
+    def _resolve_workloads(self, scenario: ScenarioConfig) -> list[tuple[str, WorkloadConfig, NodeSlice]]:
+        datacenter = _load_datacenter(scenario.datacenter)
+        placements = place_workloads(scenario.workloads, datacenter)
+        resolved: list[tuple[str, WorkloadConfig, NodeSlice]] = []
+        for instance in scenario.workloads:
+            resolved.append((instance.name, _load_workload(instance.workload), placements[instance.name]))
+        return resolved
+
+    def _slice_datacenter(self, datacenter: DatacenterConfig, node_slice: NodeSlice) -> DatacenterConfig:
+        gpus_per_node = datacenter.node.gpus_per_node
+        if gpus_per_node is None:
+            raise ValueError("datacenter.node.gpus_per_node is required for slicing")
+        data = datacenter.model_dump()
+        data["cluster"]["num_nodes"] = node_slice.num_gpus // gpus_per_node
+        return DatacenterConfig.model_validate(data)
 
     def run(self, scenario: ScenarioConfig) -> dict:
         dag = self.run_trace(scenario)
