@@ -725,3 +725,148 @@ class TestComputeCostPerRun:
         assert result_half_idle.cost_per_run is not None
         # Fewer runs when idle_fraction=0.5 → higher capex per run
         assert result_half_idle.cost_per_run.capex_component > result_no_idle.cost_per_run.capex_component
+
+
+# ---------------------------------------------------------------------------
+# Merged DAG / concurrent workload smoke tests
+# ---------------------------------------------------------------------------
+
+
+class TestMergedDagEnergyCost:
+    """Smoke-test energy and cost on a merged DAG representing concurrent workloads."""
+
+    def _make_merged_dag(self) -> ExecutionDAG:
+        """Return a merged DAG with two concurrent workloads on an 8-GPU cluster.
+
+        Workload A uses GPUs 0-3 and runs from 0 ms to 1000 ms.
+        Workload B uses GPUs 4-7 and runs from 500 ms to 1500 ms (offset 500 ms).
+        """
+        # Workload A: 4 compute nodes on ranks 0-3, duration 1000 ms each
+        nodes_a = [
+            ComputeNode(
+                node_id=i,
+                gpu_rank=i,
+                kernel="matmul",
+                layer_id=0,
+                microbatch_id=0,
+                pipeline_stage=0,
+                phase="fwd",
+                start_ms=0.0,
+                finish_ms=1000.0,
+            )
+            for i in range(4)
+        ]
+        # Workload B: 4 compute nodes on ranks 4-7, duration 1000 ms each, offset 500 ms
+        nodes_b = [
+            ComputeNode(
+                node_id=4 + i,
+                gpu_rank=4 + i,
+                kernel="matmul",
+                layer_id=0,
+                microbatch_id=0,
+                pipeline_stage=0,
+                phase="fwd",
+                start_ms=500.0,
+                finish_ms=1500.0,
+            )
+            for i in range(4)
+        ]
+        return ExecutionDAG(compute_nodes=nodes_a + nodes_b)
+
+    def test_energy_total_time_is_concurrent_makespan_not_sum(self):
+        """max(finish_ms) on merged DAG equals concurrent makespan (1500 ms), not 2000 ms."""
+        dc = _make_dc(
+            gpu_power_model=ConstantPowerModel(tdp_w=100.0),
+            pue=1.0,
+            num_nodes=2,
+            gpus_per_node=4,
+        )
+        scenario = _make_scenario(dc)
+        dag = self._make_merged_dag()
+        result = compute_energy(dag, scenario)
+        assert result is not None
+        # Makespan = max(1000, 1500) = 1500 ms
+        assert result.run_duration_hours == pytest.approx(1500.0 / 3_600_000)
+        # Total energy = 100 W * 8 GPUs * 1500 ms / 3.6M = 0.333... Wh
+        assert result.total_wh == pytest.approx(100.0 * 8 * 1500.0 / 3_600_000)
+
+    def test_energy_utilisation_on_merged_dag(self):
+        """Utilisation = avg_active_ms / total_time_ms across all cluster GPUs."""
+        dc = _make_dc(
+            gpu_power_model=LinearPowerModel(tdp_w=400.0, idle_power_w=100.0),
+            pue=1.0,
+            num_nodes=2,
+            gpus_per_node=4,
+        )
+        scenario = _make_scenario(dc)
+        dag = self._make_merged_dag()
+        result = compute_energy(dag, scenario)
+        assert result is not None
+        # avg_active_ms = (4*1000 + 4*1000) / 8 = 1000 ms
+        # utilisation = 1000 / 1500 = 2/3
+        # power = 100 + (2/3)*(400-100) = 300 W
+        # energy = 300 W * 8 GPUs * 1500 ms / 3.6M = 1.0 Wh
+        expected_power = 100.0 + (2.0 / 3.0) * (400.0 - 100.0)
+        expected_wh = expected_power * 8 * 1500.0 / 3_600_000
+        gpu_component = next(c for c in result.breakdown if c.component == "gpu")
+        assert gpu_component.wh == pytest.approx(expected_wh, rel=1e-6)
+
+    def test_energy_is_not_additive(self):
+        """Energy for concurrent workloads is less than sum of isolated energies."""
+        dc = _make_dc(
+            gpu_power_model=ConstantPowerModel(tdp_w=100.0),
+            pue=1.0,
+            num_nodes=2,
+            gpus_per_node=4,
+        )
+        scenario = _make_scenario(dc)
+        dag = self._make_merged_dag()
+        result = compute_energy(dag, scenario)
+        assert result is not None
+        # Isolated energy for A: 100 W * 8 GPUs * 1000 ms / 3.6M = 0.222... Wh
+        # Isolated energy for B: 100 W * 8 GPUs * 1000 ms / 3.6M = 0.222... Wh
+        # Sum = 0.444... Wh
+        # Concurrent energy: 100 W * 8 GPUs * 1500 ms / 3.6M = 0.333... Wh
+        assert result.total_wh < (100.0 * 8 * 1000.0 / 3_600_000) * 2
+        assert result.total_wh == pytest.approx(100.0 * 8 * 1500.0 / 3_600_000)
+
+    def test_capex_not_double_counted_on_merged_dag(self):
+        """CAPEX reflects total cluster hardware, not per-workload sum."""
+        dc = _make_dc(
+            gpu_power_model=ConstantPowerModel(tdp_w=100.0),
+            gpu_cost=10_000.0,
+            num_nodes=2,
+            gpus_per_node=4,
+        )
+        scenario = _make_scenario(dc)
+        dag = self._make_merged_dag()
+        energy = compute_energy(dag, scenario)
+        assert energy is not None
+        cost_result = compute_cost(scenario, energy)
+        gpu_comp = next(c for c in cost_result.capex.breakdown if c.component == "gpu")
+        # Total cluster = 2 nodes * 4 GPUs = 8 GPUs
+        assert gpu_comp.total == pytest.approx(8 * 10_000.0)
+
+    def test_cost_per_run_uses_merged_run_duration(self):
+        """runs_per_lifetime uses the merged DAG makespan, not per-workload time."""
+        dc = _make_dc(
+            gpu_power_model=ConstantPowerModel(tdp_w=100.0),
+            gpu_cost=10_000.0,
+            num_nodes=2,
+            gpus_per_node=4,
+            datacenter_lifetime_years=1.0,
+            idle_fraction=0.0,
+            electricity_cost_per_kwh=0.10,
+        )
+        scenario = _make_scenario(dc)
+        dag = self._make_merged_dag()
+        energy = compute_energy(dag, scenario)
+        assert energy is not None
+        cost_result = compute_cost(scenario, energy)
+        assert cost_result.cost_per_run is not None
+        # run_duration_hours = 1500 / 3.6M
+        # runs_per_lifetime = floor(1 * 8760 / (1500/3.6M))
+        # = floor(8760 * 3.6M / 1500) = floor(21,024,000)
+        expected_runs = math.floor(1.0 * 8760 * (1 - 0.0) / (1500.0 / 3_600_000))
+        expected_capex_per_run = 8 * 10_000.0 / expected_runs
+        assert cost_result.cost_per_run.capex_component == pytest.approx(expected_capex_per_run)

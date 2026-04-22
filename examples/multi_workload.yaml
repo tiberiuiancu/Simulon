@@ -1,0 +1,78 @@
+# Multi-workload scenario: two small Megatron jobs sharing an 8-GPU cluster
+#
+# Cluster: 2 nodes × 4 GPUs/node = 8 GPUs
+# Workload A (small-gpt): 4 GPUs  (node 0)
+# Workload B (tiny-llama): 4 GPUs (node 1)
+
+datacenter:
+  datacenter:
+    name: multi-workload-cluster
+  cluster:
+    num_nodes: 2
+  node:
+    gpus_per_node: 4
+    gpu:
+      from: h100
+  network:
+    scale_up:
+      switch:
+        port_speed: 7200Gbps
+        latency: 0.000025ms
+    scale_out:
+      nic:
+        speed: 400Gbps
+        latency: 0.005ms
+      topology:
+        type: fat_tree
+        params:
+          k: 2
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workloads:
+  - name: small-gpt
+    workload:
+      framework: megatron
+      model:
+        name: small-gpt
+        hidden_size: 512
+        num_layers: 2
+        num_heads: 8
+        ffn_hidden_size: 1024
+        vocab_size: 32000
+      parallelism:
+        tp: 2
+        pp: 2
+        num_microbatches: 2
+      training:
+        num_gpus: 4
+        global_batch_size: 2
+        micro_batch_size: 1
+        sequence_length: 512
+    start:
+      offset_ms: 0.0
+
+  - name: tiny-llama
+    workload:
+      framework: megatron
+      model:
+        name: tiny-llama
+        hidden_size: 256
+        num_layers: 2
+        num_heads: 4
+        ffn_hidden_size: 512
+        vocab_size: 32000
+      parallelism:
+        tp: 2
+        pp: 2
+        num_microbatches: 2
+      training:
+        num_gpus: 4
+        global_batch_size: 2
+        micro_batch_size: 1
+        sequence_length: 512
+    start:
+      offset_ms: 0.0
