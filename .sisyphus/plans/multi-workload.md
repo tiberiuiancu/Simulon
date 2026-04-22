@@ -1092,7 +1092,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(backend): multi-workload run() return shape`
   - Files: `src/simulon/backend/analytical.py`
 
-- [ ] 17. **CLI multi-workload summary output**
+- [x] 17. **CLI multi-workload summary output**
 
   **What to do**:
   - Update `src/simulon/cli/__init__.py` simulate command to handle multi-workload output
@@ -1166,7 +1166,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(cli): multi-workload summary output`
   - Files: `src/simulon/cli/__init__.py`
 
-- [ ] 18. **Energy/cost on merged DAG verification**
+- [x] 18. **Energy/cost on merged DAG verification**
 
   **What to do**:
   - Verify that `compute_energy(dag, scenario)` works correctly on a merged DAG
@@ -1219,7 +1219,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `fix(energy): verify energy/cost correctness on merged DAG`
   - Files: `src/simulon/energy.py` or `src/simulon/cost.py`
 
-- [ ] 19. **Config validation tests**
+- [x] 19. **Config validation tests**
 
   **What to do**:
   - Add tests for multi-workload config validation:
@@ -1268,7 +1268,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `test(config): add multi-workload config validation tests`
   - Files: `tests/test_multi_workload_config.py`
 
-- [ ] 20. **DAG merge unit tests**
+- [x] 20. **DAG merge unit tests**
 
   **What to do**:
   - Add tests for `merge_dags()`:
@@ -1319,7 +1319,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `test(dag): add DAG merge utility tests`
   - Files: `tests/test_dag_merge.py`
 
-- [ ] 21. **Two-workload integration test**
+- [x] 21. **Two-workload integration test**
 
   **What to do**:
   - Add end-to-end integration test for two concurrent Megatron workloads:
@@ -1375,7 +1375,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `test(integration): add two-workload concurrent and sequential tests`
   - Files: `tests/test_multi_workload_integration.py`
 
-- [ ] 22. **Backward compat test (singular workload)**
+- [x] 22. **Backward compat test (singular workload)**
 
   **What to do**:
   - Ensure all existing tests still pass with the refactored ScenarioConfig:
@@ -1426,7 +1426,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `test(compat): ensure backward compatibility with existing tests`
   - Files: `tests/*` (any fixes needed)
 
-- [ ] 23. **CLI end-to-end test**
+- [x] 23. **CLI end-to-end test**
 
   **What to do**:
   - Add CLI-level test for multi-workload scenario:
@@ -1481,19 +1481,19 @@ Max Concurrent: 7 (Wave 1)
 
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `uv run pytest` + `tsc --noEmit` (if applicable) + linter. Review all changed files for: `as any`/`@ts-ignore`, empty catches, `console.log` in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names.
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   Start from clean state. Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to `.sisyphus/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination.
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT`
 

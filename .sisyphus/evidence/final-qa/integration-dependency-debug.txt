@@ -1,0 +1,40 @@
+/Users/tibi/uni/t/simulon/src/simulon/backend/analytical.py:442: UserWarning: No profiling data found for kernel 'embedding'. Timing will be None — results may be incomplete.
+  return self._simulate_multi_workload(scenario, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'layernorm': no exact/partial match for hidden_size=512; scaling from hidden_size=4096 by 0.12x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'attn_qkv': no exact/partial match for hidden_size=512; scaling from hidden_size=4096 by 0.12x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/analytical.py:442: UserWarning: No profiling data found for kernel 'attn_flash'. Timing will be None — results may be incomplete.
+  return self._simulate_multi_workload(scenario, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'attn_proj': no exact/partial match for hidden_size=512; scaling from hidden_size=4096 by 0.12x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/analytical.py:442: UserWarning: No profiling data found for kernel 'mlp_linear1'. Timing will be None — results may be incomplete.
+  return self._simulate_multi_workload(scenario, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'mlp_act': no exact/partial match for ffn_hidden_size=1024; scaling from ffn_hidden_size=11008 by 0.09x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/analytical.py:442: UserWarning: No profiling data found for kernel 'mlp_linear2'. Timing will be None — results may be incomplete.
+  return self._simulate_multi_workload(scenario, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:218: UserWarning: kernel 'adamw': no exact/partial match for num_params=9241600; scaling from num_params=3369336832 by 0.00x
+  time_ms, extrap = lookup_kernel_time("adamw", mp, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'logit': no exact/partial match for hidden_size=512; scaling from hidden_size=4096 by 0.12x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'layernorm': no exact/partial match for hidden_size=256; scaling from hidden_size=4096 by 0.06x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'attn_qkv': no exact/partial match for hidden_size=256; scaling from hidden_size=4096 by 0.06x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'attn_proj': no exact/partial match for hidden_size=256; scaling from hidden_size=4096 by 0.06x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'mlp_act': no exact/partial match for ffn_hidden_size=512; scaling from ffn_hidden_size=11008 by 0.05x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:218: UserWarning: kernel 'adamw': no exact/partial match for num_params=4358656; scaling from num_params=3369336832 by 0.00x
+  time_ms, extrap = lookup_kernel_time("adamw", mp, gpu_spec)
+/Users/tibi/uni/t/simulon/src/simulon/backend/dag/populate.py:231: UserWarning: kernel 'logit': no exact/partial match for hidden_size=256; scaling from hidden_size=4096 by 0.06x
+  time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
+merged compute_nodes: 688
+merged comm_nodes: 776
+aggregate total_time_ms: 0.8257261600950758
+aggregate max_finish_ms: 0.8257261600950758
+by_workload small-gpt total_time_ms: 0.8257261600950758
+by_workload tiny-llama total_time_ms: 0.43218057495900664
+tiny-llama max finish_ms: 0.43218057495900664
+tiny-llama min start_ms: 0.0

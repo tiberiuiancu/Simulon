@@ -1,56 +1,6 @@
-- Added standalone `MegatronWorkload` YAML templates under `templates/workload/`.
-- Validated both files with `yaml.safe_load()` + `MegatronWorkload.model_validate()`.
-- Use inline `LLMSpec` objects for workload templates; do not reference `templates/model/`.
-- YAML LSP diagnostics were unavailable because `yaml-language-server` is not installed in this environment.
-- Added optional `num_gpus` to `CollectiveWorkload` with a `None` default, keeping `extra="forbid"` intact and preserving backward-compatible validation for existing collective configs.
-- Placement can stay duck-typed: unwrap an optional `.workload` wrapper, read `framework`, and derive raw GPU demand from `training.num_gpus`, `inference.num_gpus`, or a collective `num_gpus` fallback.
-- Greedy node placement is simplest as a running `current_node` pointer; `NodeSlice` can be computed directly from aligned GPU count without any budget validation.
-- `ScenarioConfig` now accepts `workloads: list[WorkloadInstance]` and still expands legacy singular `workload:` input into a default-named instance with an empty `StartConfig`.
-- Cross-workload validation lives in a model validator: duplicate names, missing `after_finish` dependencies, dependency cycles, and GPU budget overflow all fail at parse time.
-- `ScenarioConfig.workload` remains as a compatibility property for single-workload callers; YAML LSP diagnostics were unavailable here because `basedpyright` is not installed.
-- Verified `_validate_workloads()` rejects duplicate names, missing dependencies, `after_finish` cycles, and GPU over-allocation with `ValueError`/`ValidationError`, while a valid workload still parses successfully.
-- GPU budget validation uses node-aligned demand: `max(gpus_per_node, ceil(raw_num_gpus / gpus_per_node) * gpus_per_node)`; 513 raw GPUs on 8-GPU nodes round to 520 and exceed a 512-GPU cluster.
-- `AnalyticalBackend` can resolve YAML-backed workload paths with `TypeAdapter(WorkloadConfig).validate_python()` after `yaml.safe_load()`.
-- `DatacenterConfig.model_dump()` + `DatacenterConfig.model_validate()` is the safest way to slice `cluster.num_nodes` without dropping nested network settings.
-- Added `SimulationOutput` in `backend/analytical.py` so `simulate()` can return a backward-compatible object that still unpacks as `(dag, result)` and supports `output[0]` / `output[1]`.
-- Added `start_offsets` parameter to `replay()` in `src/simulon/backend/dag/replayer.py`.
-- Signature: `replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None)`.
-- When `start_offsets` is provided, `per_gpu_finish` is initialized to `start_offsets.get(gpu_rank, 0.0)` for every GPU in the DAG; default behavior (all zeros) is preserved when `start_offsets=None`.
-- No fake idle nodes added, topological sort unchanged, `_summarize()` untouched.
-- All 62 tests in `tests/test_replayer.py` pass.
-- **VERIFIED: `populate_network()` correctly maps offset GPU ranks to physical links on merged DAG.**
-- `_get_link_params(src_gpu, dst_gpu, datacenter)` uses `(src_gpu // gpus_per_node) == (dst_gpu // gpus_per_node)` for intra-node detection.
-- Because `merge_dags()` offsets GPU ranks by cumulative GPU count, and `place_workloads()` assigns `start_gpu_rank = start_node * gpus_per_node`, merged DAG ranks are exactly the physical global ranks.
-- Example: 2 nodes x 4 GPUs, workload A on node 0 (ranks 0-3), workload B on node 1 (ranks 4-7). After merge, ranks 0-3 map to node 0 (0//4=0), ranks 4-7 map to node 1 (4//4=1). Cross-node comms between 3 and 4 correctly use NIC bandwidth.
-- No code changes needed to `populate_network()`. Existing logic is mathematically correct for any contiguous rank range starting at 0.
-- Ran targeted verification script + existing test suite (`test_replayer.py`, `test_moe.py`, `test_dag.py`, `test_e2e.py`, `test_scenario.py`); all pass except pre-existing `test_astra_sim_backend_rejects_non_megatron` which fails due to `NotImplementedError` vs `ValueError` mismatch from earlier multi-workload changes.
-- **Refactored `AnalyticalBackend` to support multi-workload tracing:**
-  - Added `_trace_all_workloads(scenario, compact, _resolved_algorithm) -> list[tuple[str, ExecutionDAG]]`.
-  - Iterates over `_resolve_workloads()` results, slices datacenter per workload, and dispatches to `MegatronDAGTracer.trace()`, `build_collective_dag()`, or raises `NotImplementedError` for `InferenceWorkload`.
-  - `run_trace()` delegates to `_trace_all_workloads()` and returns `dags[0][1]` for single-workload scenarios; raises `ValueError` when multiple workloads are present.
-  - `run()` returns the existing single-workload dict shape when `len(dags) == 1`, and a new multi-workload dict shape (`{"workloads": {name: {...}}}`) when there are multiple workloads.
-  - Updated `test_astra_sim_backend_rejects_non_megatron` to `test_astra_sim_backend_rejects_inference`, now expecting `NotImplementedError` instead of `ValueError`.
-  - All relevant tests pass: `test_e2e.py` (12/12), `test_collective_workload.py` run_trace tests (2/2), `test_compact.py` (5/5).
-  - `simulate()` is left unchanged; it still uses `scenario.workload` directly and works for single-workload scenarios. Multi-workload simulate is out of scope (Task 9 handles merging).
-- Created `merge_dags()` in `src/simulon/backend/dag/merge.py` to merge multiple independent workload DAGs into one ExecutionDAG.
-- Uses `dataclasses.replace()` to create new ComputeNode / CommNode / DAGEdge instances, ensuring input DAGs are never modified in place.
-- Offsets applied: `node_id`, `gpu_rank` (ComputeNode), `src_gpu`/`dst_gpu` (CommNode), `flow_id`, `parent_flow_ids`, and `DAGEdge.src_node_id`/`dst_node_id`.
-- `node_id_offset` and `flow_id_offset` are computed from the accumulated merged DAG (max + 1), while `gpu_rank_offset` accumulates the GPU count of each source DAG independently.
-- `_gpu_count(dag)` derives GPU count from `max(all_gpu_ranks) + 1` across compute_nodes and comm_nodes; returns 0 for empty DAGs.
-- `merge_dags` is exported from `src/simulon/backend/dag/__init__.py`.
-- Added 14 tests in `tests/test_merge_dags.py` covering: empty input, single DAG identity, new object creation, two/three DAG cumulative offsets, GPU rank offsets, flow ID uniqueness, parent_flow_ids offset, edge offsets, input immutability, node_id_to_workload mapping, comm-only DAGs, and replayability of merged DAG.
-- All 14 new tests pass; full suite (`test_dag.py`, `test_replayer.py`, `test_e2e.py`) also passes (100/100).
-- `basedpyright` LSP server is not installed in this environment, so static type checking was not available.
-- Verified `AnalyticalBackend.run()` still preserves the single-workload shape and now returns a `workloads` dict for multi-workload scenarios via `_trace_all_workloads()`.
-- `tests/test_e2e.py` passes unchanged after the multi-workload `run()` verification.
-- Added `start_offsets: dict[int, float] | None = None` and `workload_labels: dict[int, str] | None = None` params to `to_chrome_trace()` and `write_chrome_trace()`.
-- Idle events: for each GPU with non-zero offset, emit `{"name": "idle", "ph": "X", "ts": 0, "dur": offset_ms*1000}` on `_TID_COMPUTE`.
-- When `workload_labels` is provided and GPU is in the dict, process name becomes `"GPU {gpu} | {workload_name}"` and sort_idx defaults to `gpu`. Otherwise, existing `_decode_rank()` logic is used unchanged.
-- Both params default to `None`, preserving full backward compatibility.
-- All 5 existing chrome_trace tests and 13 e2e tests pass.
-- Added `start_offsets` parameter to `dag_to_goal()` in `src/simulon/backend/dag/goal_trace.py`.
-- Signature: `dag_to_goal(dag: ExecutionDAG, start_offsets: dict[int, float] | None = None)`.
-- For each GPU rank with `offset_ms > 0` in `start_offsets`, emits `c_idle_{rank}: calc {dur_ns}` before any compute/comm events in that rank block.
-- All subsequent events for that rank get a `requires c_idle_{rank}` dependency line.
-- `write_goal_trace()` updated to accept `start_offsets` and pass it through to `dag_to_goal()`.
-- All 25 existing tests in `tests/test_goal_trace.py` pass unchanged.
+# Learnings
+
+- When testing multi-workload features, always verify cross-task integration (e.g., after_finish dependencies actually delay workload start times in the merged DAG replay).
+- `--ignore-missing` CLI flag needs to be propagated through all export paths (GOAL, Chrome trace, etc.) to avoid failures when profiling data is incomplete.
+- Pydantic v2 Union[Path, DatacenterConfig] parsing requires careful dict construction for programmatic test configs; Path is tried first.
+- `per_gpu_finish` in the replayer is used for both tracking final GPU finish times AND start_offsets initialization. These two concerns must be separated (use `gpu_offsets` for offsets, `per_gpu_finish` for tracking) to avoid accidentally serializing independent operations on the same GPU.
