@@ -9,15 +9,17 @@
 set -euo pipefail
 module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 
+source .venv/bin/activate
 SCRIPT_DIR="experiments/validation/gpt_oss_1b_training"
-cd "$SCRIPT_DIR"
+SCRIPT_DIR_REAL=$(realpath $SCRIPT_DIR)
+cd "$SCRIPT_DIR_REAL"
 
-source ../../.venv/bin/activate
-python -m pip install datasets transformers sentencepiece wget
-export PYTHONPATH="$SCRIPT_DIR/megatron-lm:${PYTHONPATH:-}"
+uv pip install datasets transformers sentencepiece wget
+uv pip install -e megatron-lm
+export PYTHONPATH="$SCRIPT_DIR_REAL/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results
 
-python run_megatron.py --mode synthetic
+uv run python run_megatron.py --mode synthetic
 
 echo "=== Done. Check results/ for chrome_trace_synthetic.json and megatron_synthetic.log ==="
