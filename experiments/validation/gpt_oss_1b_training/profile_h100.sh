@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=simulon-profile-gpt-oss-1b-h100
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --time=01:00:00
 #SBATCH --output=jobs/logs/profile_h100_%j.out
