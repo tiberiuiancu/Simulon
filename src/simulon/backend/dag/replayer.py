@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from typing import Optional
 
 from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
@@ -195,7 +196,7 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def replay(dag: ExecutionDAG) -> SimulationResult:
+def replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None) -> SimulationResult:
     """Critical-path walk over a fully-populated DAG.
 
     Assumes all node.duration_ms fields have been set before calling:
@@ -212,6 +213,13 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
         all_nodes[n.node_id] = n
     for n in dag.comm_nodes:
         all_nodes[n.node_id] = n
+
+    all_gpus: set[int] = set()
+    for n in dag.compute_nodes:
+        all_gpus.add(n.gpu_rank)
+    for n in dag.comm_nodes:
+        all_gpus.add(n.src_gpu)
+        all_gpus.add(n.dst_gpu)
 
     # flow_id → node_id (CommNode.parent_flow_ids uses flow_ids, not node_ids)
     flow_to_node: dict[int, int] = {n.flow_id: n.node_id for n in dag.comm_nodes}
@@ -264,7 +272,13 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
 
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}
-    per_gpu_finish: dict[int, float] = defaultdict(float)
+    per_gpu_finish: dict[int, float] = {}
+    if start_offsets is None:
+        for gpu in all_gpus:
+            per_gpu_finish[gpu] = 0.0
+    else:
+        for gpu in all_gpus:
+            per_gpu_finish[gpu] = start_offsets.get(gpu, 0.0)
 
     with log_progress("  replaying DAG", len(topo_order), logger) as advance:
         for nid in topo_order:

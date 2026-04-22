@@ -218,8 +218,7 @@ def test_astra_sim_backend_run_trace(simple_scenario):
     assert isinstance(dag, ExecutionDAG)
 
 
-def test_astra_sim_backend_rejects_non_megatron():
-    """AnalyticalBackend raises ValueError for non-MegatronWorkload."""
+def test_astra_sim_backend_rejects_inference():
     from simulon.config.workload import InferenceWorkload, InferenceParallelism, InferenceRun
     dc = make_datacenter()
     wl = InferenceWorkload(
@@ -230,7 +229,7 @@ def test_astra_sim_backend_rejects_non_megatron():
     )
     sc = ScenarioConfig(datacenter=dc, workload=wl)
     backend = AnalyticalBackend()
-    with pytest.raises(ValueError, match="AnalyticalBackend does not support"):
+    with pytest.raises(NotImplementedError, match="does not yet support InferenceWorkload"):
         backend.run_trace(sc)
 
 

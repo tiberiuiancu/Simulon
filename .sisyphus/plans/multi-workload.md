@@ -559,7 +559,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(backend): add workload resolution and datacenter slicing helpers`
   - Files: `src/simulon/backend/analytical.py`
 
-- [ ] 8. **Trace each workload against node slice**
+- [x] 8. **Trace each workload against node slice**
 
   **What to do**:
   - Keep `run_trace()` backward-compatible: it returns a single `ExecutionDAG` for single-workload scenarios (existing behavior)
@@ -670,7 +670,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(dag): add DAG merge utility for multi-workload`
   - Files: `src/simulon/backend/dag/merge.py`
 
-- [ ] 10. **replay() with start_offsets parameter**
+- [x] 10. **replay() with start_offsets parameter**
 
   **What to do**:
   - Modify `replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None)` in `src/simulon/backend/dag/replayer.py`
@@ -730,7 +730,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(dag): add start_offsets support to replay`
   - Files: `src/simulon/backend/dag/replayer.py`
 
-- [ ] 11. **populate_network on merged DAG**
+- [x] 11. **populate_network on merged DAG**
 
   **What to do**:
   - Ensure `populate_network()` in `src/simulon/backend/dag/populate.py` works correctly on a merged DAG
@@ -780,7 +780,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `fix(dag): ensure populate_network works with offset GPU ranks`
   - Files: `src/simulon/backend/dag/populate.py`
 
-- [ ] 12. **SimulationOutput dataclass**
+- [x] 12. **SimulationOutput dataclass**
 
   **What to do**:
   - Create `SimulationOutput` dataclass in `src/simulon/backend/analytical.py` or `src/simulon/backend/dag/nodes.py`

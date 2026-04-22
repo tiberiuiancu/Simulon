@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from dataclasses import dataclass, field
 
 import yaml
 from pydantic import TypeAdapter
@@ -18,9 +19,22 @@ from simulon.config.resolve import (
     resolve_scale_out,
 )
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import CollectiveWorkload, MegatronWorkload, WorkloadConfig
+from simulon.config.workload import CollectiveWorkload, InferenceWorkload, MegatronWorkload, WorkloadConfig
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SimulationOutput:
+    dag: ExecutionDAG
+    result: SimulationResult
+    by_workload: dict[str, SimulationResult] = field(default_factory=dict)
+
+    def __iter__(self):
+        return iter((self.dag, self.result))
+
+    def __getitem__(self, idx: int):
+        return (self.dag, self.result)[idx]
 
 _CCL_MAP: dict[str, type[CCLDecomposer]] = {
     "nccl": NCCLDecomposer,
@@ -117,43 +131,84 @@ class AnalyticalBackend(Backend):
         data["cluster"]["num_nodes"] = node_slice.num_gpus // gpus_per_node
         return DatacenterConfig.model_validate(data)
 
-    def run(self, scenario: ScenarioConfig) -> dict:
-        dag = self.run_trace(scenario)
-        d = dag.to_dict()
-        return {
-            "status": "success",
-            "compute_nodes": len(dag.compute_nodes),
-            "comm_nodes": len(dag.comm_nodes),
-            "edges": len(dag.edges),
-            "dag": d,
-        }
+    def _trace_all_workloads(
+        self,
+        scenario: ScenarioConfig,
+        compact: bool = False,
+        _resolved_algorithm: str | None = None,
+    ) -> list[tuple[str, ExecutionDAG]]:
+        datacenter = _load_datacenter(scenario.datacenter)
+        resolved = self._resolve_workloads(scenario)
+        results: list[tuple[str, ExecutionDAG]] = []
+
+        for name, workload, node_slice in resolved:
+            sliced_dc = self._slice_datacenter(datacenter, node_slice)
+
+            if isinstance(workload, MegatronWorkload):
+                from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+                cfg = _tracer_config_from_scenario(scenario)
+                cfg.compact = compact
+                if _resolved_algorithm is not None:
+                    cfg.algorithm = _resolved_algorithm
+                tracer = MegatronDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
+                dag = tracer.trace(workload, sliced_dc)
+            elif isinstance(workload, CollectiveWorkload):
+                from simulon.backend.dag.collective_tracer import build_collective_dag
+                c = scenario.collective
+                algorithm = _resolved_algorithm or (c.algorithm if c.algorithm != "auto" else "ring")
+                dag = build_collective_dag(
+                    workload=workload,
+                    datacenter=sliced_dc,
+                    algorithm=algorithm,
+                    num_channels=c.num_channels,
+                    ccl=_ccl_from_scenario(scenario),
+                )
+            elif isinstance(workload, InferenceWorkload):
+                raise NotImplementedError(
+                    "AnalyticalBackend does not yet support InferenceWorkload"
+                )
+            else:
+                raise ValueError(f"AnalyticalBackend does not support {type(workload).__name__}")
+
+            results.append((name, dag))
+
+        return results
 
     def run_trace(self, scenario: ScenarioConfig, compact: bool = False, _resolved_algorithm: str | None = None) -> ExecutionDAG:
-        from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
-        if isinstance(scenario.workload, MegatronWorkload):
-            cfg = _tracer_config_from_scenario(scenario)
-            cfg.compact = compact
-            if _resolved_algorithm is not None:
-                cfg.algorithm = _resolved_algorithm
-            tracer = MegatronDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
-            return tracer.trace(scenario.workload, scenario.datacenter)
-        elif isinstance(scenario.workload, CollectiveWorkload):
-            from simulon.backend.dag.collective_tracer import build_collective_dag
-            c = scenario.collective
-            # "auto" must be resolved before decompose_collective is called;
-            # if not resolved externally, fall back to "ring".
-            algorithm = _resolved_algorithm or (c.algorithm if c.algorithm != "auto" else "ring")
-            return build_collective_dag(
-                workload=scenario.workload,
-                datacenter=scenario.datacenter,
-                algorithm=algorithm,
-                num_channels=c.num_channels,
-                ccl=_ccl_from_scenario(scenario),
+        dags = self._trace_all_workloads(scenario, compact=compact, _resolved_algorithm=_resolved_algorithm)
+        if len(dags) != 1:
+            raise ValueError(
+                f"run_trace() requires exactly one workload; found {len(dags)}. "
+                f"Use _trace_all_workloads() for multi-workload scenarios."
             )
-        else:
-            raise ValueError(f"AnalyticalBackend does not support {type(scenario.workload).__name__}")
+        return dags[0][1]
 
-    def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False, ignore_missing: bool = False) -> tuple[ExecutionDAG, SimulationResult]:
+    def run(self, scenario: ScenarioConfig) -> dict:
+        dags = self._trace_all_workloads(scenario)
+        if len(dags) == 1:
+            dag = dags[0][1]
+            d = dag.to_dict()
+            return {
+                "status": "success",
+                "compute_nodes": len(dag.compute_nodes),
+                "comm_nodes": len(dag.comm_nodes),
+                "edges": len(dag.edges),
+                "dag": d,
+            }
+        return {
+            "status": "success",
+            "workloads": {
+                name: {
+                    "compute_nodes": len(dag.compute_nodes),
+                    "comm_nodes": len(dag.comm_nodes),
+                    "edges": len(dag.edges),
+                    "dag": dag.to_dict(),
+                }
+                for name, dag in dags
+            },
+        }
+
+    def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False, ignore_missing: bool = False) -> SimulationOutput:
         if isinstance(scenario.workload, MegatronWorkload):
             from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
             p = scenario.workload.parallelism
@@ -219,7 +274,7 @@ class AnalyticalBackend(Backend):
             result = replay(dag)
             logger.info("  Replay done: total_time=%.3f ms", result.total_time_ms)
 
-            return dag, result
+            return SimulationOutput(dag=dag, result=result)
 
         elif isinstance(scenario.workload, CollectiveWorkload):
             wl = scenario.workload
@@ -269,7 +324,7 @@ class AnalyticalBackend(Backend):
             result = replay(dag)
             logger.info("  Replay done: total_time=%.3f ms", result.total_time_ms)
 
-            return dag, result
+            return SimulationOutput(dag=dag, result=result)
 
         else:
             raise ValueError(f"AnalyticalBackend does not support {type(scenario.workload).__name__}")

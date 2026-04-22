@@ -2,13 +2,34 @@
 - Validated both files with `yaml.safe_load()` + `MegatronWorkload.model_validate()`.
 - Use inline `LLMSpec` objects for workload templates; do not reference `templates/model/`.
 - YAML LSP diagnostics were unavailable because `yaml-language-server` is not installed in this environment.
-Added optional `num_gpus` to `CollectiveWorkload` with a `None` default, keeping `extra="forbid"` intact and preserving backward-compatible validation for existing collective configs.
-Placement can stay duck-typed: unwrap an optional `.workload` wrapper, read `framework`, and derive raw GPU demand from `training.num_gpus`, `inference.num_gpus`, or a collective `num_gpus` fallback.
-Greedy node placement is simplest as a running `current_node` pointer; `NodeSlice` can be computed directly from aligned GPU count without any budget validation.
-`ScenarioConfig` now accepts `workloads: list[WorkloadInstance]` and still expands legacy singular `workload:` input into a default-named instance with an empty `StartConfig`.
-Cross-workload validation lives in a model validator: duplicate names, missing `after_finish` dependencies, dependency cycles, and GPU budget overflow all fail at parse time.
-`ScenarioConfig.workload` remains as a compatibility property for single-workload callers; YAML LSP diagnostics were unavailable here because `basedpyright` is not installed.
-Verified `_validate_workloads()` rejects duplicate names, missing dependencies, `after_finish` cycles, and GPU over-allocation with `ValueError`/`ValidationError`, while a valid workload still parses successfully.
-GPU budget validation uses node-aligned demand: `max(gpus_per_node, ceil(raw_num_gpus / gpus_per_node) * gpus_per_node)`; 513 raw GPUs on 8-GPU nodes round to 520 and exceed a 512-GPU cluster.
-13: `AnalyticalBackend` can resolve YAML-backed workload paths with `TypeAdapter(WorkloadConfig).validate_python()` after `yaml.safe_load()`.
-14: `DatacenterConfig.model_dump()` + `DatacenterConfig.model_validate()` is the safest way to slice `cluster.num_nodes` without dropping nested network settings.
+- Added optional `num_gpus` to `CollectiveWorkload` with a `None` default, keeping `extra="forbid"` intact and preserving backward-compatible validation for existing collective configs.
+- Placement can stay duck-typed: unwrap an optional `.workload` wrapper, read `framework`, and derive raw GPU demand from `training.num_gpus`, `inference.num_gpus`, or a collective `num_gpus` fallback.
+- Greedy node placement is simplest as a running `current_node` pointer; `NodeSlice` can be computed directly from aligned GPU count without any budget validation.
+- `ScenarioConfig` now accepts `workloads: list[WorkloadInstance]` and still expands legacy singular `workload:` input into a default-named instance with an empty `StartConfig`.
+- Cross-workload validation lives in a model validator: duplicate names, missing `after_finish` dependencies, dependency cycles, and GPU budget overflow all fail at parse time.
+- `ScenarioConfig.workload` remains as a compatibility property for single-workload callers; YAML LSP diagnostics were unavailable here because `basedpyright` is not installed.
+- Verified `_validate_workloads()` rejects duplicate names, missing dependencies, `after_finish` cycles, and GPU over-allocation with `ValueError`/`ValidationError`, while a valid workload still parses successfully.
+- GPU budget validation uses node-aligned demand: `max(gpus_per_node, ceil(raw_num_gpus / gpus_per_node) * gpus_per_node)`; 513 raw GPUs on 8-GPU nodes round to 520 and exceed a 512-GPU cluster.
+- `AnalyticalBackend` can resolve YAML-backed workload paths with `TypeAdapter(WorkloadConfig).validate_python()` after `yaml.safe_load()`.
+- `DatacenterConfig.model_dump()` + `DatacenterConfig.model_validate()` is the safest way to slice `cluster.num_nodes` without dropping nested network settings.
+- Added `SimulationOutput` in `backend/analytical.py` so `simulate()` can return a backward-compatible object that still unpacks as `(dag, result)` and supports `output[0]` / `output[1]`.
+- Added `start_offsets` parameter to `replay()` in `src/simulon/backend/dag/replayer.py`.
+- Signature: `replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None)`.
+- When `start_offsets` is provided, `per_gpu_finish` is initialized to `start_offsets.get(gpu_rank, 0.0)` for every GPU in the DAG; default behavior (all zeros) is preserved when `start_offsets=None`.
+- No fake idle nodes added, topological sort unchanged, `_summarize()` untouched.
+- All 62 tests in `tests/test_replayer.py` pass.
+- **VERIFIED: `populate_network()` correctly maps offset GPU ranks to physical links on merged DAG.**
+- `_get_link_params(src_gpu, dst_gpu, datacenter)` uses `(src_gpu // gpus_per_node) == (dst_gpu // gpus_per_node)` for intra-node detection.
+- Because `merge_dags()` offsets GPU ranks by cumulative GPU count, and `place_workloads()` assigns `start_gpu_rank = start_node * gpus_per_node`, merged DAG ranks are exactly the physical global ranks.
+- Example: 2 nodes x 4 GPUs, workload A on node 0 (ranks 0-3), workload B on node 1 (ranks 4-7). After merge, ranks 0-3 map to node 0 (0//4=0), ranks 4-7 map to node 1 (4//4=1). Cross-node comms between 3 and 4 correctly use NIC bandwidth.
+- No code changes needed to `populate_network()`. Existing logic is mathematically correct for any contiguous rank range starting at 0.
+- Ran targeted verification script + existing test suite (`test_replayer.py`, `test_moe.py`, `test_dag.py`, `test_e2e.py`, `test_scenario.py`); all pass except pre-existing `test_astra_sim_backend_rejects_non_megatron` which fails due to `NotImplementedError` vs `ValueError` mismatch from earlier multi-workload changes.
+- **Refactored `AnalyticalBackend` to support multi-workload tracing:**
+  - Added `_trace_all_workloads(scenario, compact, _resolved_algorithm) -> list[tuple[str, ExecutionDAG]]`.
+  - Iterates over `_resolve_workloads()` results, slices datacenter per workload, and dispatches to `MegatronDAGTracer.trace()`, `build_collective_dag()`, or raises `NotImplementedError` for `InferenceWorkload`.
+  - `run_trace()` delegates to `_trace_all_workloads()` and returns `dags[0][1]` for single-workload scenarios; raises `ValueError` when multiple workloads are present.
+  - `run()` returns the existing single-workload dict shape when `len(dags) == 1`, and a new multi-workload dict shape (`{"workloads": {name: {...}}}`) when there are multiple workloads.
+  - Updated `test_astra_sim_backend_rejects_non_megatron` to `test_astra_sim_backend_rejects_inference`, now expecting `NotImplementedError` instead of `ValueError`.
+  - All relevant tests pass: `test_e2e.py` (12/12), `test_collective_workload.py` run_trace tests (2/2), `test_compact.py` (5/5).
+  - `simulate()` is left unchanged; it still uses `scenario.workload` directly and works for single-workload scenarios. Multi-workload simulate is out of scope (Task 9 handles merging).
+
