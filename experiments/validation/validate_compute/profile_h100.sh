@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=simulon-profile-gpt-oss-1b-h100
+#SBATCH --job-name=simulon-profile-validate-compute-h100
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --time=01:00:00
@@ -9,7 +9,7 @@
 set -euo pipefail
 module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 
-SCRIPT_DIR="experiments/validation/gpt_oss_1b_training"
+SCRIPT_DIR="experiments/validation/validate_compute"
 cd "$SCRIPT_DIR"
 
 uv sync --extra profiling
@@ -19,7 +19,7 @@ mkdir -p jobs/logs
 
 simulon profile gpu \
     --name H100 \
-    --model gpt-oss-1b-moe \
+    --model validation-model \
     --tp 1 \
     --ep 1 \
     --batch-size 1 \

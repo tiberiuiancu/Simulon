@@ -1,8 +1,8 @@
-## Validation Experiment: GPT-OSS-1B-MoE Training
+## Validation Experiment: Compute Validation (MoE Training)
 
 ### Model Architecture
-- Name: `gpt-oss-1b-moe`
-- Layers: `6`, Hidden: `1536`, Heads: `24`, FFN: `6144`
+- Name: `validation-model`
+- Layers: `12`, Hidden: `2048`, Heads: `32`, FFN: `8192`
 - Experts: `8`, Top-k: `2`, Vocab: `32000`, Seq: `8192`
 
 ### Artifacts
@@ -17,14 +17,14 @@ Pending manual execution on Snellius:
 
 ### Simulon Prediction
 - `results/sim_trace.json` is available and valid.
-- Predicted total step time: `60.611 ms`.
+- Predicted total step time: `60.611 ms` (for old 1B model; will be updated after re-simulation with 4B model).
 
 ### Real Training (Pending Manual Execution)
 T4, T7, and T8 must be run on Snellius with SLURM.
 
 ```bash
 # On Snellius:
-cd experiments/validation/gpt_oss_1b_training
+cd experiments/validation/validate_compute
 
 # Profile H100 kernels
 sbatch profile_h100.sh
@@ -42,5 +42,5 @@ sbatch run_megatron_real.sh
 Load traces in `chrome://tracing` or https://ui.perfetto.dev.
 
 Compare:
-- `experiments/validation/gpt_oss_1b_training/results/sim_trace.json`
+- `experiments/validation/validate_compute/results/sim_trace.json`
 - Megatron-generated Chrome traces from the Snellius runs, typically under the job `tensorboard_dir` / `torch_profile/rank-*.json.gz`

@@ -1,4 +1,4 @@
-# Megatron-LM pretrain arguments for GPT-OSS-4B-MoE on real C4 data
+# Megatron-LM base config for compute-validation MoE model
 # Single GPU profiling run: 5 warmup iterations + 1 profiled iteration
 
 # Model architecture
@@ -33,9 +33,6 @@ min-lr: 3.0e-5
 lr-decay-iters: 6
 lr-warmup-fraction: 0.0
 bf16: true
-
-# Data (real C4 via external dataloader)
-dataloader-type: external
 
 # Profiling
 profile: true

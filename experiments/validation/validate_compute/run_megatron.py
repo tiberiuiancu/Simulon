@@ -172,8 +172,9 @@ def main() -> None:
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    config_path = SCRIPT_DIR / f"gpt_oss_1b_{args.mode}.yaml"
-    config = _load_config(config_path)
+    base_config = _load_config(SCRIPT_DIR / "megatron_base.yaml")
+    mode_config = _load_config(SCRIPT_DIR / f"megatron_{args.mode}.yaml")
+    config = {**base_config, **mode_config}
 
     log_path = RESULTS_DIR / f"megatron_{args.mode}.log"
 
