@@ -612,7 +612,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(backend): trace each workload independently against node slice`
   - Files: `src/simulon/backend/analytical.py`
 
-- [ ] 9. **DAG merge utility (merge_dags)**
+- [x] 9. **DAG merge utility (merge_dags)**
 
   **What to do**:
   - Create `src/simulon/backend/dag/merge.py` with `merge_dags(dags: list[tuple[str, ExecutionDAG]]) -> ExecutionDAG`

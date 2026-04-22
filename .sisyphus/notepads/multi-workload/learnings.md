@@ -32,4 +32,12 @@
   - Updated `test_astra_sim_backend_rejects_non_megatron` to `test_astra_sim_backend_rejects_inference`, now expecting `NotImplementedError` instead of `ValueError`.
   - All relevant tests pass: `test_e2e.py` (12/12), `test_collective_workload.py` run_trace tests (2/2), `test_compact.py` (5/5).
   - `simulate()` is left unchanged; it still uses `scenario.workload` directly and works for single-workload scenarios. Multi-workload simulate is out of scope (Task 9 handles merging).
-
+- Created `merge_dags()` in `src/simulon/backend/dag/merge.py` to merge multiple independent workload DAGs into one ExecutionDAG.
+- Uses `dataclasses.replace()` to create new ComputeNode / CommNode / DAGEdge instances, ensuring input DAGs are never modified in place.
+- Offsets applied: `node_id`, `gpu_rank` (ComputeNode), `src_gpu`/`dst_gpu` (CommNode), `flow_id`, `parent_flow_ids`, and `DAGEdge.src_node_id`/`dst_node_id`.
+- `node_id_offset` and `flow_id_offset` are computed from the accumulated merged DAG (max + 1), while `gpu_rank_offset` accumulates the GPU count of each source DAG independently.
+- `_gpu_count(dag)` derives GPU count from `max(all_gpu_ranks) + 1` across compute_nodes and comm_nodes; returns 0 for empty DAGs.
+- `merge_dags` is exported from `src/simulon/backend/dag/__init__.py`.
+- Added 14 tests in `tests/test_merge_dags.py` covering: empty input, single DAG identity, new object creation, two/three DAG cumulative offsets, GPU rank offsets, flow ID uniqueness, parent_flow_ids offset, edge offsets, input immutability, node_id_to_workload mapping, comm-only DAGs, and replayability of merged DAG.
+- All 14 new tests pass; full suite (`test_dag.py`, `test_replayer.py`, `test_e2e.py`) also passes (100/100).
+- `basedpyright` LSP server is not installed in this environment, so static type checking was not available.
