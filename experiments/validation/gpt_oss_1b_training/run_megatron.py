@@ -28,12 +28,12 @@ def _load_config(path: Path) -> dict:
 def _build_argv(config: dict) -> list[str]:
     argv = []
     for key, value in config.items():
-        flag = f"--{key.replace('_', '-')}"
+        arg = f"--{key}"
         if isinstance(value, bool):
             if value:
-                argv.append(flag)
+                argv.append(arg)
         else:
-            argv.extend([flag, str(value)])
+            argv.extend([arg, str(value)])
     return argv
 
 
