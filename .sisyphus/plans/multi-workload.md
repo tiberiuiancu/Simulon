@@ -308,7 +308,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(config): add WorkloadInstance and StartConfig models`
   - Files: `src/simulon/config/scenario.py`
 
-- [ ] 3. **ScenarioConfig refactor with backward-compat alias**
+- [x] 3. **ScenarioConfig refactor with backward-compat alias**
 
   **What to do**:
   - Replace `workload: Union[Path, WorkloadConfig]` with `workloads: list[WorkloadInstance]`
