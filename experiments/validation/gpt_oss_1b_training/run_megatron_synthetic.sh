@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=simulon-gpt-oss-1b-synthetic
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --time=02:00:00
 #SBATCH --output=jobs/logs/megatron_synthetic_%j.out
