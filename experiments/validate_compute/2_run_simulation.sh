@@ -7,7 +7,7 @@
 #SBATCH --error=jobs/simulate_%j.err
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
-source ../../../.venv/bin/activate
+source ../../.venv/bin/activate
 mkdir -p results
 simulon simulate sim_training.yaml --chrome results/sim_trace.json
 echo "=== Simulation done ==="

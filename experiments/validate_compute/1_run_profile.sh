@@ -11,7 +11,7 @@ module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2
 
 cd "$(dirname "$(realpath "$0")")"
 
-source ../../../.venv/bin/activate
+source ../../.venv/bin/activate
 
 mkdir -p jobs
 
