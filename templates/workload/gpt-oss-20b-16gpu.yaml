@@ -1,0 +1,27 @@
+framework: megatron
+model:
+  name: gpt-oss-20b
+  hidden_size: 512
+  num_layers: 4
+  num_heads: 8
+  ffn_hidden_size: 2048
+  vocab_size: 32000
+  swiglu: true
+  num_experts: 4
+  top_k: 2
+parallelism:
+  tp: 2
+  pp: 2
+  ep: 2
+  dp: 2
+  distributed_optimizer: true
+  num_microbatches: 8
+  pipeline_schedule: 1f1b
+training:
+  num_gpus: 16
+  global_batch_size: 16
+  micro_batch_size: 1
+  sequence_length: 1024
+  dtype: bf16
+  flash_attention: false
+  iterations: 1

@@ -31,6 +31,22 @@ CollectiveConfig = Annotated[
 
 
 # ---------------------------------------------------------------------------
+# Workload start / instances
+# ---------------------------------------------------------------------------
+
+
+class StartConfig(BaseModel):
+    offset_ms: float = 0.0
+    after_finish: list[str] = Field(default_factory=list)
+
+
+class WorkloadInstance(BaseModel):
+    name: str
+    workload: Union[Path, WorkloadConfig]
+    start: StartConfig = Field(default_factory=StartConfig)
+
+
+# ---------------------------------------------------------------------------
 # Scenario
 # ---------------------------------------------------------------------------
 

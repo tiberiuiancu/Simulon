@@ -1,0 +1,85 @@
+\section{Evaluation}
+
+We evaluate \textsc{Simulon} along two axes. First, we validate each
+simulator component independently against controlled measurements on a
+physical testbed, so that errors cannot cancel across subsystems.
+Second, to assess whether the simulator generalises to configurations
+and scales beyond the testbed, we compare end-to-end throughput
+predictions against publicly reported numbers from the NVIDIA
+Megatron-Bridge benchmark suite~\cite{megatron-bridge-perf}, which
+covers a range of production LLM configurations on up to
+$[\textbf{N\_MAX}]$ GPUs.
+
+\subsection{Testbeds}
+
+\paragraph{Physical testbed.}
+Component-level validation is performed on a cluster of
+$[\textbf{NUM\_NODES}]$ nodes, each equipped with
+$[\textbf{NUM\_GPUS\_PER\_NODE}]$ NVIDIA $[\textbf{GPU\_MODEL}]$
+GPUs ($[\textbf{GPU\_MEM}]$\,GB HBM, $[\textbf{GPU\_TF\_BF16}]$
+TFLOP/s BF16). Within each node, GPUs are connected via NVSwitch with
+an all-to-all bisection bandwidth of
+$[\textbf{INTRA\_BW}]$\,GB/s per GPU. Nodes are
+interconnected through a $[\textbf{SWITCH\_MODEL}]$ switch fabric
+arranged in a $[\textbf{TOPOLOGY}]$ topology
+(e.g.\ fat-tree with $[\textbf{NUM\_RAILS}]$ rails), providing
+$[\textbf{INTER\_BW}]$\,GB/s inter-node bandwidth per GPU via
+$[\textbf{NIC\_MODEL}]$ NICs. The collective library used throughout
+is NCCL $[\textbf{NCCL\_VERSION}]$.
+
+\paragraph{Megatron-Bridge benchmarks.}
+For scale validation we use the NVIDIA Megatron-Bridge performance
+summary~\cite{megatron-bridge-perf}, which reports
+tokens\,s$^{-1}$\,GPU$^{-1}$ and model TFLOP\,s$^{-1}$\,GPU$^{-1}$
+for a suite of production models---including LLaMA-3 (8B--405B),
+DeepSeek-V3, and GPT-class models up to 120B parameters---across
+DGX~H100, DGX~B200, and DGX~GB200 systems at scales ranging from 8
+to $[\textbf{N\_MAX\_BRIDGE}]$ GPUs. Because these results are
+third-party and cover hardware we do not operate directly, they
+serve as an external check on end-to-end simulator accuracy rather
+than a controlled component benchmark; we discuss the additional
+sources of uncertainty this introduces in
+Section~\ref{sec:e2e-validation}.
+
+\paragraph{Validation methodology.}
+Our validation strategy is designed to localise errors: if the three
+component models are validated independently, a discrepancy in an
+end-to-end comparison can be attributed to a specific subsystem rather
+than absorbed by compensating errors. The three components and their
+validation paths are:
+
+\begin{enumerate}
+  \item \textbf{Compute model} (Section~\ref{sec:compute-validation}).
+        We run a single-GPU Megatron-LM training step (PP\,=\,TP\,=\,DP\,=\,1)
+        and record per-phase wall times (\texttt{forward-compute},
+        \texttt{backward-compute}, \texttt{optimizer}) at
+        \texttt{timing\_log\_level=1}. With no parallelism, the
+        simulator's prediction reduces to a sum of profiled kernel
+        durations with no collective or scheduling logic, so any
+        residual error is unambiguously in the compute model.
+
+  \item \textbf{Collective model} (Section~\ref{sec:comm-validation}).
+        We run \texttt{nccl-tests} for AllReduce, AllGather,
+        ReduceScatter, and AllToAll at the exact message sizes that
+        \textsc{Simulon} generates for a given configuration, and
+        compare measured bandwidth and latency against the simulator's
+        collective timing predictions. This is fully decoupled from
+        compute.
+
+  \item \textbf{Scheduling model} (Section~\ref{sec:pipeline-validation}).
+        With PP\,>\,1 the 1F1B schedule yields a theoretically known
+        pipeline-bubble ratio:
+        \[
+          \rho = \frac{p - 1}{p + m - 1},
+        \]
+        where $p$ is the number of pipeline stages and $m$ the
+        number of microbatches. We measure the actual GPU idle fraction
+        from Megatron's per-stage timers and compare it against the
+        replayer's output. A match here confirms the scheduling logic
+        independently of whether compute or communication timings are
+        exact.
+\end{enumerate}
+
+Finally, Section~\ref{sec:e2e-validation} compares end-to-end
+throughput predictions against the Megatron-Bridge benchmarks to
+assess generalisation beyond the testbed.
