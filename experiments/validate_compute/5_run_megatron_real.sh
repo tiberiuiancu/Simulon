@@ -3,19 +3,16 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --time=02:00:00
-#SBATCH --output=jobs/logs/megatron_real_%j.out
-#SBATCH --error=jobs/logs/megatron_real_%j.err
+#SBATCH --output=jobs/megatron_real_%j.out
+#SBATCH --error=jobs/megatron_real_%j.err
 
 set -euo pipefail
 module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
 
-SCRIPT_DIR="experiments/validation/validate_compute"
-cd "$SCRIPT_DIR"
+cd "$(dirname "$(realpath "$0")")"
+source ../../../.venv/bin/activate
 
-source ../../.venv/bin/activate
-python -m pip install datasets transformers sentencepiece wget pybind11
-python -m pip install --no-build-isolation git+https://github.com/NVIDIA/TransformerEngine.git@stable
-export PYTHONPATH="$SCRIPT_DIR/megatron-lm:${PYTHONPATH:-}"
+export PYTHONPATH="$(pwd)/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results
 
