@@ -18,6 +18,12 @@ export PYTHONPATH="$SCRIPT_DIR/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results
 
+export MASTER_ADDR=localhost
+export MASTER_PORT=29500
+export WORLD_SIZE=1
+export RANK=0
+export LOCAL_RANK=0
+
 python run_megatron.py --mode real
 
 echo "=== Done. Check results/ for chrome_trace_real.json and megatron_real.log ==="

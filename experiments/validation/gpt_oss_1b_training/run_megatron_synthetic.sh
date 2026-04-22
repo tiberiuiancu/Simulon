@@ -20,6 +20,12 @@ export PYTHONPATH="$SCRIPT_DIR_REAL/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results
 
+export MASTER_ADDR=localhost
+export MASTER_PORT=29500
+export WORLD_SIZE=1
+export RANK=0
+export LOCAL_RANK=0
+
 uv run python run_megatron.py --mode synthetic
 
 echo "=== Done. Check results/ for chrome_trace_synthetic.json and megatron_synthetic.log ==="
