@@ -3,7 +3,7 @@
 ### Model Architecture
 - Name: `validation-model`
 - Layers: `12`, Hidden: `2048`, Heads: `32`, FFN: `8192`
-- Experts: `8`, Top-k: `2`, Vocab: `32000`, Seq: `8192`
+- Experts: `8`, Top-k: `2`, Vocab: `32000`, Seq: `4096`
 
 ### Artifacts
 
@@ -24,7 +24,7 @@ T4, T7, and T8 must be run on Snellius with SLURM.
 
 ```bash
 # On Snellius:
-cd experiments/validation/validate_compute
+cd experiments/validate_compute
 
 # Profile H100 kernels
 sbatch profile_h100.sh
@@ -42,5 +42,5 @@ sbatch run_megatron_real.sh
 Load traces in `chrome://tracing` or https://ui.perfetto.dev.
 
 Compare:
-- `experiments/validation/validate_compute/results/sim_trace.json`
+- `experiments/validate_compute/results/sim_trace.json`
 - Megatron-generated Chrome traces from the Snellius runs, typically under the job `tensorboard_dir` / `torch_profile/rank-*.json.gz`

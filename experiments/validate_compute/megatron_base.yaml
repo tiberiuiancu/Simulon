@@ -9,7 +9,7 @@ ffn-hidden-size: 8192
 vocab-size: 32000
 num-query-groups: 32
 position-embedding-type: rope
-max-position-embeddings: 8192
+max-position-embeddings: 4096
 swiglu: true
 disable-bias-linear: true
 no-bias-swiglu-fusion: true
@@ -26,7 +26,7 @@ expert-model-parallel-size: 1
 # Training
 micro-batch-size: 1
 global-batch-size: 1
-seq-length: 8192
+seq-length: 4096
 train-iters: 6
 lr: 3.0e-4
 min-lr: 3.0e-5
