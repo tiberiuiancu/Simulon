@@ -13,7 +13,7 @@ SCRIPT_DIR="experiments/validation/gpt_oss_1b_training"
 cd "$SCRIPT_DIR"
 
 source ../../.venv/bin/activate
-python -m pip install datasets transformers sentencepiece wget
+python -m pip install datasets transformers sentencepiece wget pybind11
 export PYTHONPATH="$SCRIPT_DIR/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results

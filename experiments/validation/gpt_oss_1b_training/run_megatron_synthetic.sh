@@ -14,7 +14,7 @@ SCRIPT_DIR="experiments/validation/gpt_oss_1b_training"
 SCRIPT_DIR_REAL=$(realpath $SCRIPT_DIR)
 cd "$SCRIPT_DIR_REAL"
 
-uv pip install datasets transformers sentencepiece wget
+uv pip install datasets transformers sentencepiece wget pybind11
 uv pip install -e megatron-lm
 export PYTHONPATH="$SCRIPT_DIR_REAL/megatron-lm:${PYTHONPATH:-}"
 
