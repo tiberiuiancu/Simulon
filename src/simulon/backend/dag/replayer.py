@@ -339,12 +339,15 @@ def replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None) 
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}
     per_gpu_finish: dict[int, float] = {}
+    gpu_offsets: dict[int, float] = {}
     if start_offsets is None:
         for gpu in all_gpus:
             per_gpu_finish[gpu] = 0.0
+            gpu_offsets[gpu] = 0.0
     else:
         for gpu in all_gpus:
             per_gpu_finish[gpu] = start_offsets.get(gpu, 0.0)
+            gpu_offsets[gpu] = start_offsets.get(gpu, 0.0)
 
     with log_progress("  replaying DAG", len(topo_order), logger) as advance:
         for nid in topo_order:
@@ -352,6 +355,7 @@ def replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None) 
             start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
 
             if isinstance(node, ComputeNode):
+                start_time = max(start_time, gpu_offsets[node.gpu_rank])
                 duration = node.duration_ms if node.duration_ms is not None else 0.0
                 finish = start_time + duration
                 finish_time[nid] = finish
@@ -361,6 +365,7 @@ def replay(dag: ExecutionDAG, start_offsets: Optional[dict[int, float]] = None) 
                     per_gpu_finish[node.gpu_rank] = finish
 
             else:  # CommNode
+                start_time = max(start_time, gpu_offsets[node.src_gpu], gpu_offsets[node.dst_gpu])
                 duration = node.duration_ms if node.duration_ms is not None else 0.0
                 finish = start_time + duration
                 finish_time[nid] = finish

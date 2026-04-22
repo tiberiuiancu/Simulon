@@ -31,6 +31,8 @@ class SimulationOutput:
     dag: ExecutionDAG
     result: SimulationResult
     by_workload: dict[str, SimulationResult] = field(default_factory=dict)
+    start_offsets: dict[int, float] = field(default_factory=dict)
+    node_id_to_workload: dict[int, str] = field(default_factory=dict)
 
     def __iter__(self):
         return iter((self.dag, self.result))
@@ -420,7 +422,18 @@ class AnalyticalBackend(Backend):
             workload_node_ids = {nid for nid, wl_name in node_id_to_workload.items() if wl_name == name}
             per_workload[name] = summarize_subset(merged_dag, workload_node_ids)
 
-        return SimulationOutput(dag=merged_dag, result=aggregate_result, by_workload=per_workload)
+        workload_labels: dict[int, str] = {}
+        for name, _, _, node_slice, _ in entries:
+            for gpu in range(node_slice.start_gpu_rank, node_slice.start_gpu_rank + node_slice.num_gpus):
+                workload_labels[gpu] = name
+
+        return SimulationOutput(
+            dag=merged_dag,
+            result=aggregate_result,
+            by_workload=per_workload,
+            start_offsets=start_offsets,
+            node_id_to_workload=node_id_to_workload,
+        )
 
     def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False, ignore_missing: bool = False) -> SimulationOutput:
         if len(scenario.workloads) == 1:

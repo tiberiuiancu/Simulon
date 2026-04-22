@@ -1,6 +1,7 @@
 """Utilities for resolving hardware specs that may reference named templates."""
 from __future__ import annotations
 
+import functools
 import warnings
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from simulon.config.dc import (
 from simulon.config.nccl_profile import NcclProfile
 
 
+@functools.lru_cache(maxsize=None)
 def _load_profile_data(template_path: Path) -> dict:
     profile_path = template_path.with_suffix("").with_suffix(".profile.yaml")
     if profile_path.exists():
@@ -39,6 +41,7 @@ def _load_profile_data(template_path: Path) -> dict:
     return {}
 
 
+@functools.lru_cache(maxsize=None)
 def load_gpu_template(name: str) -> GPUSpec:
     """Load a GPU spec from a named YAML template file.
 

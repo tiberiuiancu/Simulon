@@ -49,6 +49,7 @@ from simulon.backend.dag.nodes import ComputeNode, CommNode, ExecutionDAG
 def dag_to_goal(
     dag: ExecutionDAG,
     start_offsets: dict[int, float] | None = None,
+    ignore_missing: bool = False,
 ) -> str:
     """Convert a timing-populated ExecutionDAG to GOAL text format.
 
@@ -59,6 +60,8 @@ def dag_to_goal(
             milliseconds.  When a rank has a positive offset, an idle ``calc``
             block is emitted first and all subsequent events for that rank
             depend on it.
+        ignore_missing: If True, treat ComputeNode.duration_ms == None as 0
+            instead of raising ValueError.
 
     Returns:
         GOAL schedule as a string, ready to write to a .goal file.
@@ -72,7 +75,7 @@ def dag_to_goal(
 
     # Validate compute timing is populated on every compute node.
     for n in dag.compute_nodes:
-        if n.duration_ms is None:
+        if n.duration_ms is None and not ignore_missing:
             raise ValueError(
                 f"ComputeNode {n.node_id} (kernel={n.kernel!r}, gpu={n.gpu_rank}) "
                 "has no duration_ms. Run populate_dag() before exporting to GOAL."
@@ -170,7 +173,8 @@ def dag_to_goal(
             lines.append(f"{idle_label}: calc {dur_ns}")
 
         for n in compute_by_rank.get(rank, []):
-            dur_ns = int(n.duration_ms * 1_000_000)  # ms → ns  (1 ms = 1 000 000 ns)
+            dur_ms = n.duration_ms if n.duration_ms is not None else 0.0
+            dur_ns = int(dur_ms * 1_000_000)  # ms → ns  (1 ms = 1 000 000 ns)
             lines.append(f"c{n.node_id}: calc {dur_ns}")
 
         for n in sends_by_rank.get(rank, []):
@@ -200,6 +204,7 @@ def write_goal_trace(
     dag: ExecutionDAG,
     path: str | Path,
     start_offsets: dict[int, float] | None = None,
+    ignore_missing: bool = False,
 ) -> None:
     """Write a GOAL trace file from a timing-populated ExecutionDAG.
 
@@ -208,10 +213,11 @@ def write_goal_trace(
         path: Output path for the .goal file.
         start_offsets: Optional mapping from GPU rank to idle duration in
             milliseconds.  Passed through to :func:`dag_to_goal`.
+        ignore_missing: Passed through to :func:`dag_to_goal`.
 
     Raises:
         ValueError: If any ComputeNode.duration_ms is None.
     """
-    goal = dag_to_goal(dag, start_offsets=start_offsets)
+    goal = dag_to_goal(dag, start_offsets=start_offsets, ignore_missing=ignore_missing)
     with open(path, "w", encoding="utf-8") as f:
         f.write(goal)

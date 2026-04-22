@@ -30,7 +30,12 @@ app.add_typer(profile_app, name="profile")
 from simulon.cli.install import app as install_app  # noqa: E402
 app.add_typer(install_app, name="install", help="Install third-party components (apex, deepgemm, m4).")
 
-from simulon.config.resolve import resolve_node_spec
+from simulon.cli.output import (
+    _print_collective_summary,
+    _print_cost_summary,
+    _print_energy_summary,
+    _print_summary,
+)
 
 
 @app.command()
@@ -76,7 +81,9 @@ def simulate(
             tracker.start_run()
 
         backend = AnalyticalBackend()
-        dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+        output = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+        dag = output.dag
+        result = output.result
 
         if trackers:
             params = extract_params(sc)
@@ -94,16 +101,37 @@ def simulate(
             finally:
                 scenario_artifact_path.unlink(missing_ok=True)
 
+        is_multi = len(sc.workloads) > 1
+
         if summary:
             from simulon.config.workload import CollectiveWorkload, MegatronWorkload as _MW
-            if isinstance(sc.workload, CollectiveWorkload):
-                _print_collective_summary(sc.workload, result, sc.datacenter)
-            elif isinstance(sc.workload, _MW):
-                _print_summary(result, sc.workload)
+            if is_multi:
+                typer.echo("\n=== Aggregate Summary ===")
+                _print_summary(output.result)
+                if output.by_workload:
+                    typer.echo("=== Per-Workload Summaries ===")
+                    for name, wl_result in output.by_workload.items():
+                        typer.echo(f"\n--- {name} ---")
+                        wl_config = None
+                        for inst in sc.workloads:
+                            if inst.name == name and isinstance(inst.workload, _MW):
+                                wl_config = inst.workload
+                                break
+                        _print_summary(wl_result, wl_config)
             else:
-                _print_summary(result)
+                single_wl = sc.workloads[0].workload if sc.workloads else None
+                if isinstance(single_wl, CollectiveWorkload):
+                    _print_collective_summary(single_wl, result, sc.datacenter)
+                elif isinstance(single_wl, _MW):
+                    _print_summary(result, single_wl)
+                else:
+                    _print_summary(result)
 
-        if isinstance(sc.workload, MegatronWorkload):
+        has_megatron = any(
+            isinstance(inst.workload, MegatronWorkload) for inst in sc.workloads
+        )
+
+        if has_megatron:
             energy_result = None
             if energy or cost:
                 from simulon.energy import compute_energy
@@ -117,13 +145,28 @@ def simulate(
                 _print_cost_summary(cost_result)
 
             if chrome is not None:
-                p = sc.workload.parallelism
-                t = sc.workload.training
-                tp = p.tp
-                pp_val = p.pp
-                ep = p.ep
-                dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
-                trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+                if is_multi:
+                    workload_labels: dict[int, str] = {}
+                    for n in dag.compute_nodes:
+                        if n.node_id in output.node_id_to_workload:
+                            workload_labels[n.gpu_rank] = output.node_id_to_workload[n.node_id]
+                    for n in dag.comm_nodes:
+                        if n.node_id in output.node_id_to_workload:
+                            workload_labels[n.src_gpu] = output.node_id_to_workload[n.node_id]
+                            workload_labels[n.dst_gpu] = output.node_id_to_workload[n.node_id]
+                    trace_dict = to_chrome_trace(
+                        dag, tp=1, pp=1, dp=1, ep=1,
+                        start_offsets=output.start_offsets or None,
+                        workload_labels=workload_labels or None,
+                    )
+                else:
+                    p = sc.workload.parallelism
+                    t = sc.workload.training
+                    tp = p.tp
+                    pp_val = p.pp
+                    ep = p.ep
+                    dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
+                    trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
                 with open(chrome, "w") as f:
                     json.dump(trace_dict, f)
                 typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
@@ -139,7 +182,7 @@ def simulate(
 
         if goal is not None:
             from simulon.backend.dag.goal_trace import write_goal_trace
-            write_goal_trace(dag, goal)
+            write_goal_trace(dag, goal, start_offsets=output.start_offsets or None, ignore_missing=ignore_missing)
             typer.echo(f"GOAL trace written to {goal}  (feed to ATLAHS/LogGOPSim via txt2bin)")
             for tracker in trackers:
                 tracker.log_artifact(goal)
@@ -147,102 +190,6 @@ def simulate(
     finally:
         for tracker in trackers:
             tracker.end_run()
-
-
-def _print_summary(result, workload=None) -> None:
-    """Print a human-readable simulation summary to stdout.
-
-    Args:
-        result: SimulationResult from AnalyticalBackend.simulate().
-        workload: Optional MegatronWorkload for throughput metrics.
-    """
-
-    total = result.total_time_ms
-    n_gpus = len(result.per_gpu_times_ms)
-
-    def _pct(ms: float) -> str:
-        return f"{ms / total * 100:5.1f}%" if total > 0 else "  n/a"
-
-    typer.echo(f"\nIteration wall time:  {total:.3f} ms")
-    typer.echo(f"  (metrics below averaged across {n_gpus} GPUs)")
-    typer.echo("")
-    typer.echo(f"  Compute:        {result.compute_ms:9.3f} ms  {_pct(result.compute_ms)}")
-    typer.echo(f"  Exposed comm:   {result.exposed_comm_ms:9.3f} ms  {_pct(result.exposed_comm_ms)}")
-    for ctype, ms in sorted(result.exposed_comm_by_type.items(), key=lambda x: -x[1]):
-        typer.echo(f"    {ctype + ':':22s} {ms:9.3f} ms")
-    typer.echo(f"  Bubble:         {result.bubble_ms:9.3f} ms  {_pct(result.bubble_ms)}")
-    typer.echo("")
-    typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
-               "  (hidden by compute, not in totals above)")
-    typer.echo("")
-
-    if workload is not None and total > 0:
-        from simulon.profiling.models import _resolve_model
-        t = workload.training
-        tokens_per_iter = t.global_batch_size * t.sequence_length
-        iter_time_s = total / 1000.0
-        throughput_tps = tokens_per_iter / iter_time_s
-        per_gpu_tps = throughput_tps / n_gpus
-        typer.echo(f"Throughput:           {per_gpu_tps:,.1f} tokens/s ({throughput_tps:,.1f} tokens/s)")
-        resolved = _resolve_model(workload.model)
-        if resolved.gflops_per_train_token is not None:
-            tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
-        per_gpu_tflops = tflops / n_gpus
-        typer.echo(f"                      {per_gpu_tflops:.2f} TFLOPs/s ({tflops:.2f} TFLOPs/s)")
-        typer.echo("")
-
-
-def _print_collective_summary(workload, result, datacenter) -> None:
-    node = resolve_node_spec(datacenter)
-    gpus_per_node = node.gpus_per_node
-    if gpus_per_node is None:
-        gpus_per_node = 0
-    num_ranks = datacenter.cluster.num_nodes * gpus_per_node
-    typer.echo(f"\nCollective wall time:  {result.total_time_ms:.3f} ms")
-    typer.echo(f"  Type:          {workload.collective_type.value}")
-    typer.echo(f"  Message size:  {workload.message_size_bytes:,} bytes")
-    typer.echo(f"  Ranks:         {num_ranks}")
-    typer.echo("")
-
-
-def _print_energy_summary(result) -> None:
-    """Print a human-readable energy summary to stdout."""
-    typer.echo(f"Energy per iteration:  {result.total_wh:.4f} Wh"
-               f"   (avg cluster power: {result.avg_power_kw:.2f} kW)")
-    typer.echo(f"  Hardware subtotal:   {result.hardware_subtotal_wh:.4f} Wh")
-    for comp in result.breakdown:
-        label = comp.component + ":"
-        typer.echo(f"    {label:26s} {comp.wh:10.4f} Wh  ({comp.pct:5.1f}%)")
-    typer.echo(f"  PUE overhead:        {result.pue_overhead_wh:.4f} Wh")
-    typer.echo("")
-
-
-def _print_cost_summary(result) -> None:
-    """Print a human-readable cost summary to stdout."""
-
-    def _fmt(v: float) -> str:
-        return f"${v:,.0f}"
-
-    typer.echo("Cost model")
-    capex = result.capex
-    range_str = ""
-    if capex.min is not None and capex.max is not None:
-        range_str = f"  [{_fmt(capex.min)} \u2013 {_fmt(capex.max)}]"
-    typer.echo(f"  CAPEX total:    {_fmt(capex.total)}{range_str}")
-    for comp in capex.breakdown:
-        label = comp.component + ":"
-        range_comp = ""
-        if comp.min is not None and comp.max is not None:
-            range_comp = f"  [{_fmt(comp.min)} \u2013 {_fmt(comp.max)}]"
-        typer.echo(f"    {label:26s} {_fmt(comp.total):>14s}{range_comp}  ({comp.pct:5.1f}%)")
-    typer.echo(f"  OPEX per run:   {_fmt(result.opex_per_run)}")
-    if result.cost_per_run is not None:
-        cpr = result.cost_per_run
-        typer.echo(
-            f"  Cost per run:   {_fmt(cpr.total)}"
-            f"  (capex {_fmt(cpr.capex_component)} + opex {_fmt(cpr.opex_component)})"
-        )
-    typer.echo("")
 
 
 @profile_app.command("gpu")

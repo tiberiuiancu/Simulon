@@ -307,6 +307,7 @@ class TestAnalyticalBackendCollective:
         dag, _ = AnalyticalBackend().simulate(sc)
         assert len(dag.comm_nodes) > 0
 
+    @pytest.mark.slow
     def test_simulate_allreduce_larger_message_takes_longer(self):
         """Larger message sizes produce higher total_time_ms."""
         sc_small = make_collective_scenario(message_size_bytes=1024)
