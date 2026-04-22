@@ -15,6 +15,7 @@ SCRIPT_DIR_REAL=$(realpath $SCRIPT_DIR)
 cd "$SCRIPT_DIR_REAL"
 
 uv pip install datasets transformers sentencepiece wget pybind11
+uv pip install --no-build-isolation git+https://github.com/NVIDIA/TransformerEngine.git@stable
 uv pip install -e megatron-lm
 export PYTHONPATH="$SCRIPT_DIR_REAL/megatron-lm:${PYTHONPATH:-}"
 

@@ -14,6 +14,7 @@ cd "$SCRIPT_DIR"
 
 source ../../.venv/bin/activate
 python -m pip install datasets transformers sentencepiece wget pybind11
+python -m pip install --no-build-isolation git+https://github.com/NVIDIA/TransformerEngine.git@stable
 export PYTHONPATH="$SCRIPT_DIR/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results
