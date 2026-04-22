@@ -13,7 +13,7 @@ SCRIPT_DIR="experiments/validation/validate_compute"
 cd "$SCRIPT_DIR"
 
 uv sync --extra profiling
-source ../../.venv/bin/activate
+source ../../../.venv/bin/activate
 
 mkdir -p jobs/logs
 
