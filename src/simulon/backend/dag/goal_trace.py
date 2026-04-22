@@ -46,12 +46,19 @@ from pathlib import Path
 from simulon.backend.dag.nodes import ComputeNode, CommNode, ExecutionDAG
 
 
-def dag_to_goal(dag: ExecutionDAG) -> str:
+def dag_to_goal(
+    dag: ExecutionDAG,
+    start_offsets: dict[int, float] | None = None,
+) -> str:
     """Convert a timing-populated ExecutionDAG to GOAL text format.
 
     Args:
         dag: ExecutionDAG after populate_dag() and replay() have been called
              so that ComputeNode.duration_ms is set on every compute node.
+        start_offsets: Optional mapping from GPU rank to idle duration in
+            milliseconds.  When a rank has a positive offset, an idle ``calc``
+            block is emitted first and all subsequent events for that rank
+            depend on it.
 
     Returns:
         GOAL schedule as a string, ready to write to a .goal file.
@@ -152,6 +159,16 @@ def dag_to_goal(dag: ExecutionDAG) -> str:
     for rank in range(num_ranks):
         lines.append(f"\nrank {rank} {{")
 
+        offset_ms = 0.0
+        if start_offsets is not None:
+            offset_ms = start_offsets.get(rank, 0.0)
+
+        idle_label = ""
+        if offset_ms > 0:
+            idle_label = f"c_idle_{rank}"
+            dur_ns = int(offset_ms * 1_000_000)
+            lines.append(f"{idle_label}: calc {dur_ns}")
+
         for n in compute_by_rank.get(rank, []):
             dur_ns = int(n.duration_ms * 1_000_000)  # ms → ns  (1 ms = 1 000 000 ns)
             lines.append(f"c{n.node_id}: calc {dur_ns}")
@@ -162,6 +179,15 @@ def dag_to_goal(dag: ExecutionDAG) -> str:
         for n in recvs_by_rank.get(rank, []):
             lines.append(f"r{n.node_id}: recv {n.bytes}b from {n.src_gpu} tag {n.node_id}")
 
+        if idle_label:
+            # All events in this rank block must wait for the idle block.
+            for n in compute_by_rank.get(rank, []):
+                lines.append(f"c{n.node_id} requires {idle_label}")
+            for n in sends_by_rank.get(rank, []):
+                lines.append(f"s{n.node_id} requires {idle_label}")
+            for n in recvs_by_rank.get(rank, []):
+                lines.append(f"r{n.node_id} requires {idle_label}")
+
         for dst_label, src_label in sorted(deps_by_rank.get(rank, [])):
             lines.append(f"{dst_label} requires {src_label}")
 
@@ -170,16 +196,22 @@ def dag_to_goal(dag: ExecutionDAG) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_goal_trace(dag: ExecutionDAG, path: str | Path) -> None:
+def write_goal_trace(
+    dag: ExecutionDAG,
+    path: str | Path,
+    start_offsets: dict[int, float] | None = None,
+) -> None:
     """Write a GOAL trace file from a timing-populated ExecutionDAG.
 
     Args:
         dag:  ExecutionDAG after populate_dag() and replay() have been called.
         path: Output path for the .goal file.
+        start_offsets: Optional mapping from GPU rank to idle duration in
+            milliseconds.  Passed through to :func:`dag_to_goal`.
 
     Raises:
         ValueError: If any ComputeNode.duration_ms is None.
     """
-    goal = dag_to_goal(dag)
+    goal = dag_to_goal(dag, start_offsets=start_offsets)
     with open(path, "w", encoding="utf-8") as f:
         f.write(goal)

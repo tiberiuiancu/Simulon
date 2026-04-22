@@ -41,3 +41,16 @@
 - Added 14 tests in `tests/test_merge_dags.py` covering: empty input, single DAG identity, new object creation, two/three DAG cumulative offsets, GPU rank offsets, flow ID uniqueness, parent_flow_ids offset, edge offsets, input immutability, node_id_to_workload mapping, comm-only DAGs, and replayability of merged DAG.
 - All 14 new tests pass; full suite (`test_dag.py`, `test_replayer.py`, `test_e2e.py`) also passes (100/100).
 - `basedpyright` LSP server is not installed in this environment, so static type checking was not available.
+- Verified `AnalyticalBackend.run()` still preserves the single-workload shape and now returns a `workloads` dict for multi-workload scenarios via `_trace_all_workloads()`.
+- `tests/test_e2e.py` passes unchanged after the multi-workload `run()` verification.
+- Added `start_offsets: dict[int, float] | None = None` and `workload_labels: dict[int, str] | None = None` params to `to_chrome_trace()` and `write_chrome_trace()`.
+- Idle events: for each GPU with non-zero offset, emit `{"name": "idle", "ph": "X", "ts": 0, "dur": offset_ms*1000}` on `_TID_COMPUTE`.
+- When `workload_labels` is provided and GPU is in the dict, process name becomes `"GPU {gpu} | {workload_name}"` and sort_idx defaults to `gpu`. Otherwise, existing `_decode_rank()` logic is used unchanged.
+- Both params default to `None`, preserving full backward compatibility.
+- All 5 existing chrome_trace tests and 13 e2e tests pass.
+- Added `start_offsets` parameter to `dag_to_goal()` in `src/simulon/backend/dag/goal_trace.py`.
+- Signature: `dag_to_goal(dag: ExecutionDAG, start_offsets: dict[int, float] | None = None)`.
+- For each GPU rank with `offset_ms > 0` in `start_offsets`, emits `c_idle_{rank}: calc {dur_ns}` before any compute/comm events in that rank block.
+- All subsequent events for that rank get a `requires c_idle_{rank}` dependency line.
+- `write_goal_trace()` updated to accept `start_offsets` and pass it through to `dag_to_goal()`.
+- All 25 existing tests in `tests/test_goal_trace.py` pass unchanged.

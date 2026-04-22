@@ -841,7 +841,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(backend): add SimulationOutput dataclass for multi-workload results`
   - Files: `src/simulon/backend/dag/nodes.py` or `src/simulon/backend/analytical.py`
 
-- [ ] 13. **GOAL trace export with start_offsets**
+- [x] 13. **GOAL trace export with start_offsets**
 
   **What to do**:
   - Modify `dag_to_goal(dag, start_offsets=None)` in `src/simulon/backend/dag/goal_trace.py` to accept `start_offsets: dict[int, float]`
@@ -892,7 +892,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(goal): support start_offsets in GOAL trace export`
   - Files: `src/simulon/backend/dag/goal_trace.py`
 
-- [ ] 14. **Chrome trace export with start_offsets**
+- [x] 14. **Chrome trace export with start_offsets**
 
   **What to do**:
   - Modify `to_chrome_trace(dag, ...)` in `src/simulon/backend/dag/chrome_trace.py` to accept `start_offsets: dict[int, float]`
@@ -1032,7 +1032,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(backend): multi-workload simulate() with merged DAG replay`
   - Files: `src/simulon/backend/analytical.py`
 
-- [ ] 16. **AnalyticalBackend.run() multi-workload flow**
+- [x] 16. **AnalyticalBackend.run() multi-workload flow**
 
   **What to do**:
   - Update `run()` in `src/simulon/backend/analytical.py` to support multi-workload scenarios
