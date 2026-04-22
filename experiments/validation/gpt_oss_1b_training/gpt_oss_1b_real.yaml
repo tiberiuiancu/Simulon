@@ -26,6 +26,10 @@ micro-batch-size: 1
 global-batch-size: 1
 seq-length: 8192
 train-iters: 6
+lr: 6.0e-4
+min-lr: 6.0e-5
+lr-decay-iters: 6
+lr-warmup-fraction: 0.0
 bf16: true
 
 # Data (real C4 via external dataloader)
