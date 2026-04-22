@@ -22,6 +22,6 @@ simulon profile gpu \
     --ep 1 \
     --batch-size 1 \
     --seq-len 4096 \
-    --output templates/gpu/h100.yaml
+    --output ../../templates/gpu/h100.yaml
 
-echo "=== Done. Profile appended to templates/gpu/h100.yaml ==="
+echo "=== Done. Profile appended to ../../templates/gpu/h100.yaml ==="
