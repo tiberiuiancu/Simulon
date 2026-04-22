@@ -14,6 +14,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 cd "$SCRIPT_DIR"
 
 source "$REPO_ROOT/.venv/bin/activate"
+python -m pip install datasets transformers sentencepiece
+export PYTHONPATH="$SCRIPT_DIR/megatron-lm:${PYTHONPATH:-}"
 
 mkdir -p results
 

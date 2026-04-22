@@ -11,12 +11,20 @@ module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-cd "$SCRIPT_DIR"
+cd "$REPO_ROOT"
 
-source "$REPO_ROOT/.venv/bin/activate"
+uv sync --extra profiling
+source .venv/bin/activate
 
-mkdir -p results
+mkdir -p jobs/logs
 
-python profile_h100.py
+simulon profile gpu \
+    --name H100 \
+    --model gpt-oss-1b-moe \
+    --tp 1 \
+    --ep 1 \
+    --batch-size 1 \
+    --seq-len 8192 \
+    --output templates/gpu/h100.yaml
 
-echo "=== Done. Profile saved to results/h100_profile.yaml ==="
+echo "=== Done. Profile appended to templates/gpu/h100.yaml ==="
