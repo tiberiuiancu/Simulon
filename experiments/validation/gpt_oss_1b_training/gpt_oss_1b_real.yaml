@@ -1,13 +1,13 @@
-# Megatron-LM pretrain arguments for GPT-OSS-1B-MoE on real C4 data
+# Megatron-LM pretrain arguments for GPT-OSS-4B-MoE on real C4 data
 # Single GPU profiling run: 5 warmup iterations + 1 profiled iteration
 
 # Model architecture
-num-layers: 6
-hidden-size: 1536
-num-attention-heads: 24
-ffn-hidden-size: 6144
+num-layers: 12
+hidden-size: 2048
+num-attention-heads: 32
+ffn-hidden-size: 8192
 vocab-size: 32000
-num-query-groups: 24
+num-query-groups: 32
 position-embedding-type: rope
 max-position-embeddings: 8192
 swiglu: true
@@ -28,8 +28,8 @@ micro-batch-size: 1
 global-batch-size: 1
 seq-length: 8192
 train-iters: 6
-lr: 6.0e-4
-min-lr: 6.0e-5
+lr: 3.0e-4
+min-lr: 3.0e-5
 lr-decay-iters: 6
 lr-warmup-fraction: 0.0
 bf16: true
