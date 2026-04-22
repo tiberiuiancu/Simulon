@@ -7,7 +7,9 @@ from pydantic import TypeAdapter
 
 from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
+from simulon.backend.dag.merge import merge_dags
 from simulon.backend.dag.populate import populate_network
+from simulon.backend.dag.replayer import summarize_subset
 from simulon.collective import CCLDecomposer, NCCLDecomposer, RCCLDecomposer
 from simulon.collective.calbusbw import cal_busbw
 from simulon.config.dc import DatacenterConfig, GPUSpec, NICSpec
@@ -208,7 +210,13 @@ class AnalyticalBackend(Backend):
             },
         }
 
-    def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False, ignore_missing: bool = False) -> SimulationOutput:
+    def _simulate_single_workload(
+        self,
+        scenario: ScenarioConfig,
+        compact: bool = False,
+        ignore_oom: bool = False,
+        ignore_missing: bool = False,
+    ) -> SimulationOutput:
         if isinstance(scenario.workload, MegatronWorkload):
             from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
             p = scenario.workload.parallelism
@@ -328,3 +336,94 @@ class AnalyticalBackend(Backend):
 
         else:
             raise ValueError(f"AnalyticalBackend does not support {type(scenario.workload).__name__}")
+
+    def _simulate_multi_workload(
+        self,
+        scenario: ScenarioConfig,
+        compact: bool = False,
+        ignore_oom: bool = False,
+        ignore_missing: bool = False,
+    ) -> SimulationOutput:
+        datacenter = _load_datacenter(scenario.datacenter)
+        resolved = self._resolve_workloads(scenario)
+        gpu_spec = _resolve_gpu_spec(datacenter)
+
+        entries: list[tuple[str, ExecutionDAG, SimulationResult, NodeSlice, WorkloadConfig]] = []
+        for name, workload, node_slice in resolved:
+            sliced_dc = self._slice_datacenter(datacenter, node_slice)
+
+            if isinstance(workload, MegatronWorkload):
+                from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+                cfg = _tracer_config_from_scenario(scenario)
+                cfg.compact = compact
+                cfg.cache_dir = None
+                tracer = MegatronDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
+                dag = tracer.trace(workload, sliced_dc)
+            elif isinstance(workload, CollectiveWorkload):
+                from simulon.backend.dag.collective_tracer import build_collective_dag
+                c = scenario.collective
+                algorithm = c.algorithm if c.algorithm != "auto" else "ring"
+                dag = build_collective_dag(
+                    workload=workload,
+                    datacenter=sliced_dc,
+                    algorithm=algorithm,
+                    num_channels=c.num_channels,
+                    ccl=_ccl_from_scenario(scenario),
+                )
+            elif isinstance(workload, InferenceWorkload):
+                raise NotImplementedError(
+                    "AnalyticalBackend does not yet support InferenceWorkload"
+                )
+            else:
+                raise ValueError(f"AnalyticalBackend does not support {type(workload).__name__}")
+
+            if isinstance(workload, MegatronWorkload):
+                populate_dag(dag, workload, gpu_spec, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+
+            populate_network(dag, sliced_dc)
+            result = replay(dag)
+            entries.append((name, dag, result, node_slice, workload))
+
+        result_by_name = {name: result for name, _, result, _, _ in entries}
+        instance_by_name = {instance.name: instance for instance in scenario.workloads}
+
+        effective_start: dict[str, float] = {}
+
+        def _compute_effective_start(name: str) -> float:
+            if name in effective_start:
+                return effective_start[name]
+            instance = instance_by_name[name]
+            dep_finish = 0.0
+            for dep in instance.start.after_finish:
+                dep_finish = max(dep_finish, result_by_name[dep].total_time_ms)
+            start = max(instance.start.offset_ms, dep_finish)
+            effective_start[name] = start
+            return start
+
+        for name, _, _, _, _ in entries:
+            _compute_effective_start(name)
+
+        start_offsets: dict[int, float] = {}
+        for name, _, _, node_slice, _ in entries:
+            offset = effective_start[name]
+            for gpu in range(node_slice.start_gpu_rank, node_slice.start_gpu_rank + node_slice.num_gpus):
+                start_offsets[gpu] = offset
+
+        dags = [(name, dag) for name, dag, _, _, _ in entries]
+        merged_dag, node_id_to_workload = merge_dags(dags)
+
+        populate_network(merged_dag, datacenter)
+        aggregate_result = replay(merged_dag, start_offsets=start_offsets)
+
+        per_workload: dict[str, SimulationResult] = {}
+        for name, _, _, _, _ in entries:
+            workload_node_ids = {nid for nid, wl_name in node_id_to_workload.items() if wl_name == name}
+            per_workload[name] = summarize_subset(merged_dag, workload_node_ids)
+
+        return SimulationOutput(dag=merged_dag, result=aggregate_result, by_workload=per_workload)
+
+    def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False, ignore_missing: bool = False) -> SimulationOutput:
+        if len(scenario.workloads) == 1:
+            return self._simulate_single_workload(scenario, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+        else:
+            return self._simulate_multi_workload(scenario, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)

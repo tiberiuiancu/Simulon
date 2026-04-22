@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from simulon.backend.dag._progress import log_progress
@@ -189,6 +189,72 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
         "bubble_ms": sum(per_gpu_bubble) / n_gpus,
         "overlapped_comm_ms": sum(per_gpu_overlapped) / n_gpus,
     }
+
+
+# ---------------------------------------------------------------------------
+# Subset summary
+# ---------------------------------------------------------------------------
+
+
+def summarize_subset(dag: ExecutionDAG, node_ids: set[int]) -> SimulationResult:
+    """Compute a SimulationResult from a subset of nodes in a replayed DAG.
+
+    The returned result is shifted so that the earliest start time among the
+    subset nodes becomes time 0. This makes per-workload total_time_ms match
+    the workload's isolated duration.
+    """
+    compute_nodes = [n for n in dag.compute_nodes if n.node_id in node_ids]
+    comm_nodes = [n for n in dag.comm_nodes if n.node_id in node_ids]
+    all_nodes = compute_nodes + comm_nodes
+
+    if not all_nodes:
+        return SimulationResult(
+            total_time_ms=0.0,
+            compute_ms=0.0,
+            exposed_comm_ms=0.0,
+            exposed_comm_by_type={},
+            bubble_ms=0.0,
+            overlapped_comm_ms=0.0,
+            per_gpu_times_ms={},
+        )
+
+    offset_ms = min(
+        (n.start_ms for n in all_nodes if n.start_ms is not None),
+        default=0.0,
+    )
+
+    def _shift(node: ComputeNode | CommNode):
+        return replace(
+            node,
+            start_ms=node.start_ms - offset_ms if node.start_ms is not None else None,
+            finish_ms=node.finish_ms - offset_ms if node.finish_ms is not None else None,
+        )
+
+    shifted_compute = [_shift(n) for n in compute_nodes]
+    shifted_comm = [_shift(n) for n in comm_nodes]
+    subset_dag = ExecutionDAG(compute_nodes=shifted_compute, comm_nodes=shifted_comm, edges=[])
+
+    total_time_ms = max(
+        (n.finish_ms for n in shifted_compute + shifted_comm if n.finish_ms is not None),
+        default=0.0,
+    )
+
+    summary = _summarize(subset_dag, total_time_ms)
+
+    per_gpu_times_ms: dict[int, float] = {}
+    for n in shifted_compute:
+        if n.finish_ms is not None:
+            per_gpu_times_ms[n.gpu_rank] = max(per_gpu_times_ms.get(n.gpu_rank, 0.0), n.finish_ms)
+    for n in shifted_comm:
+        if n.finish_ms is not None:
+            per_gpu_times_ms[n.src_gpu] = max(per_gpu_times_ms.get(n.src_gpu, 0.0), n.finish_ms)
+            per_gpu_times_ms[n.dst_gpu] = max(per_gpu_times_ms.get(n.dst_gpu, 0.0), n.finish_ms)
+
+    return SimulationResult(
+        total_time_ms=total_time_ms,
+        per_gpu_times_ms=per_gpu_times_ms,
+        **summary,
+    )
 
 
 # ---------------------------------------------------------------------------

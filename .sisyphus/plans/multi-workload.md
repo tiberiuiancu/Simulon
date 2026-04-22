@@ -946,7 +946,7 @@ Max Concurrent: 7 (Wave 1)
   - Message: `feat(chrome): support start_offsets in Chrome trace export`
   - Files: `src/simulon/backend/dag/chrome_trace.py`
 
-- [ ] 15. **AnalyticalBackend.simulate() multi-workload flow**
+- [x] 15. **AnalyticalBackend.simulate() multi-workload flow**
 
   **What to do**:
   - **Pre-refactoring**: Extract existing single-workload simulate logic into `_simulate_single_workload()` private method BEFORE adding multi-workload logic. Keep `simulate()` as a clean dispatcher:
