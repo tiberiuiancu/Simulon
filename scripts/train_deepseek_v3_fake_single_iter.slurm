@@ -156,8 +156,6 @@ MEMORY_ARGS=(
 
 MISC_ARGS=(
     --bf16
-    --no-save
-    --no-load
     --log-interval 1
     --log-throughput
     --log-params-norm
