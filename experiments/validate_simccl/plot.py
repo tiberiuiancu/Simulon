@@ -10,8 +10,8 @@ Loads JSON files from a results directory:
 All files are optional; missing ones are silently skipped.
 
 Usage (from repo root):
-    uv run python experiments/validation/simccl/plot.py
-    uv run python experiments/validation/simccl/plot.py --results-dir /path/to/results --output plot.pdf
+    uv run python experiments/validate_simccl/plot.py
+    uv run python experiments/validate_simccl/plot.py --results-dir /path/to/results --output plot.pdf
 """
 
 from __future__ import annotations
@@ -132,7 +132,7 @@ def main() -> None:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=Path("experiments/validation/simccl/results"),
+        default=Path("experiments/validate_simccl/results"),
         help="Directory containing sim_*.json and nccl_*.json files",
     )
     parser.add_argument(
