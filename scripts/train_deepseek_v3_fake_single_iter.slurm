@@ -169,6 +169,7 @@ MISC_ARGS=(
     --recompute-granularity selective
     --recompute-modules moe_act mlp layernorm mla_up_proj
     --eval-iters 0
+    --eval-interval 100000
 )
 
 python "${MEGATRON_PATH}/pretrain_gpt.py" \
