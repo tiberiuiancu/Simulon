@@ -75,7 +75,7 @@ DATA_ARGS=(
 
 MODEL_ARGS=(
     --use-mcore-models
-    --num-layers 61
+    --num-layers 64
     --hidden-size 7168
     --ffn-hidden-size 18432
     --num-attention-heads 128
