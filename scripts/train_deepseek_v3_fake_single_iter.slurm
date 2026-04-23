@@ -140,7 +140,7 @@ OPTIMIZER_ARGS=(
     --lr 3.9e-6
     --min-lr 3.9e-7
     --lr-decay-style cosine
-    --lr-warmup-samples 1
+    --lr-warmup-iters 0
 )
 
 FAKE_ARGS=(
