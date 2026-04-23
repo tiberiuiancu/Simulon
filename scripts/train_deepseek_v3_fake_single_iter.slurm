@@ -58,7 +58,7 @@ PARALLELISM_ARGS=(
 
 BATCH_ARGS=(
     --micro-batch-size 1
-    --global-batch-size 128
+    --global-batch-size 15360
     --train-iters 10
     --exit-interval 10
 )
