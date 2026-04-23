@@ -58,7 +58,7 @@ PARALLELISM_ARGS=(
 
 BATCH_ARGS=(
     --micro-batch-size 1
-    --global-batch-size 1
+    --global-batch-size 128
     --train-iters 1
     --exit-interval 1
 )
@@ -67,7 +67,7 @@ DATA_ARGS=(
     --mock-data
     --tokenizer-type NullTokenizer
     --vocab-size 32000
-    --split 99,1,0
+    --split 100,0,0
     --no-mmap-bin-files
     --no-create-attention-mask-in-dataloader
     --num-workers 0
@@ -156,6 +156,8 @@ MEMORY_ARGS=(
 
 MISC_ARGS=(
     --bf16
+    --no-save
+    --no-load
     --log-interval 1
     --log-throughput
     --log-params-norm
@@ -168,6 +170,7 @@ MISC_ARGS=(
     --manual-gc-interval 1
     --recompute-granularity selective
     --recompute-modules moe_act mlp layernorm mla_up_proj
+    --eval-iters 0
 )
 
 python "${MEGATRON_PATH}/pretrain_gpt.py" \
