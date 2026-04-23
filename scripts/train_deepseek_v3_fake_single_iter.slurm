@@ -59,8 +59,8 @@ PARALLELISM_ARGS=(
 BATCH_ARGS=(
     --micro-batch-size 1
     --global-batch-size 128
-    --train-iters 1
-    --exit-interval 1
+    --train-iters 10
+    --exit-interval 10
 )
 
 DATA_ARGS=(
@@ -140,7 +140,7 @@ OPTIMIZER_ARGS=(
     --lr 3.9e-6
     --min-lr 3.9e-7
     --lr-decay-style cosine
-    --lr-warmup-iters 0
+    --lr-warmup-iters 2
 )
 
 FAKE_ARGS=(
