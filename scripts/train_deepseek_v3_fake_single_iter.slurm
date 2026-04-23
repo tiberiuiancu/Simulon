@@ -97,7 +97,7 @@ MODEL_ARGS=(
 
 MOE_ARGS=(
     --num-experts 256
-    --moe-layer-freq "([0]*3+[1]*58)"
+    --moe-layer-freq "([0]*3+[1]*61)"
     --moe-ffn-hidden-size 2048
     --moe-shared-expert-intermediate-size 2048
     --moe-router-load-balancing-type seq_aux_loss
