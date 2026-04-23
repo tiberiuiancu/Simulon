@@ -6,8 +6,8 @@ for three cluster configs: 1×4 GPUs, 2×4 GPUs, 4×4 GPUs (H100 + NVSwitch 4 +
 InfiniBand HDR100).
 
 Usage (from repo root):
-    uv run python experiments/validation/simccl/sim_ccl.py
-    uv run python experiments/validation/simccl/sim_ccl.py --output-dir /path/to/results
+    uv run python experiments/validate_simccl/sim_ccl.py
+    uv run python experiments/validate_simccl/sim_ccl.py --output-dir /path/to/results
 """
 
 from __future__ import annotations
@@ -165,8 +165,8 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("experiments/validation/simccl/results"),
-        help="Directory to write JSON results (default: experiments/validation/simccl/results)",
+        default=Path("experiments/validate_simccl/results"),
+        help="Directory to write JSON results (default: experiments/validate_simccl/results)",
     )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
