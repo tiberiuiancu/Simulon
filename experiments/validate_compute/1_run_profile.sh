@@ -18,10 +18,10 @@ mkdir -p experiments/validate_compute/jobs
 
 simulon profile gpu \
     --name H100 \
-    --model validation-model \
+    --model validation-model-dense \
     --tp 1 \
     --ep 1 \
-    --batch-size 1 \
+    --batch-size 2 \
     --seq-len 4096 \
     --output templates/gpu/h100.yaml
 

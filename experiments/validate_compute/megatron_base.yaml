@@ -1,4 +1,4 @@
-# Megatron-LM base config for compute-validation MoE model
+# Megatron-LM base config for compute-validation dense model
 # Single GPU profiling run: 5 warmup iterations + 1 profiled iteration
 
 # Model architecture
@@ -14,18 +14,13 @@ swiglu: true
 disable-bias-linear: true
 no-bias-swiglu-fusion: true
 
-# MoE
-num-experts: 8
-moe-router-topk: 2
-
 # Parallelism (single GPU)
 tensor-model-parallel-size: 1
 pipeline-model-parallel-size: 1
-expert-model-parallel-size: 1
 
 # Training
-micro-batch-size: 1
-global-batch-size: 1
+micro-batch-size: 2
+global-batch-size: 2
 seq-length: 4096
 train-iters: 6
 lr: 3.0e-4

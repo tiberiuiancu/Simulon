@@ -16,7 +16,7 @@ collective:
 
 workload:
   framework: megatron
-  model: validation-model
+  model: validation-model-dense
   parallelism:
     tp: 1
     pp: 1
@@ -25,6 +25,6 @@ workload:
     num_microbatches: 1
   training:
     num_gpus: 1
-    global_batch_size: 1
-    micro_batch_size: 1
+    global_batch_size: 2
+    micro_batch_size: 2
     sequence_length: 4096
