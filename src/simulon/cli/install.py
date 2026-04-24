@@ -185,37 +185,57 @@ def _install_flash_attn_prebuilt() -> None:
         raise typer.Exit(1)
     cuda_major_minor = cuda_version.replace('.', '')[:3]
 
-    api_url = "https://api.github.com/repos/mjun0812/flash-attention-prebuild-wheels/releases/latest"
-    try:
-        with urllib.request.urlopen(api_url, timeout=10) as response:
-            release_data = json.loads(response.read().decode())
-            latest_tag = release_data["tag_name"]
-    except Exception as exc:
-        typer.echo(f"Warning: Could not fetch latest release tag from GitHub: {exc}", err=True)
-        typer.echo("Falling back to known release tag v0.9.13", err=True)
-        latest_tag = "v0.9.13"
-
-    # Default to latest known version; user can override by editing if needed
     fa_version = "2.7.4"
     wheel_name = (
         f"flash_attn-{fa_version}+cu{cuda_major_minor}torch{torch_major_minor}-"
         f"{py_tag}-{py_tag}-linux_x86_64.whl"
     )
-    wheel_url = (
-        f"https://github.com/mjun0812/flash-attention-prebuild-wheels/"
-        f"releases/download/{latest_tag}/{wheel_name}"
-    )
 
-    typer.echo("Installing Flash Attention from prebuilt wheel ...")
+    typer.echo("Searching for prebuilt wheel across all releases ...")
     typer.echo(f"  Detected: Python {py_major}.{py_minor}, PyTorch {torch_version}, CUDA {cuda_version}")
-    typer.echo(f"  Release: {latest_tag}")
     typer.echo(f"  Wheel: {wheel_name}")
 
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "install", wheel_url], check=True)
-        typer.echo("Flash Attention installed successfully from prebuilt wheel.")
-    except subprocess.CalledProcessError:
-        typer.echo("Error: Prebuilt wheel install failed.", err=True)
-        typer.echo("The wheel may not exist for your Python/PyTorch/CUDA combination.", err=True)
-        typer.echo("Try installing from source instead (omit --prebuilt).", err=True)
-        raise typer.Exit(1)
+    page = 1
+    per_page = 30
+    while True:
+        api_url = (
+            f"https://api.github.com/repos/mjun0812/flash-attention-prebuild-wheels/"
+            f"releases?per_page={per_page}&page={page}"
+        )
+        try:
+            req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=15) as response:
+                releases = json.loads(response.read().decode())
+        except Exception as exc:
+            typer.echo(f"Error: Failed to fetch releases from GitHub: {exc}", err=True)
+            raise typer.Exit(1)
+
+        if not releases:
+            break
+
+        for release in releases:
+            tag = release.get("tag_name", "")
+            assets = release.get("assets", [])
+            asset_names = {a.get("name", "") for a in assets}
+            if wheel_name in asset_names:
+                wheel_url = (
+                    f"https://github.com/mjun0812/flash-attention-prebuild-wheels/"
+                    f"releases/download/{tag}/{wheel_name}"
+                )
+                typer.echo(f"  Found in release {tag}")
+                try:
+                    subprocess.run([sys.executable, "-m", "pip", "install", wheel_url], check=True)
+                    typer.echo("Flash Attention installed successfully from prebuilt wheel.")
+                    return
+                except subprocess.CalledProcessError as exc:
+                    typer.echo(f"Error: pip install failed for {wheel_url}: {exc}", err=True)
+                    raise typer.Exit(1)
+
+        if len(releases) < per_page:
+            break
+        page += 1
+
+    typer.echo("Error: Could not find a prebuilt wheel for your environment.", err=True)
+    typer.echo(f"  Searched {wheel_name} across all releases.", err=True)
+    typer.echo("Try installing from source instead (omit --prebuilt).", err=True)
+    raise typer.Exit(1)
