@@ -236,12 +236,16 @@ def _install_flash_attn_prebuilt(version: str | None = None) -> None:
             assets = release.get("assets", [])
             asset_names = [a.get("name", "") for a in assets]
             for name in asset_names:
-                if name.startswith("flash_attn-3.") and name.endswith(f"+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"):
-                    if fa3_match is None:
+                if version:
+                    if name == fa3_wheel_prefix and fa3_match is None:
                         fa3_match = (tag, name)
-                elif name.startswith("flash_attn-2.") and name.endswith(f"+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"):
-                    if fa2_match is None:
-                        fa2_match = (tag, name)
+                else:
+                    if name.startswith("flash_attn-3.") and name.endswith(f"+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"):
+                        if fa3_match is None:
+                            fa3_match = (tag, name)
+                    elif name.startswith("flash_attn-2.") and name.endswith(f"+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"):
+                        if fa2_match is None:
+                            fa2_match = (tag, name)
 
             if fa3_match and fa2_match:
                 break
