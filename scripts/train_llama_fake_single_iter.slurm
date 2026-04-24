@@ -9,10 +9,10 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# Llama 3 dense model single-iteration smoke test with --fake-process-group
+# Llama 3 70B dense model single-iteration smoke test with --fake-process-group
 #
-# Parallelism: TP=2, PP=2 (DP derived = 8 / (2*2) = 2)
-# World size: 8
+# Parallelism: TP=4, PP=4 (DP derived = 32 / (4*4) = 2)
+# World size: 32
 # -----------------------------------------------------------------------------
 
 module load 2025 CUDA/12.8.0 cuDNN/9.10.1.4-CUDA-12.8.0 NCCL/2.26.6-GCCcore-14.2.0-CUDA-12.8.0
@@ -26,19 +26,19 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 mkdir -p jobs results
 
-# Fake distributed env: we are rank 0 of an 8-GPU job
-export WORLD_SIZE=8
+# Fake distributed env: we are rank 0 of a 32-GPU job
+export WORLD_SIZE=32
 export RANK=0
 export LOCAL_RANK=0
 export MASTER_ADDR=localhost
 export MASTER_PORT=29500
 
 # Memory profiling output
-MEMORY_SNAPSHOT="results/llama_fake_iter1_memory.pickle"
+MEMORY_SNAPSHOT="results/llama70b_fake_iter1_memory.pickle"
 
 PARALLELISM_ARGS=(
-    --tensor-model-parallel-size 2
-    --pipeline-model-parallel-size 2
+    --tensor-model-parallel-size 4
+    --pipeline-model-parallel-size 4
     --context-parallel-size 1
     --use-distributed-optimizer
     --sequence-parallel
@@ -63,14 +63,14 @@ DATA_ARGS=(
 
 MODEL_ARGS=(
     --use-mcore-models
-    --num-layers 32
-    --hidden-size 4096
-    --ffn-hidden-size 14336
-    --num-attention-heads 32
+    --num-layers 80
+    --hidden-size 8192
+    --ffn-hidden-size 28672
+    --num-attention-heads 64
     --group-query-attention
     --num-query-groups 8
     --kv-channels 128
-    --max-position-embeddings 4096
+    --max-position-embeddings 8192
     --seq-length 4096
     --position-embedding-type rope
     --rotary-base 1000000
