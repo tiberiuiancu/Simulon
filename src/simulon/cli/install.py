@@ -168,6 +168,9 @@ def flash_attn_hopper(
 
 def _install_flash_attn_prebuilt() -> None:
     """Install Flash Attention from prebuilt wheels (mjun0812/flash-attention-prebuild-wheels)."""
+    import json
+    import urllib.request
+
     import torch
 
     py_major, py_minor = sys.version_info[:2]
@@ -182,6 +185,16 @@ def _install_flash_attn_prebuilt() -> None:
         raise typer.Exit(1)
     cuda_major_minor = cuda_version.replace('.', '')[:3]
 
+    api_url = "https://api.github.com/repos/mjun0812/flash-attention-prebuild-wheels/releases/latest"
+    try:
+        with urllib.request.urlopen(api_url, timeout=10) as response:
+            release_data = json.loads(response.read().decode())
+            latest_tag = release_data["tag_name"]
+    except Exception as exc:
+        typer.echo(f"Warning: Could not fetch latest release tag from GitHub: {exc}", err=True)
+        typer.echo("Falling back to known release tag v0.9.13", err=True)
+        latest_tag = "v0.9.13"
+
     # Default to latest known version; user can override by editing if needed
     fa_version = "2.7.4"
     wheel_name = (
@@ -190,11 +203,12 @@ def _install_flash_attn_prebuilt() -> None:
     )
     wheel_url = (
         f"https://github.com/mjun0812/flash-attention-prebuild-wheels/"
-        f"releases/download/v0.0.0/{wheel_name}"
+        f"releases/download/{latest_tag}/{wheel_name}"
     )
 
     typer.echo("Installing Flash Attention from prebuilt wheel ...")
     typer.echo(f"  Detected: Python {py_major}.{py_minor}, PyTorch {torch_version}, CUDA {cuda_version}")
+    typer.echo(f"  Release: {latest_tag}")
     typer.echo(f"  Wheel: {wheel_name}")
 
     try:
