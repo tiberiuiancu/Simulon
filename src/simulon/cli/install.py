@@ -128,6 +128,10 @@ def flash_attn_hopper(
         bool,
         typer.Option("--prebuilt", help="Install from prebuilt wheel instead of building from source."),
     ] = False,
+    version: Annotated[
+        str | None,
+        typer.Option("--version", help="Exact flash-attn version to install (e.g. 2.7.3)."),
+    ] = None,
     git_url: Annotated[
         str,
         typer.Option("--git-url", help="Git URL to clone flash-attention from."),
@@ -143,12 +147,16 @@ def flash_attn_hopper(
     subdirectory. Use --prebuilt to install from a prebuilt wheel instead.
     """
     if prebuilt:
-        _install_flash_attn_prebuilt()
+        _install_flash_attn_prebuilt(version=version)
         return
 
     flash_src = src or (_FLASH_ATTN_CACHE_DIR if _FLASH_ATTN_CACHE_DIR.is_dir() else None)
     if not flash_src or force:
         flash_src = _clone_repo(git_url, _FLASH_ATTN_CACHE_DIR)
+
+    if version:
+        typer.echo(f"Checking out flash-attn version {version} ...")
+        subprocess.run(["git", "-C", str(flash_src), "checkout", f"v{version}"], check=True)
 
     hopper_dir = flash_src / "hopper"
     if not hopper_dir.is_dir():
@@ -166,7 +174,7 @@ def flash_attn_hopper(
     typer.echo("Flash Attention 3 (Hopper) installed successfully.")
 
 
-def _install_flash_attn_prebuilt() -> None:
+def _install_flash_attn_prebuilt(version: str | None = None) -> None:
     """Install Flash Attention from prebuilt wheels (mjun0812/flash-attention-prebuild-wheels)."""
     import json
     import urllib.request
@@ -185,16 +193,20 @@ def _install_flash_attn_prebuilt() -> None:
         raise typer.Exit(1)
     cuda_major_minor = cuda_version.replace('.', '')[:3]
 
-    fa3_wheel_prefix = (
-        f"flash_attn-3."
-        f"+cu{cuda_major_minor}torch{torch_major_minor}-"
-        f"{py_tag}-{py_tag}-linux_x86_64.whl"
-    )
-    fa2_wheel_prefix = (
-        f"flash_attn-2."
-        f"+cu{cuda_major_minor}torch{torch_major_minor}-"
-        f"{py_tag}-{py_tag}-linux_x86_64.whl"
-    )
+    if version:
+        fa3_wheel_prefix = f"flash_attn-{version}+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"
+        fa2_wheel_prefix = fa3_wheel_prefix
+    else:
+        fa3_wheel_prefix = (
+            f"flash_attn-3."
+            f"+cu{cuda_major_minor}torch{torch_major_minor}-"
+            f"{py_tag}-{py_tag}-linux_x86_64.whl"
+        )
+        fa2_wheel_prefix = (
+            f"flash_attn-2."
+            f"+cu{cuda_major_minor}torch{torch_major_minor}-"
+            f"{py_tag}-{py_tag}-linux_x86_64.whl"
+        )
 
     typer.echo("Searching for prebuilt wheel across all releases ...")
     typer.echo(f"  Detected: Python {py_major}.{py_minor}, PyTorch {torch_version}, CUDA {cuda_version}")
