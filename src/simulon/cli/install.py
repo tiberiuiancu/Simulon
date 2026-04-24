@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -16,6 +17,9 @@ _APEX_CACHE_DIR = Path.home() / ".cache" / "simulon" / "apex"
 
 _DEEPGEMM_GIT_URL = "https://github.com/deepseek-ai/DeepGEMM.git"
 _DEEPGEMM_CACHE_DIR = Path.home() / ".cache" / "simulon" / "DeepGEMM"
+
+_FLASH_ATTN_GIT_URL = "git@github.com:Dao-AILab/flash-attention.git"
+_FLASH_ATTN_CACHE_DIR = Path.home() / ".cache" / "simulon" / "flash-attention"
 
 
 def _clone_repo(git_url: str, dest: Path) -> Path:
@@ -112,3 +116,43 @@ def deepgemm(
     typer.echo(f"Installing DeepGEMM from {deepgemm_src} ...")
     subprocess.run(["bash", str(install_sh)], cwd=str(deepgemm_src), check=True)
     typer.echo("DeepGEMM installed successfully.")
+
+
+@app.command()
+def flash_attn_hopper(
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Reinstall even if already installed."),
+    ] = False,
+    git_url: Annotated[
+        str,
+        typer.Option("--git-url", help="Git URL to clone flash-attention from."),
+    ] = _FLASH_ATTN_GIT_URL,
+    src: Annotated[
+        Path | None,
+        typer.Option("--src", help="Path to flash-attention source directory.", exists=True, file_okay=False),
+    ] = None,
+) -> None:
+    """Install Flash Attention 3 (Hopper-optimized) for H100 GPUs.
+
+    Clones Dao-AILab/flash-attention and builds the hopper/ subdirectory,
+    which contains FA3 kernels specifically optimized for NVIDIA Hopper.
+    """
+    flash_src = src or (_FLASH_ATTN_CACHE_DIR if _FLASH_ATTN_CACHE_DIR.is_dir() else None)
+    if not flash_src or force:
+        flash_src = _clone_repo(git_url, _FLASH_ATTN_CACHE_DIR)
+
+    hopper_dir = flash_src / "hopper"
+    if not hopper_dir.is_dir():
+        typer.echo(f"Error: {hopper_dir} not found. Is this the flash-attention repo?", err=True)
+        raise typer.Exit(1)
+
+    setup_py = hopper_dir / "setup.py"
+    if not setup_py.is_file():
+        typer.echo(f"Error: {setup_py} not found.", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Installing Flash Attention 3 (Hopper) from {hopper_dir} ...")
+    typer.echo(f"Using Python interpreter: {sys.executable}")
+    subprocess.run([sys.executable, str(setup_py), "install"], cwd=str(hopper_dir), check=True)
+    typer.echo("Flash Attention 3 (Hopper) installed successfully.")
