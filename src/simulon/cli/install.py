@@ -185,18 +185,24 @@ def _install_flash_attn_prebuilt() -> None:
         raise typer.Exit(1)
     cuda_major_minor = cuda_version.replace('.', '')[:3]
 
-    fa_version = "2.7.4"
-    wheel_name = (
-        f"flash_attn-{fa_version}+cu{cuda_major_minor}torch{torch_major_minor}-"
+    fa3_wheel_prefix = (
+        f"flash_attn-3."
+        f"+cu{cuda_major_minor}torch{torch_major_minor}-"
+        f"{py_tag}-{py_tag}-linux_x86_64.whl"
+    )
+    fa2_wheel_prefix = (
+        f"flash_attn-2."
+        f"+cu{cuda_major_minor}torch{torch_major_minor}-"
         f"{py_tag}-{py_tag}-linux_x86_64.whl"
     )
 
     typer.echo("Searching for prebuilt wheel across all releases ...")
     typer.echo(f"  Detected: Python {py_major}.{py_minor}, PyTorch {torch_version}, CUDA {cuda_version}")
-    typer.echo(f"  Wheel: {wheel_name}")
 
     page = 1
     per_page = 30
+    fa3_match = None
+    fa2_match = None
     while True:
         api_url = (
             f"https://api.github.com/repos/mjun0812/flash-attention-prebuild-wheels/"
@@ -216,26 +222,45 @@ def _install_flash_attn_prebuilt() -> None:
         for release in releases:
             tag = release.get("tag_name", "")
             assets = release.get("assets", [])
-            asset_names = {a.get("name", "") for a in assets}
-            if wheel_name in asset_names:
-                wheel_url = (
-                    f"https://github.com/mjun0812/flash-attention-prebuild-wheels/"
-                    f"releases/download/{tag}/{wheel_name}"
-                )
-                typer.echo(f"  Found in release {tag}")
-                try:
-                    subprocess.run([sys.executable, "-m", "pip", "install", wheel_url], check=True)
-                    typer.echo("Flash Attention installed successfully from prebuilt wheel.")
-                    return
-                except subprocess.CalledProcessError as exc:
-                    typer.echo(f"Error: pip install failed for {wheel_url}: {exc}", err=True)
-                    raise typer.Exit(1)
+            asset_names = [a.get("name", "") for a in assets]
+            for name in asset_names:
+                if name.startswith("flash_attn-3.") and name.endswith(f"+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"):
+                    if fa3_match is None:
+                        fa3_match = (tag, name)
+                elif name.startswith("flash_attn-2.") and name.endswith(f"+cu{cuda_major_minor}torch{torch_major_minor}-{py_tag}-{py_tag}-linux_x86_64.whl"):
+                    if fa2_match is None:
+                        fa2_match = (tag, name)
 
+            if fa3_match and fa2_match:
+                break
+        if fa3_match and fa2_match:
+            break
         if len(releases) < per_page:
             break
         page += 1
 
+    tag, wheel_name = None, None
+    if fa3_match:
+        tag, wheel_name = fa3_match
+        typer.echo(f"  Found Flash Attention 3 wheel: {wheel_name} in {tag}")
+    elif fa2_match:
+        tag, wheel_name = fa2_match
+        typer.echo(f"  Found Flash Attention 2 wheel: {wheel_name} in {tag}")
+
+    if tag and wheel_name:
+        wheel_url = (
+            f"https://github.com/mjun0812/flash-attention-prebuild-wheels/"
+            f"releases/download/{tag}/{wheel_name}"
+        )
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", wheel_url], check=True)
+            typer.echo("Flash Attention installed successfully from prebuilt wheel.")
+            return
+        except subprocess.CalledProcessError as exc:
+            typer.echo(f"Error: pip install failed for {wheel_url}: {exc}", err=True)
+            raise typer.Exit(1)
+
     typer.echo("Error: Could not find a prebuilt wheel for your environment.", err=True)
-    typer.echo(f"  Searched {wheel_name} across all releases.", err=True)
+    typer.echo(f"  Searched across all releases for Python {py_major}.{py_minor}, PyTorch {torch_major_minor}, CUDA {cuda_major_minor}.", err=True)
     typer.echo("Try installing from source instead (omit --prebuilt).", err=True)
     raise typer.Exit(1)
