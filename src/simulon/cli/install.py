@@ -124,6 +124,10 @@ def flash_attn_hopper(
         bool,
         typer.Option("--force", help="Reinstall even if already installed."),
     ] = False,
+    prebuilt: Annotated[
+        bool,
+        typer.Option("--prebuilt", help="Install from prebuilt wheel instead of building from source."),
+    ] = False,
     git_url: Annotated[
         str,
         typer.Option("--git-url", help="Git URL to clone flash-attention from."),
@@ -135,9 +139,13 @@ def flash_attn_hopper(
 ) -> None:
     """Install Flash Attention 3 (Hopper-optimized) for H100 GPUs.
 
-    Clones Dao-AILab/flash-attention and builds the hopper/ subdirectory,
-    which contains FA3 kernels specifically optimized for NVIDIA Hopper.
+    By default clones Dao-AILab/flash-attention and builds the hopper/
+    subdirectory. Use --prebuilt to install from a prebuilt wheel instead.
     """
+    if prebuilt:
+        _install_flash_attn_prebuilt()
+        return
+
     flash_src = src or (_FLASH_ATTN_CACHE_DIR if _FLASH_ATTN_CACHE_DIR.is_dir() else None)
     if not flash_src or force:
         flash_src = _clone_repo(git_url, _FLASH_ATTN_CACHE_DIR)
@@ -156,3 +164,44 @@ def flash_attn_hopper(
     typer.echo(f"Using Python interpreter: {sys.executable}")
     subprocess.run([sys.executable, str(setup_py), "install"], cwd=str(hopper_dir), check=True)
     typer.echo("Flash Attention 3 (Hopper) installed successfully.")
+
+
+def _install_flash_attn_prebuilt() -> None:
+    """Install Flash Attention from prebuilt wheels (mjun0812/flash-attention-prebuild-wheels)."""
+    import torch
+
+    py_major, py_minor = sys.version_info[:2]
+    py_tag = f"cp{py_major}{py_minor}"
+
+    torch_version = torch.__version__.split('+')[0]
+    torch_major_minor = '.'.join(torch_version.split('.')[:2])
+
+    cuda_version = torch.version.cuda
+    if cuda_version is None:
+        typer.echo("Error: PyTorch is not built with CUDA support.", err=True)
+        raise typer.Exit(1)
+    cuda_major_minor = cuda_version.replace('.', '')[:3]
+
+    # Default to latest known version; user can override by editing if needed
+    fa_version = "2.7.4"
+    wheel_name = (
+        f"flash_attn-{fa_version}+cu{cuda_major_minor}torch{torch_major_minor}-"
+        f"{py_tag}-{py_tag}-linux_x86_64.whl"
+    )
+    wheel_url = (
+        f"https://github.com/mjun0812/flash-attention-prebuild-wheels/"
+        f"releases/download/v0.0.0/{wheel_name}"
+    )
+
+    typer.echo("Installing Flash Attention from prebuilt wheel ...")
+    typer.echo(f"  Detected: Python {py_major}.{py_minor}, PyTorch {torch_version}, CUDA {cuda_version}")
+    typer.echo(f"  Wheel: {wheel_name}")
+
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", wheel_url], check=True)
+        typer.echo("Flash Attention installed successfully from prebuilt wheel.")
+    except subprocess.CalledProcessError:
+        typer.echo("Error: Prebuilt wheel install failed.", err=True)
+        typer.echo("The wheel may not exist for your Python/PyTorch/CUDA combination.", err=True)
+        typer.echo("Try installing from source instead (omit --prebuilt).", err=True)
+        raise typer.Exit(1)
