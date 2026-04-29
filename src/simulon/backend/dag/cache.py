@@ -54,7 +54,7 @@ import numpy as np
 if TYPE_CHECKING:
     from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
     from simulon.backend.dag.tracer import DAGTracerConfig
-    from simulon.config.workload import LLMSpec, MegatronWorkload
+    from simulon.config.workload import LLMSpec, MegatronDeprecatedWorkload
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ _NAN32 = np.float32("nan")
 # Cache key
 # ---------------------------------------------------------------------------
 
-def _cache_key(workload: MegatronWorkload, resolved_model: LLMSpec, cfg: DAGTracerConfig) -> str:
+def _cache_key(workload: MegatronDeprecatedWorkload, resolved_model: LLMSpec, cfg: DAGTracerConfig) -> str:
     """Return a hex digest that uniquely identifies this DAG's structure."""
     payload = {
         "model": resolved_model.model_dump(),

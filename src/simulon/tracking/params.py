@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Union
 from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.resolve import resolve_node_spec
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import CollectiveWorkload, LLMSpec, MegatronWorkload
+from simulon.config.workload import CollectiveWorkload, LLMSpec, MegatronDeprecatedWorkload
 
 if TYPE_CHECKING:
     from simulon.backend.dag.replayer import SimulationResult
@@ -23,7 +23,7 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, Union[str, int, float,
 
     # --- workload ---
     wl = scenario.workload
-    if isinstance(wl, MegatronWorkload):
+    if isinstance(wl, MegatronDeprecatedWorkload):
         p = wl.parallelism
         t = wl.training
 

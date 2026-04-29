@@ -70,6 +70,7 @@ class DatacenterCoolingSpec(BaseModel):
 class DatacenterMeta(BaseModel):
     name: Optional[str] = None
     profiles_dir: Optional[str] = None
+    traces_dir: Optional[str] = None
     pue: float = 1.0
     electricity_cost_per_kwh: Optional[float] = None
     datacenter_lifetime_years: Optional[float] = None

@@ -3,6 +3,9 @@ from itertools import product
 from pathlib import Path
 from typing import Optional
 
+import subprocess
+import sys
+
 import typer
 import yaml
 
@@ -26,6 +29,9 @@ def _dump_profile(data: dict, f) -> None:
 app = typer.Typer(name="simulon", help="AI cluster simulator")
 profile_app = typer.Typer(help="Profile local hardware and save templates.")
 app.add_typer(profile_app, name="profile")
+
+trace_app = typer.Typer(help="Trace generation commands.")
+app.add_typer(trace_app, name="trace")
 
 from simulon.cli.install import app as install_app  # noqa: E402
 app.add_typer(install_app, name="install", help="Install third-party components (apex, deepgemm, m4).")
@@ -57,7 +63,7 @@ def simulate(
     from simulon.backend.analytical import AnalyticalBackend
     from simulon.backend.dag.chrome_trace import to_chrome_trace
     from simulon.config.scenario import ScenarioConfig
-    from simulon.config.workload import MegatronWorkload
+    from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
     from simulon.tracking import get_trackers
     from simulon.tracking.params import extract_metrics, extract_params
 
@@ -95,7 +101,7 @@ def simulate(
                 scenario_artifact_path.unlink(missing_ok=True)
 
         if summary:
-            from simulon.config.workload import CollectiveWorkload, MegatronWorkload as _MW
+            from simulon.config.workload import CollectiveWorkload, MegatronDeprecatedWorkload as _MW
             if isinstance(sc.workload, CollectiveWorkload):
                 _print_collective_summary(sc.workload, result, sc.datacenter)
             elif isinstance(sc.workload, _MW):
@@ -103,7 +109,7 @@ def simulate(
             else:
                 _print_summary(result)
 
-        if isinstance(sc.workload, MegatronWorkload):
+        if isinstance(sc.workload, MegatronDeprecatedWorkload):
             energy_result = None
             if energy or cost:
                 from simulon.energy import compute_energy
@@ -154,7 +160,7 @@ def _print_summary(result, workload=None) -> None:
 
     Args:
         result: SimulationResult from AnalyticalBackend.simulate().
-        workload: Optional MegatronWorkload for throughput metrics.
+        workload: Optional MegatronDeprecatedWorkload for throughput metrics.
     """
 
     total = result.total_time_ms
@@ -753,3 +759,132 @@ def profile_node(
         typer.echo(f"Written to {out_path}")
         NodeSpec.model_validate(yaml.safe_load(out_path.read_text()))
         typer.echo("Validated successfully.")
+
+
+# ---------------------------------------------------------------------------
+# simulon trace generate
+# ---------------------------------------------------------------------------
+
+_MEGATRON_ENTRYPOINT = Path(__file__).parents[3] / "vendor" / "Megatron-LM-traced" / "pretrain_gpt.py"
+
+
+@trace_app.command("generate")
+def generate_trace(
+    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    output_dir: Path = typer.Option(Path("./traces"), "--output-dir", "-o", help="Directory to write trace files"),
+    stages: Optional[list[int]] = typer.Option(None, "--stage", help="Specific PP stages to trace (default: first, middle, last)"),
+):
+    """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
+    from simulon.config.scenario import ScenarioConfig
+    from simulon.config.workload import LLMSpec, MegatronDeprecatedWorkload, MegatronWorkload
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    if not isinstance(sc.workload, (MegatronWorkload, MegatronDeprecatedWorkload)):
+        raise typer.BadParameter("Scenario workload must be a Megatron workload")
+
+    derived_args: dict[str, str | int | bool]
+
+    if isinstance(sc.workload, MegatronDeprecatedWorkload):
+        workload = sc.workload
+        p = workload.parallelism
+        t = workload.training
+
+        derived_args = {
+            "--tensor-model-parallel-size": p.tp,
+            "--pipeline-model-parallel-size": p.pp,
+            "--micro-batch-size": t.micro_batch_size,
+            "--global-batch-size": t.global_batch_size,
+            "--seq-length": t.sequence_length,
+        }
+        if p.ep > 1:
+            derived_args["--expert-model-parallel-size"] = p.ep
+
+        model = workload.model
+        if isinstance(model, LLMSpec):
+            if model.num_layers is not None:
+                derived_args["--num-layers"] = model.num_layers
+            if model.hidden_size is not None:
+                derived_args["--hidden-size"] = model.hidden_size
+            if model.num_heads is not None:
+                derived_args["--num-attention-heads"] = model.num_heads
+            if model.ffn_hidden_size is not None:
+                derived_args["--ffn-hidden-size"] = model.ffn_hidden_size
+
+        if workload.megatron_args:
+            for key, value in workload.megatron_args.items():
+                flag = f"--{key}"
+                if isinstance(value, bool):
+                    if value:
+                        derived_args[flag] = True
+                    elif flag in derived_args:
+                        del derived_args[flag]
+                else:
+                    derived_args[flag] = value
+
+        pp = p.pp
+        tp = p.tp
+    else:
+        workload = sc.workload
+        cfg = workload.config
+        derived_args = {}
+        for key in ("tensor-model-parallel-size", "pipeline-model-parallel-size",
+                    "micro-batch-size", "global-batch-size", "seq-length",
+                    "expert-model-parallel-size", "num-layers", "hidden-size",
+                    "num-attention-heads", "ffn-hidden-size"):
+            if key in cfg:
+                derived_args[f"--{key}"] = cfg[key]
+        skip = {"num_gpus", "num_microbatches"}
+        for key, value in cfg.items():
+            flag = f"--{key}"
+            if flag not in derived_args and key not in skip:
+                if isinstance(value, bool):
+                    if value:
+                        derived_args[flag] = True
+                else:
+                    derived_args[flag] = value
+
+        pp = int(cfg.get("pipeline-model-parallel-size", 1))
+        tp = int(cfg.get("tensor-model-parallel-size", 1))
+    if stages is not None:
+        stages_to_trace = stages
+    else:
+        if pp == 1:
+            stages_to_trace = [0]
+        elif pp == 2:
+            stages_to_trace = [0, pp - 1]
+        else:
+            stages_to_trace = [0, pp // 2, pp - 1]
+
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for stage in stages_to_trace:
+        rank = stage * p.tp
+        cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
+        for flag, value in derived_args.items():
+            cmd.append(flag)
+            if value is not True:
+                cmd.append(str(value))
+        cmd.extend([
+            "--fake-process-group",
+            "--rank", str(rank),
+            "--trace-dir", str(output_dir),
+        ])
+
+        typer.echo(f"Tracing PP stage {stage} (rank {rank}) ...")
+        try:
+            subprocess.run(cmd, check=True)
+        except FileNotFoundError as exc:
+            typer.echo(f"Error: could not run Megatron entry point: {exc}", err=True)
+            raise typer.Exit(1)
+        except subprocess.CalledProcessError as exc:
+            typer.echo(f"Error: Megatron exited with code {exc.returncode} for PP stage {stage}", err=True)
+            raise typer.Exit(1)
+
+    trace_files = sorted(output_dir.glob("trace_pp_stage_*.json"))
+    typer.echo(f"\nTrace generation complete. {len(trace_files)} file(s) in {output_dir}:")
+    for tf in trace_files:
+        typer.echo(f"  {tf.name}")

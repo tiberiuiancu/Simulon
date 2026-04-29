@@ -1,7 +1,12 @@
-# GPT-OSS-20B (MoE) training scenario
+# GPT-OSS-20B (MoE) training scenario — NEW flat-config format
 #
 # Parallelism: TP=1, PP=4, EP=4, DP=1
 # Total GPUs:  1 × 4 × 4 × 1 = 16  (4 nodes × 4 GPUs/node)
+#
+# This uses the trace-driven path (framework: megatron) with a flat "config"
+# dict that mirrors Megatron-LM CLI flags.  Compute durations come from real
+# GPU execution traces (saved under datacenter.datacenter.traces_dir) rather
+# than analytical layer expansion.
 #
 # Network: standard H100 cluster
 #   Scale-up:  NVLink → port_speed = 3600 Gbps
@@ -14,6 +19,7 @@ datacenter:
     electricity_cost_per_kwh: 0.10   # Netherlands commercial rate (EUR)
     datacenter_lifetime_years: 5
     idle_fraction: 0.4
+    # traces_dir: ./traces/h100-16gpu   # ← point to directory with trace_pp_stage_*.json
   cluster:
     num_nodes: 4
   node:
@@ -50,17 +56,25 @@ collective:
   num_channels: 1
 
 workload:
-  framework: megatron-deprecated
-  model: gpt-oss-20b
-  parallelism:
-    tp: 1
-    pp: 4
-    ep: 4
-    dp: 1
-    distributed_optimizer: true
-    num_microbatches: 16
-  training:
-    num_gpus: 16
-    global_batch_size: 16   # dp=1 × mbs=1 × num_microbatches=16
-    micro_batch_size: 1
-    sequence_length: 8192
+  framework: megatron
+  config:
+    # Parallelism
+    tensor-model-parallel-size: 1
+    pipeline-model-parallel-size: 4
+    expert-model-parallel-size: 4
+
+    # Model architecture
+    num-layers: 24
+    hidden-size: 6144
+    num-attention-heads: 32
+    ffn-hidden-size: 8192
+    swiglu: true
+    num-experts: 8
+    moe-router-topk: 2
+
+    # Training
+    micro-batch-size: 1
+    global-batch-size: 16
+    seq-length: 8192
+    num-gpus: 16
+    distributed-optimizer: true

@@ -13,7 +13,8 @@ from simulon.config.resolve import (
     resolve_scale_out,
 )
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import CollectiveWorkload, MegatronWorkload
+from simulon.config.workload import CollectiveWorkload, MegatronDeprecatedWorkload, MegatronWorkload
+from simulon.backend.dag.trace_tracer import MegatronDagTracer
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def _ccl_from_scenario(scenario: ScenarioConfig) -> CCLDecomposer:
 
 def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
     c = scenario.collective
-    # "auto" is resolved per-collective in simulate(); for MegatronWorkload tracing,
+    # "auto" is resolved per-collective in simulate(); for MegatronDeprecatedWorkload tracing,
     # fall back to "ring" as the default algorithm.
     algorithm = c.algorithm if c.algorithm != "auto" else "ring"
     return DAGTracerConfig(
@@ -59,7 +60,7 @@ def _dtype_bytes(dtype) -> int:
     return {DType.fp32: 4, DType.fp16: 2, DType.bf16: 2, DType.fp8: 1}.get(dtype, 2)
 
 
-def _tp_message_size(workload: MegatronWorkload) -> int:
+def _tp_message_size(workload: MegatronDeprecatedWorkload) -> int:
     """Representative TP AllReduce message size in bytes.
 
     Uses hidden_size × seq_len × micro_batch_size × dtype_bytes — the typical
@@ -93,14 +94,22 @@ class AnalyticalBackend(Backend):
         }
 
     def run_trace(self, scenario: ScenarioConfig, compact: bool = False, _resolved_algorithm: str | None = None) -> ExecutionDAG:
-        from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
-        if isinstance(scenario.workload, MegatronWorkload):
+        from simulon.backend.dag.megatron_tracer import MegatronDeprecatedDAGTracer
+        if isinstance(scenario.workload, MegatronDeprecatedWorkload):
             cfg = _tracer_config_from_scenario(scenario)
             cfg.compact = compact
             if _resolved_algorithm is not None:
                 cfg.algorithm = _resolved_algorithm
-            tracer = MegatronDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
+            tracer = MegatronDeprecatedDAGTracer(cfg, ccl=_ccl_from_scenario(scenario))
             return tracer.trace(scenario.workload, scenario.datacenter)
+        elif isinstance(scenario.workload, MegatronWorkload):
+            cfg = _tracer_config_from_scenario(scenario)
+            cfg.compact = compact
+            if _resolved_algorithm is not None:
+                cfg.algorithm = _resolved_algorithm
+            tracer = MegatronDagTracer(cfg, ccl=_ccl_from_scenario(scenario))
+            return tracer.trace(scenario.workload, scenario.datacenter)
+
         elif isinstance(scenario.workload, CollectiveWorkload):
             from simulon.backend.dag.collective_tracer import build_collective_dag
             c = scenario.collective
@@ -118,8 +127,7 @@ class AnalyticalBackend(Backend):
             raise ValueError(f"AnalyticalBackend does not support {type(scenario.workload).__name__}")
 
     def simulate(self, scenario: ScenarioConfig, compact: bool = False, ignore_oom: bool = False, ignore_missing: bool = False) -> tuple[ExecutionDAG, SimulationResult]:
-        if isinstance(scenario.workload, MegatronWorkload):
-            from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+        if isinstance(scenario.workload, MegatronDeprecatedWorkload):
             p = scenario.workload.parallelism
             t = scenario.workload.training
             num_gpus = t.num_gpus
@@ -176,6 +184,34 @@ class AnalyticalBackend(Backend):
                 bw_override_bytes_per_ms=intra_override,
                 inter_bw_override_bytes_per_ms=inter_override,
             )
+            logger.info("  Network durations resolved")
+
+            total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes)
+            logger.info("Replaying DAG (%d nodes) ...", total_nodes)
+            result = replay(dag)
+            logger.info("  Replay done: total_time=%.3f ms", result.total_time_ms)
+
+            return dag, result
+
+        elif isinstance(scenario.workload, MegatronWorkload):
+            cfg = scenario.workload.config
+            tp = int(cfg.get("tensor-model-parallel-size", 1))
+            pp = int(cfg.get("pipeline-model-parallel-size", 1))
+            ep = int(cfg.get("expert-model-parallel-size", 1))
+            num_gpus = int(cfg.get("num_gpus", tp * pp * ep))
+            dp = max(1, num_gpus // (tp * pp * ep))
+            logger.info("Building DAG  (GPUs=%d  tp=%d  pp=%d  ep=%d  dp=%d) ...",
+                        num_gpus, tp, pp, ep, dp)
+
+            dag = self.run_trace(scenario, compact=compact)
+            logger.info("  DAG built: %d compute nodes, %d comm nodes, %d edges",
+                        len(dag.compute_nodes), len(dag.comm_nodes), len(dag.edges))
+
+            logger.info("  Trace-driven path: skipping populate_dag (compute durations from trace)")
+
+            dc = scenario.datacenter
+            logger.info("Populating network durations (%d comm nodes) ...", len(dag.comm_nodes))
+            populate_network(dag, dc)
             logger.info("  Network durations resolved")
 
             total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes)

@@ -4,10 +4,10 @@ import pytest
 
 from simulon.backend.dag.layer_expander import LayerExpander
 from simulon.backend.dag import DAGTracerConfig
-from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.dag.megatron_tracer import MegatronDeprecatedDAGTracer
 from simulon.config.common import DType
 from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
-from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
+from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronDeprecatedWorkload
 
 
 # ---------------------------------------------------------------------------
@@ -44,9 +44,9 @@ def make_moe_workload(
     top_k: int = 2,
     global_batch_size: int = 4,
     num_microbatches: int = 4,
-) -> MegatronWorkload:
-    return MegatronWorkload(
-        framework="megatron",
+) -> MegatronDeprecatedWorkload:
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-moe",
             hidden_size=hidden_size,
@@ -279,7 +279,7 @@ def test_tracer_moe_ep1_no_alltoall():
     """moe=True, ep=1: no AllToAll nodes (single-rank EP is a no-op)."""
     wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=2, num_layers=1, global_batch_size=4, num_microbatches=4)
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert a2a == []
 
@@ -289,7 +289,7 @@ def test_tracer_moe_ep2_generates_alltoall():
     # tp=1, pp=1, ep=2, dp=1 → 2 GPUs
     wl = make_moe_workload(tp=1, pp=1, ep=2, num_gpus=2, num_layers=1, global_batch_size=4, num_microbatches=4)
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert len(a2a) > 0
 
@@ -298,7 +298,7 @@ def test_tracer_moe_kernels_in_dag():
     """DAG contains moe_route and moe_expert compute nodes when moe=True."""
     wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=1, num_layers=1, global_batch_size=1, num_microbatches=1)
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
     kernels = {n.kernel for n in dag.compute_nodes}
     assert "moe_route" in kernels
     assert "moe_expert" in kernels
@@ -308,7 +308,7 @@ def test_tracer_moe_no_mlp_kernels():
     """When moe=True, mlp_linear1/mlp_linear2 are absent."""
     wl = make_moe_workload(tp=1, pp=1, ep=1, num_gpus=1, num_layers=1, global_batch_size=1, num_microbatches=1)
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
     kernels = {n.kernel for n in dag.compute_nodes}
     assert "mlp_linear1" not in kernels
     assert "mlp_linear2" not in kernels
@@ -321,7 +321,7 @@ def test_tracer_moe_ep2_alltoall_on_ep_group():
     # EP group for ep_rank∈{0,1} with tp_rank=1: GPUs 1 and 3
     wl = make_moe_workload(tp=2, pp=1, ep=2, num_gpus=4, num_layers=1, global_batch_size=4, num_microbatches=4)
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert len(a2a) > 0
@@ -335,7 +335,7 @@ def test_tracer_moe_tp2_still_generates_ag_rs():
     """With moe=True and tp=2, AllGather/ReduceScatter are still present."""
     wl = make_moe_workload(tp=2, pp=1, ep=1, num_gpus=2, num_layers=1, global_batch_size=2, num_microbatches=2)
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
     ag = [n for n in dag.comm_nodes if n.collective_type == "AllGather"]
     rs = [n for n in dag.comm_nodes if n.collective_type == "ReduceScatter"]
     assert len(ag) > 0
@@ -346,14 +346,14 @@ def test_tracer_dense_ep1_unchanged():
     """Dense model (moe=False) with ep=1 produces the same GPU count as before."""
     from simulon.config.workload import MegatronParallelism, MegatronTraining
 
-    wl = MegatronWorkload(
-        framework="megatron",
+    wl = MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(name="dense", hidden_size=512, num_layers=1, num_heads=8, vocab_size=32000),
         parallelism=MegatronParallelism(tp=2, pp=1, ep=1, num_microbatches=2),
         training=MegatronTraining(num_gpus=4, global_batch_size=4, micro_batch_size=1, sequence_length=64),
     )
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
     gpu_ids = {n.gpu_rank for n in dag.compute_nodes}
     assert gpu_ids == {0, 1, 2, 3}  # dp=2, tp=2 → 4 GPUs
 
@@ -393,7 +393,7 @@ def test_num_experts_set_ep2_produces_alltoall():
     assert wl.model.num_experts == 4
 
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert len(a2a) > 0, (
@@ -408,7 +408,7 @@ def test_num_experts_set_ep1_no_alltoall():
     assert wl.model.num_experts == 4
 
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
     assert a2a == [], "ep=1 MoE should produce no AllToAll regardless of num_experts"
@@ -418,8 +418,8 @@ def test_dense_model_no_alltoall_has_mlp_kernels():
     """Dense model (num_experts=None) produces no AllToAll and uses mlp_linear kernels, not moe_expert."""
     from simulon.config.workload import MegatronParallelism, MegatronTraining
 
-    wl = MegatronWorkload(
-        framework="megatron",
+    wl = MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(name="dense", hidden_size=512, num_layers=1, num_heads=8, vocab_size=32000),
         parallelism=MegatronParallelism(tp=1, pp=1, ep=1, num_microbatches=1),
         training=MegatronTraining(num_gpus=1, global_batch_size=1, micro_batch_size=1, sequence_length=64),
@@ -427,7 +427,7 @@ def test_dense_model_no_alltoall_has_mlp_kernels():
     assert wl.model.num_experts is None
 
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
     kernels = {n.kernel for n in dag.compute_nodes}
     a2a = [n for n in dag.comm_nodes if n.collective_type == "AllToAll"]
@@ -448,7 +448,7 @@ def test_moe_bwd_ig_compute_nodes_are_sequential_per_gpu():
         global_batch_size=2, num_microbatches=2,
     )
     dc = make_dc()
-    dag = MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    dag = MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
     for n in dag.compute_nodes:
         if n.kernel == "moe_expert":

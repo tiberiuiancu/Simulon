@@ -8,7 +8,7 @@ from simulon.backend.dag.nodes import (
     DAGEdge,
     ExecutionDAG,
 )
-from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.dag.megatron_tracer import MegatronDeprecatedDAGTracer
 from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.backend.dag.pipeline import OneFOneBScheduler, ScheduleSlot
 from simulon.backend.dag.layer_expander import LayerExpander
@@ -24,7 +24,7 @@ from simulon.config.workload import (
     LLMSpec,
     MegatronParallelism,
     MegatronTraining,
-    MegatronWorkload,
+    MegatronDeprecatedWorkload,
 )
 
 
@@ -248,11 +248,11 @@ def _minimal_workload(
     micro_batch_size: int = 1,
     global_batch_size: int | None = None,
     vocab_size: int = 32000,
-) -> MegatronWorkload:
+) -> MegatronDeprecatedWorkload:
     num_gpus = tp * pp
     gbs = global_batch_size if global_batch_size is not None else num_gpus
-    return MegatronWorkload(
-        framework="megatron",
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-model",
             hidden_size=hidden_size,
@@ -271,8 +271,8 @@ def _minimal_workload(
     )
 
 
-def _no_cache_tracer() -> MegatronDAGTracer:
-    return MegatronDAGTracer(config=DAGTracerConfig(cache_dir=None))
+def _no_cache_tracer() -> MegatronDeprecatedDAGTracer:
+    return MegatronDeprecatedDAGTracer(config=DAGTracerConfig(cache_dir=None))
 
 
 class TestEmbeddingLossNodes:
@@ -322,8 +322,8 @@ class TestEmbeddingLossNodes:
     def test_pp1_tp1_dp_allreduce_for_loss_present(self):
         """PP=1, dp>1: DP AllReduce for loss averaging is present in the DAG in fwd phase."""
         # dp=2 so 2 GPUs: tp=1, pp=1, dp=2
-        wl = MegatronWorkload(
-            framework="megatron",
+        wl = MegatronDeprecatedWorkload(
+            framework="megatron-deprecated",
             model=LLMSpec(name="test-model", hidden_size=512, num_layers=2, num_heads=8, vocab_size=32000),
             parallelism=MegatronParallelism(tp=1, pp=1, dp=2),
             training=MegatronTraining(

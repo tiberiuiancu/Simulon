@@ -18,10 +18,10 @@ any target hardware.
 ## Architecture
 
 ```
-ScenarioConfig (DatacenterConfig + MegatronWorkload)
+ScenarioConfig (DatacenterConfig + MegatronDeprecatedWorkload)
     │
     ▼
-MegatronDAGTracer.trace()
+MegatronDeprecatedDAGTracer.trace() / MegatronDagTracer.trace()
     │
     ├─ PipelineScheduler   — 1F1B schedule per pipeline stage
     │
@@ -66,11 +66,12 @@ Top-level dispatcher: `decompose_collective(collective_type, group_ranks, data_s
 | `pipeline.py` | `PipelineScheduler` — 1F1B warmup / steady-state / cooldown schedule |
 | `layer_expander.py` | Expands one sublayer (attn or mlp) into: `AllGather → kernels → ReduceScatter` for fwd/bwd_ig; `kernels` only for bwd_wg |
 | `tracer.py` | `DAGTracer` (ABC) + `DAGTracerConfig` |
-| `megatron_tracer.py` | `MegatronDAGTracer` — iterates all GPU ranks × pipeline slots × layers × sublayers, fills comm stubs via `CCLDecomposer`, adds PP_Send nodes at stage boundaries |
+| `megatron_tracer.py` | `MegatronDeprecatedDAGTracer` — iterates all GPU ranks × pipeline slots × layers × sublayers, fills comm stubs via `CCLDecomposer`, adds PP_Send nodes at stage boundaries |
+| `trace_tracer.py` | `MegatronDagTracer` — builds DAG from real trace events and trace_path inputs |
 
 ### `simulon.backend.analytical`
 
-`AnalyticalBackend` is a thin wrapper around `MegatronDAGTracer`:
+`AnalyticalBackend` dispatches between `MegatronDeprecatedDAGTracer` and `MegatronDagTracer`:
 
 ```python
 backend = AnalyticalBackend()
