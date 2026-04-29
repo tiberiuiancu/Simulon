@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -24,8 +24,19 @@ class RcclConfig(BaseModel):
     num_channels: int = 1
 
 
+class LogGOPSimConfig(BaseModel):
+    """Optional LogGOPSim parameter overrides for a scenario."""
+
+    latency_ns: float | None = None
+    gap_per_byte_ns: float | None = None
+    overhead_ns: float | None = None
+    gap_ns: float | None = None
+    overhead_per_byte_ns: float | None = None
+    eager_threshold_bytes: float | None = None
+
+
 CollectiveConfig = Annotated[
-    Union[NcclConfig, RcclConfig],
+    NcclConfig | RcclConfig,
     Field(discriminator="library"),
 ]
 
@@ -36,6 +47,7 @@ CollectiveConfig = Annotated[
 
 
 class ScenarioConfig(BaseModel):
-    datacenter: Union[Path, DatacenterConfig]
-    workload: Union[Path, WorkloadConfig]
+    datacenter: Path | DatacenterConfig
+    workload: Path | WorkloadConfig
     collective: CollectiveConfig = Field(default_factory=NcclConfig)
+    loggopsim: LogGOPSimConfig | None = None

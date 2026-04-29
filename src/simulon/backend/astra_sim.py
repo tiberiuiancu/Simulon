@@ -61,7 +61,7 @@ def _load_gpu_template(name: str) -> GPUSpec:
 class AstraSimBackend(Backend):
     """Backend that produces a GPU-agnostic execution DAG."""
 
-    def run(self, scenario: ScenarioConfig) -> dict:
+    def run(self, scenario: ScenarioConfig) -> dict[str, object]:
         dag = self.run_trace(scenario)
         d = dag.to_dict()
         return {
@@ -78,7 +78,13 @@ class AstraSimBackend(Backend):
         tracer = DAGTracer(_tracer_config_from_scenario(scenario))
         return tracer.trace(scenario.workload, scenario.datacenter)
 
-    def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
+    def simulate(
+        self,
+        scenario: ScenarioConfig,
+        compact: bool = False,
+        ignore_oom: bool = False,
+        ignore_missing: bool = False,
+    ) -> tuple[ExecutionDAG, SimulationResult]:
         if not isinstance(scenario.workload, MegatronWorkload):
             raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
 

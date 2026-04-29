@@ -81,15 +81,20 @@ _resolve_gpu_spec = resolve_gpu_spec
 class AnalyticalBackend(Backend):
     """Python analytical backend that produces a GPU-agnostic execution DAG."""
 
-    def run(self, scenario: ScenarioConfig) -> dict:
-        dag = self.run_trace(scenario)
+    def run(self, scenario: ScenarioConfig) -> dict[str, object]:
+        dag, result = self.simulate(scenario, ignore_oom=True, ignore_missing=True)
         d = dag.to_dict()
+        summary = getattr(result, "summary", None)
         return {
             "status": "success",
             "compute_nodes": len(dag.compute_nodes),
             "comm_nodes": len(dag.comm_nodes),
             "edges": len(dag.edges),
             "dag": d,
+            "result": {
+                "total_time_ms": result.total_time_ms,
+                "summary": summary,
+            },
         }
 
     def run_trace(self, scenario: ScenarioConfig, compact: bool = False, _resolved_algorithm: str | None = None) -> ExecutionDAG:

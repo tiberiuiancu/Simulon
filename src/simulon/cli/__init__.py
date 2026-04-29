@@ -36,6 +36,7 @@ from simulon.config.resolve import resolve_node_spec
 @app.command()
 def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    backend: str = typer.Option("analytical", "--backend", help="Simulation backend to use"),
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Print iteration summary to stdout"),
     chrome: Optional[Path] = typer.Option(None, "--chrome", help="Write Chrome/Perfetto trace to this path"),
     dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
@@ -71,16 +72,33 @@ def simulate(
 
     trackers = get_trackers()
 
+    def _make_backend(name: str):
+        if name == "analytical":
+            return AnalyticalBackend()
+        if name == "atlahs-lgs":
+            from importlib import import_module
+
+            return import_module("simulon.backend.atlahs_lgs").ATLAHSLGSBackend()
+        if name == "atlahs-htsim":
+            from importlib import import_module
+
+            return import_module("simulon.backend.atlahs_htsim").ATLAHShtsimBackend()
+        raise typer.BadParameter(f"Unknown backend: {name}")
+
     try:
         for tracker in trackers:
             tracker.start_run()
 
-        backend = AnalyticalBackend()
-        dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+        if backend != "analytical" and chrome is not None:
+            raise typer.BadParameter("--chrome is only supported with the analytical backend")
+
+        sim_backend = _make_backend(backend)
+        dag, result = sim_backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
 
         if trackers:
             params = extract_params(sc)
             metrics = extract_metrics(result)
+            numeric_metrics = {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".yaml", prefix="scenario_", delete=False
             ) as tmp:
@@ -89,7 +107,7 @@ def simulate(
             try:
                 for tracker in trackers:
                     tracker.log_params(params)
-                    tracker.log_metrics(metrics)
+                    tracker.log_metrics(numeric_metrics)
                     tracker.log_artifact(scenario_artifact_path)
             finally:
                 scenario_artifact_path.unlink(missing_ok=True)
@@ -107,7 +125,7 @@ def simulate(
             energy_result = None
             if energy or cost:
                 from simulon.energy import compute_energy
-                energy_result = compute_energy(dag, sc)
+                energy_result = compute_energy(dag, sc, result.total_time_ms)
                 if energy_result is not None:
                     _print_energy_summary(energy_result)
 
@@ -157,6 +175,10 @@ def _print_summary(result, workload=None) -> None:
         workload: Optional MegatronWorkload for throughput metrics.
     """
 
+    if hasattr(result, "summary"):
+        typer.echo(result.summary)
+        return
+
     total = result.total_time_ms
     n_gpus = len(result.per_gpu_times_ms)
 
@@ -187,8 +209,8 @@ def _print_summary(result, workload=None) -> None:
         resolved = _resolve_model(workload.model)
         if resolved.gflops_per_train_token is not None:
             tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
-        per_gpu_tflops = tflops / n_gpus
-        typer.echo(f"                      {per_gpu_tflops:.2f} TFLOPs/s ({tflops:.2f} TFLOPs/s)")
+            per_gpu_tflops = tflops / n_gpus
+            typer.echo(f"                      {per_gpu_tflops:.2f} TFLOPs/s ({tflops:.2f} TFLOPs/s)")
         typer.echo("")
 
 

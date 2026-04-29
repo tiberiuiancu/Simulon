@@ -93,15 +93,24 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, Union[str, int, float,
     return params
 
 
-def extract_metrics(result: SimulationResult) -> dict[str, float]:
-    """Return a flat dict of metrics from a SimulationResult."""
-    metrics: dict[str, float] = {
-        "total_time_ms": result.total_time_ms,
-        "compute_ms": result.compute_ms,
-        "exposed_comm_ms": result.exposed_comm_ms,
-        "bubble_ms": result.bubble_ms,
-        "overlapped_comm_ms": result.overlapped_comm_ms,
-    }
+def extract_metrics(result: SimulationResult) -> dict[str, float | str]:
+    """Return a flat dict of metrics from a backend result."""
+    metrics: dict[str, float | str] = {"total_time_ms": result.total_time_ms}
+
+    if not hasattr(result, "compute_ms"):
+        summary = getattr(result, "summary", None)
+        if summary is not None:
+            metrics["summary"] = summary
+        return metrics
+
+    metrics.update(
+        {
+            "compute_ms": result.compute_ms,
+            "exposed_comm_ms": result.exposed_comm_ms,
+            "bubble_ms": result.bubble_ms,
+            "overlapped_comm_ms": result.overlapped_comm_ms,
+        }
+    )
     for ctype, ms in result.exposed_comm_by_type.items():
         metrics[f"exposed_comm.{ctype}_ms"] = ms
     return metrics

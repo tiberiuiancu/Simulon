@@ -44,12 +44,14 @@ def _component_wh(power_w: float, count: int, total_time_ms: float) -> float:
     return power_w * count * total_time_ms * _MS_TO_HOURS
 
 
-def compute_energy(dag, scenario) -> EnergyResult | None:
-    """Compute energy consumption for one training iteration from a replayed DAG.
+def compute_energy(dag, scenario, total_time_ms: float | None = None) -> EnergyResult | None:
+    """Compute energy consumption for one training iteration.
 
     Args:
-        dag: Fully timing-populated and replayed ExecutionDAG (nodes have start_ms/finish_ms).
+        dag: ExecutionDAG with timing populated when available.
         scenario: ScenarioConfig providing hardware specs and datacenter params.
+        total_time_ms: Optional wall time for the iteration. When omitted, derive it
+            from the DAG finish timestamps.
 
     Returns:
         EnergyResult, or None (with a warning) if the GPU has no power_model set.
@@ -65,17 +67,18 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
         )
         return None
 
-    # --- Derive total iteration time from the replayed DAG ---
-    finish_times = [
-        n.finish_ms
-        for n in (list(dag.compute_nodes) + list(dag.comm_nodes))
-        if n.finish_ms is not None
-    ]
-    if not finish_times:
-        logger.warning("No node finish times found in DAG; cannot compute energy.")
-        return None
+    # --- Derive total iteration time ---
+    if total_time_ms is None:
+        finish_times = [
+            n.finish_ms
+            for n in (list(dag.compute_nodes) + list(dag.comm_nodes))
+            if n.finish_ms is not None
+        ]
+        if not finish_times:
+            logger.warning("No node finish times found in DAG; cannot compute energy.")
+            return None
 
-    total_time_ms = max(finish_times)
+        total_time_ms = max(finish_times)
     run_duration_hours = total_time_ms * _MS_TO_HOURS
 
     # --- Cluster scale ---
@@ -89,7 +92,9 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
     # Ranks absent from the DAG (no compute nodes) contribute 0 active time.
     active_ms_by_rank: dict[int, float] = defaultdict(float)
     for compute_node in dag.compute_nodes:
-        if compute_node.start_ms is not None and compute_node.finish_ms is not None:
+        if compute_node.start_ms is None:
+            active_ms_by_rank[compute_node.gpu_rank] += compute_node.duration_ms
+        elif compute_node.finish_ms is not None:
             active_ms_by_rank[compute_node.gpu_rank] += compute_node.finish_ms - compute_node.start_ms
 
     num_gpus_total = num_nodes * gpus_per_node
