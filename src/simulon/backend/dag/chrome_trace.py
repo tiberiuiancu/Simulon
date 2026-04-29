@@ -43,14 +43,31 @@ def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int
     return dp_rank, pp_stage, ep_rank, tp_rank
 
 
-def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -> dict[str, Any]:
+def to_chrome_trace(
+    dag: ExecutionDAG,
+    tp: int,
+    pp: int,
+    dp: int,
+    ep: int = 1,
+    start_offsets: dict[int, float] | None = None,
+    workload_labels: dict[int, str] | None = None,
+) -> dict[str, Any]:
     """Build a Chrome Trace dict from a timing-populated ExecutionDAG.
 
     Args:
-        dag:  ExecutionDAG after replay() has been called.
-        tp:   Tensor parallelism degree.
-        pp:   Pipeline parallelism degree.
-        dp:   Data parallelism degree.
+        dag:              ExecutionDAG after replay() has been called.
+        tp:               Tensor parallelism degree.
+        pp:               Pipeline parallelism degree.
+        dp:               Data parallelism degree.
+        ep:               Expert parallelism degree (default 1).
+        start_offsets:    Optional mapping from gpu_rank to start offset in ms.
+                          For each GPU with a non-zero offset, an idle event is
+                          emitted at the beginning of the trace.
+        workload_labels:  Optional mapping from gpu_rank to workload name.
+                          When provided, the process label is
+                          ``"GPU {gpu} | {workload_name}"`` and ``_decode_rank()``
+                          is skipped.  When None, the existing
+                          ``"GPU {gpu} | DP=… PP=… EP=… TP=…"`` label is used.
 
     Returns:
         Dict with "traceEvents" list, ready for json.dump().
@@ -72,11 +89,14 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
     # Emit process/thread metadata sorted by (dp, pp, tp) = natural gpu_rank order
     for gpu in sorted(all_gpus):
         pid = 1000 + gpu
-        dp_rank, pp_stage, ep_rank, tp_rank = _decode_rank(gpu, tp, pp, ep)
 
-        # Group label: DP replicas together, PP stages within, EP/TP ranks innermost
-        proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} EP={ep_rank} TP={tp_rank}"
-        sort_idx = dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
+        if workload_labels is not None and gpu in workload_labels:
+            proc_name = f"GPU {gpu} | {workload_labels[gpu]}"
+            sort_idx = gpu
+        else:
+            dp_rank, pp_stage, ep_rank, tp_rank = _decode_rank(gpu, tp, pp, ep)
+            proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} EP={ep_rank} TP={tp_rank}"
+            sort_idx = dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
 
         events += [
             {"name": "process_name",       "ph": "M", "pid": pid, "tid": 0,
@@ -104,6 +124,20 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
             {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_PP_RECV,
              "args": {"sort_index": 4}},
         ]
+
+    # Idle events for GPUs with non-zero start offsets
+    if start_offsets:
+        for gpu, offset_ms in start_offsets.items():
+            if offset_ms > 0 and gpu in all_gpus:
+                events.append({
+                    "name": "idle",
+                    "ph": "X",
+                    "pid": 1000 + gpu,
+                    "tid": _TID_COMPUTE,
+                    "ts": 0,
+                    "dur": offset_ms * 1_000,
+                    "args": {"offset_ms": offset_ms},
+                })
 
     # Compute events
     for n in dag.compute_nodes:
@@ -191,9 +225,13 @@ def write_chrome_trace(
     dp: int,
     path: str | Path,
     ep: int = 1,
+    start_offsets: dict[int, float] | None = None,
+    workload_labels: dict[int, str] | None = None,
 ) -> None:
     """Write a Chrome Trace JSON file from a populated ExecutionDAG."""
     import json
-    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep)
+    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep,
+                            start_offsets=start_offsets,
+                            workload_labels=workload_labels)
     with open(path, "w") as f:
         json.dump(trace, f)

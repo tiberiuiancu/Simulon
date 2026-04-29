@@ -126,6 +126,7 @@ class CollectiveWorkload(BaseModel):
 
     framework: Literal["collective"]
     collective_type: CollectiveType
+    num_gpus: Optional[int] = None
     message_size_bytes: int = Field(..., gt=0)
 
 
