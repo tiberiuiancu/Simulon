@@ -10,9 +10,9 @@ format alongside the existing sim_ccl.py / nccl-tests results, so they can
 all be fed into the same plot.py.
 
 Usage (from repo root):
-    uv run python experiments/validation/simccl/run_simai_sweep.py
-    uv run python experiments/validation/simccl/run_simai_sweep.py --mode ns3
-    uv run python experiments/validation/simccl/run_simai_sweep.py --mode both
+    uv run python experiments/validate_simccl/run_simai_sweep.py
+    uv run python experiments/validate_simccl/run_simai_sweep.py --mode ns3
+    uv run python experiments/validate_simccl/run_simai_sweep.py --mode both
 
 Requires SimAI binaries (build from ~/uni/t/simai-original):
     Analytical:  cd ~/uni/t/simai-original && ./scripts/build.sh -c analytical
@@ -561,8 +561,8 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("experiments/validation/simccl/results"),
-        help="Directory to write JSON results (default: experiments/validation/simccl/results)",
+        default=Path("experiments/validate_simccl/results"),
+        help="Directory to write JSON results (default: experiments/validate_simccl/results)",
     )
     parser.add_argument(
         "--collective",

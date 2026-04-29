@@ -3,9 +3,9 @@
 # for a single cluster config determined by the number of nodes at submit time.
 #
 # Submit with the exact node count you need:
-#   sbatch --nodes=1 experiments/validation/simccl/run_nccl.sh   # 1n4g
-#   sbatch --nodes=2 experiments/validation/simccl/run_nccl.sh   # 2n4g
-#   sbatch --nodes=4 experiments/validation/simccl/run_nccl.sh   # 4n4g
+#   sbatch --nodes=1 experiments/validate_simccl/run_nccl.sh   # 1n4g
+#   sbatch --nodes=2 experiments/validate_simccl/run_nccl.sh   # 2n4g
+#   sbatch --nodes=4 experiments/validate_simccl/run_nccl.sh   # 4n4g
 #
 # Output JSON: results/nccl_<collective>_<Nn>4g.json
 #
@@ -17,8 +17,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --exclusive
 #SBATCH --partition=gpu_h100
-#SBATCH --output=experiments/validation/simccl/results/nccl_slurm_%j.log
-#SBATCH --error=experiments/validation/simccl/results/nccl_slurm_%j.err
+#SBATCH --output=experiments/validate_simccl/results/nccl_slurm_%j.log
+#SBATCH --error=experiments/validate_simccl/results/nccl_slurm_%j.err
 # ──────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
