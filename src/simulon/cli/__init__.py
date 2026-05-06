@@ -123,19 +123,29 @@ def simulate(
                 cost_result = compute_cost(sc, energy_result)
                 _print_cost_summary(cost_result)
 
-            if chrome is not None:
+        if chrome is not None:
+            if isinstance(sc.workload, MegatronDeprecatedWorkload):
                 p = sc.workload.parallelism
                 t = sc.workload.training
                 tp = p.tp
                 pp_val = p.pp
                 ep = p.ep
                 dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
-                trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
-                with open(chrome, "w") as f:
-                    json.dump(trace_dict, f)
-                typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
-                for tracker in trackers:
-                    tracker.log_artifact(chrome)
+            elif isinstance(sc.workload, MegatronWorkload):
+                cfg = sc.workload.config
+                tp = int(cfg.get("tensor-model-parallel-size", 1))
+                pp_val = int(cfg.get("pipeline-model-parallel-size", 1))
+                ep = int(cfg.get("expert-model-parallel-size", 1))
+                num_gpus = int(cfg.get("num_gpus", tp * pp_val * ep))
+                dp = max(1, num_gpus // (tp * pp_val * ep))
+            else:
+                tp = pp_val = ep = dp = 1
+            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+            with open(chrome, "w") as f:
+                json.dump(trace_dict, f)
+            typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
+            for tracker in trackers:
+                tracker.log_artifact(chrome)
 
         if dag_out is not None:
             with open(dag_out, "w") as f:
