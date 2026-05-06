@@ -857,10 +857,20 @@ def generate_trace(
         tp = int(cfg.get("tensor-model-parallel-size", 1))
         world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
 
-    if "--train-iters" not in derived_args and "--train-samples" not in derived_args:
-        derived_args["--train-iters"] = 1
-    if "--lr" not in derived_args:
-        derived_args["--lr"] = 0.001
+    _TRACE_DEFAULTS = {
+        "--train-iters": 1,
+        "--lr": 0.001,
+        "--min-lr": 0.0,
+        "--eval-interval": 1000000,
+        "--eval-iters": 1,
+        "--save-interval": 1000000,
+        "--log-interval": 1,
+        "--mock-data": True,
+        "--no-masked-softmax-fusion": True,
+    }
+    for flag, value in _TRACE_DEFAULTS.items():
+        if flag not in derived_args:
+            derived_args[flag] = value
     if stages is not None:
         stages_to_trace = stages
     else:
