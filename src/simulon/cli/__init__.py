@@ -867,6 +867,7 @@ def generate_trace(
         "--log-interval": 1,
         "--mock-data": True,
         "--no-masked-softmax-fusion": True,
+        "--no-bias-swiglu-fusion": True,
         "--tokenizer-type": "NullTokenizer",
         "--vocab-size": 32000,
     }
