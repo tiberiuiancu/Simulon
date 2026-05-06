@@ -3,6 +3,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from simulon.backend.dag.nodes import DAGEdge
 from simulon.backend.dag.trace_tracer import MegatronDagTracer
 from simulon.backend.dag.tracer import DAGTracerConfig
@@ -305,3 +307,80 @@ def test_slot_markers_assign_microbatch_and_phase():
             for cn in rank_cnodes[1:]:
                 assert cn.microbatch_id == 3
                 assert cn.phase == "fwd"
+
+
+def test_missing_middle_trace_reused():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, pp_stage=0)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=2), traces_dir, pp_stage=2)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=3), traces_dir, pp_stage=3)
+        workload = _make_workload(tp=1, pp=4, num_gpus=4)
+        dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+        stages = {n.pipeline_stage for n in dag.compute_nodes}
+        assert stages == {0, 1, 2, 3}, f"Expected all 4 stages, got {stages}"
+
+
+def test_pp_send_has_activation_bytes():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, pp_stage=0)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, pp_stage=1)
+        workload = MegatronWorkload(
+            framework="megatron",
+            config={
+                "tensor-model-parallel-size": 1,
+                "pipeline-model-parallel-size": 2,
+                "num-layers": 2,
+                "hidden-size": 512,
+                "num-attention-heads": 8,
+                "ffn-hidden-size": 11008,
+                "seq-length": 128,
+                "micro-batch-size": 1,
+                "global-batch-size": 2,
+                "num_gpus": 2,
+            },
+        )
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+        pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
+        assert len(pp_sends) > 0
+        for n in pp_sends:
+            assert n.bytes > 0, f"PP_Send must have non-zero bytes, got {n.bytes}"
+
+
+def test_missing_first_trace_raises():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, pp_stage=1)
+        workload = _make_workload(tp=1, pp=2, num_gpus=2)
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        with pytest.raises(ValueError, match="First PP stage"):
+            _run_tracer(workload, dc)
+
+
+def test_missing_last_trace_raises():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, pp_stage=0)
+        workload = _make_workload(tp=1, pp=2, num_gpus=2)
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        with pytest.raises(ValueError, match="Last PP stage"):
+            _run_tracer(workload, dc)

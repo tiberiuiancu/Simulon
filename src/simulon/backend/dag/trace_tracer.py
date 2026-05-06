@@ -43,6 +43,14 @@ class MegatronDagTracer(DAGTracer):
 
         scheduler = OneFOneBScheduler(pp, num_microbatches)
 
+        # Activation bytes for PP_Send (seq_len * micro_bs * hidden_size * dtype_bytes)
+        seq_len = int(cfg.get("seq-length", 2048))
+        micro_bs = int(cfg.get("micro-batch-size", 1))
+        hidden_size = int(cfg.get("hidden-size", 0))
+        dtype_str = str(cfg.get("dtype", "bf16")).lower()
+        dtype_bytes = 4 if dtype_str == "fp32" else 1 if dtype_str == "fp8" else 2
+        activation_bytes = seq_len * micro_bs * hidden_size * dtype_bytes
+
         slot_entry_node: dict[tuple[int, int, str], int] = {}
         slot_last_node: dict[tuple[int, int, str], int] = {}
 
@@ -80,6 +88,32 @@ class MegatronDagTracer(DAGTracer):
             path = traces_dir / f"trace_pp_stage_{pp_stage}.json"
             if path.exists():
                 trace_paths[pp_stage] = str(path)
+
+        if 0 not in trace_paths:
+            raise ValueError(
+                f"First PP stage (0) trace missing: {traces_dir / 'trace_pp_stage_0.json'}. "
+                "Run trace generation for the first stage."
+            )
+        if (pp - 1) not in trace_paths:
+            raise ValueError(
+                f"Last PP stage ({pp - 1}) trace missing: {traces_dir / f'trace_pp_stage_{pp - 1}.json'}. "
+                "Run trace generation for the last stage."
+            )
+
+        if pp > 2:
+            fallback_middle: str | None = None
+            for candidate in range(1, pp - 1):
+                if candidate in trace_paths:
+                    fallback_middle = trace_paths[candidate]
+                    break
+            for pp_stage in range(1, pp - 1):
+                if pp_stage not in trace_paths:
+                    if fallback_middle is None:
+                        raise ValueError(
+                            f"Middle PP stage ({pp_stage}) trace missing and no fallback available. "
+                            f"Expected one of: {[traces_dir / f'trace_pp_stage_{s}.json' for s in range(1, pp - 1)]}"
+                        )
+                    trace_paths[pp_stage] = fallback_middle
 
         for pp_stage, path in trace_paths.items():
             trace_file = TraceFileParser.parse(path)
@@ -217,7 +251,7 @@ class MegatronDagTracer(DAGTracer):
                             node_id=node_id_counter,
                             src_gpu=src_gpu,
                             dst_gpu=dst_gpu,
-                            bytes=0,
+                            bytes=activation_bytes,
                             collective_type="PP_Send",
                             layer_id=0,
                             phase=direction,
