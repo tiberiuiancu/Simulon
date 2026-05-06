@@ -859,6 +859,8 @@ def generate_trace(
 
     if "--train-iters" not in derived_args and "--train-samples" not in derived_args:
         derived_args["--train-iters"] = 1
+    if "--lr" not in derived_args:
+        derived_args["--lr"] = 0.001
     if stages is not None:
         stages_to_trace = stages
     else:
