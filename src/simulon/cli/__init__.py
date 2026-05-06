@@ -838,6 +838,8 @@ def generate_trace(
                     "num-attention-heads", "ffn-hidden-size"):
             if key in cfg:
                 derived_args[f"--{key}"] = cfg[key]
+        if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
+            derived_args["--max-position-embeddings"] = derived_args["--seq-length"]
         skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
         for key, value in cfg.items():
             if key == "distributed-optimizer":
