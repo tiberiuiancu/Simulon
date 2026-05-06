@@ -1,4 +1,5 @@
 import json
+import os
 from itertools import product
 from pathlib import Path
 from typing import Optional
@@ -826,6 +827,7 @@ def generate_trace(
 
         pp = p.pp
         tp = p.tp
+        world_size = t.num_gpus
     else:
         workload = sc.workload
         cfg = workload.config
@@ -836,9 +838,12 @@ def generate_trace(
                     "num-attention-heads", "ffn-hidden-size"):
             if key in cfg:
                 derived_args[f"--{key}"] = cfg[key]
-        skip = {"num_gpus", "num_microbatches"}
+        skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
         for key, value in cfg.items():
-            flag = f"--{key}"
+            if key == "distributed-optimizer":
+                flag = "--use-distributed-optimizer"
+            else:
+                flag = f"--{key}"
             if flag not in derived_args and key not in skip:
                 if isinstance(value, bool):
                     if value:
@@ -848,6 +853,7 @@ def generate_trace(
 
         pp = int(cfg.get("pipeline-model-parallel-size", 1))
         tp = int(cfg.get("tensor-model-parallel-size", 1))
+        world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
     if stages is not None:
         stages_to_trace = stages
     else:
@@ -875,8 +881,11 @@ def generate_trace(
         ])
 
         typer.echo(f"Tracing PP stage {stage} (rank {rank}) ...")
+        env = os.environ.copy()
+        if world_size is not None:
+            env["WORLD_SIZE"] = str(world_size)
         try:
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd, check=True, env=env)
         except FileNotFoundError as exc:
             typer.echo(f"Error: could not run Megatron entry point: {exc}", err=True)
             raise typer.Exit(1)
