@@ -856,6 +856,9 @@ def generate_trace(
         pp = int(cfg.get("pipeline-model-parallel-size", 1))
         tp = int(cfg.get("tensor-model-parallel-size", 1))
         world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
+
+    if "--train-iters" not in derived_args and "--train-samples" not in derived_args:
+        derived_args["--train-iters"] = 1
     if stages is not None:
         stages_to_trace = stages
     else:
