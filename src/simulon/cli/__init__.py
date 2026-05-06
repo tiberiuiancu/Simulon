@@ -888,7 +888,8 @@ def generate_trace(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for stage in stages_to_trace:
-        rank = stage * tp
+        ranks_per_stage = world_size // pp if world_size and pp else tp
+        rank = stage * ranks_per_stage
         cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
         for flag, value in derived_args.items():
             cmd.append(flag)
