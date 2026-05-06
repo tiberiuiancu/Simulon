@@ -867,6 +867,8 @@ def generate_trace(
         "--log-interval": 1,
         "--mock-data": True,
         "--no-masked-softmax-fusion": True,
+        "--tokenizer-type": "NullTokenizer",
+        "--vocab-size": 32000,
     }
     for flag, value in _TRACE_DEFAULTS.items():
         if flag not in derived_args:
