@@ -862,7 +862,7 @@ def generate_trace(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for stage in stages_to_trace:
-        rank = stage * p.tp
+        rank = stage * tp
         cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
         for flag, value in derived_args.items():
             cmd.append(flag)
