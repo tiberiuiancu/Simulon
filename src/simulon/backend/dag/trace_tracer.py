@@ -114,7 +114,6 @@ class MegatronDagTracer(DAGTracer):
                     trace_paths[pp_stage] = fallback_middle
 
         slot_nodes: dict[tuple[int, int, str], list[int]] = {}
-        pp_events: dict[int, list[tuple[int, str, int, int, int, str]]] = {}
         slot_entry_node: dict[tuple[int, int, str], int] = {}
         slot_last_node: dict[tuple[int, int, str], int] = {}
 
@@ -187,50 +186,7 @@ class MegatronDagTracer(DAGTracer):
                         if event.type == "collective":
                             collective_type = str(event.metadata.get("collective_type", ""))
                             if collective_type in ("PP_Send", "PP_Recv"):
-                                if pp <= 1:
-                                    continue
-                                group_ranks_raw = event.metadata.get("group_ranks", [])
-                                group_ranks = cast(
-                                    list[int],
-                                    list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else [],
-                                )
-                                data_size = cast(int, event.metadata.get("bytes", 0))
-                                mb = cast(int, event.metadata.get("microbatch_id", active_microbatch_id))
-                                direction = str(event.metadata.get("direction", active_direction))
-
-                                if len(group_ranks) == 2:
-                                    src_gpu = group_ranks[0]
-                                    dst_gpu = group_ranks[1]
-                                else:
-                                    src_gpu = replica_ranks[0]
-                                    dst_gpu = replica_ranks[0]
-
-                                cn = CommNode(
-                                    node_id=node_id_counter,
-                                    src_gpu=src_gpu,
-                                    dst_gpu=dst_gpu,
-                                    bytes=data_size,
-                                    collective_type=collective_type,
-                                    layer_id=-1,
-                                    phase=direction,
-                                    flow_id=flow_id_counter,
-                                )
-                                dag.comm_nodes.append(cn)
-                                if src_gpu in slot_node_ids_by_replica:
-                                    slot_node_ids_by_replica[src_gpu].append(node_id_counter)
-                                    if src_gpu in last_node_by_replica:
-                                        dag.edges.append(DAGEdge(src_node_id=last_node_by_replica[src_gpu], dst_node_id=node_id_counter))
-                                    last_node_by_replica[src_gpu] = node_id_counter
-                                if dst_gpu in slot_node_ids_by_replica and dst_gpu != src_gpu:
-                                    slot_node_ids_by_replica[dst_gpu].append(node_id_counter)
-                                    if dst_gpu in last_node_by_replica:
-                                        dag.edges.append(DAGEdge(src_node_id=last_node_by_replica[dst_gpu], dst_node_id=node_id_counter))
-                                    last_node_by_replica[dst_gpu] = node_id_counter
-                                pp_events.setdefault(pp_stage, []).append(
-                                    (node_id_counter, collective_type, src_gpu, dst_gpu, mb, direction)
-                                )
-                                node_id_counter += 1
-                                flow_id_counter += 1
+                                continue
                             else:
                                 group_ranks_raw = event.metadata.get("group_ranks", [])
                                 group_ranks = cast(
@@ -278,30 +234,6 @@ class MegatronDagTracer(DAGTracer):
                 dag.edges.append(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
 
         if pp > 1:
-            for pp_stage, events_list in pp_events.items():
-                for (node_id, collective_type, src_gpu, dst_gpu, mb, direction) in events_list:
-                    if collective_type == "PP_Send":
-                        if direction == "fwd" and pp_stage < pp - 1:
-                            dst_stage = pp_stage + 1
-                        elif direction == "bwd" and pp_stage > 0:
-                            dst_stage = pp_stage - 1
-                        else:
-                            continue
-
-                        found_recv = False
-                        for dst_events in pp_events.get(dst_stage, []):
-                            (dst_node_id, dst_type, dst_src, dst_dst, dst_mb, dst_dir) = dst_events
-                            if dst_type == "PP_Recv" and dst_mb == mb and dst_dir == direction:
-                                dag.edges.append(DAGEdge(src_node_id=node_id, dst_node_id=dst_node_id))
-                                found_recv = True
-                                break
-
-                        if not found_recv:
-                            dst_key = (dst_gpu, mb, direction)
-                            if dst_key in slot_entry_node:
-                                dag.edges.append(DAGEdge(src_node_id=node_id, dst_node_id=slot_entry_node[dst_key]))
-
-        if pp > 1 and not pp_events:
             for dp_rank in range(dp):
                 for pp_stage in range(pp):
                     if pp_stage not in trace_paths:
