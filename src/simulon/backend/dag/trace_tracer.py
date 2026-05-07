@@ -135,7 +135,16 @@ class MegatronDagTracer(DAGTracer):
         for target_stage, path in trace_paths.items():
             trace_file = TraceFileParser.parse(path)
             events = sorted(trace_file.events, key=lambda e: e.timestamp_ms)
-            traced_stage = trace_file.pipeline_stage
+            # The file header pipeline_stage is often 0 in fake-process-group runs.
+            # Use the first slot_begin event metadata for the actual traced stage.
+            traced_stage = next(
+                (
+                    cast(int, e.metadata.get("pipeline_stage", trace_file.pipeline_stage))
+                    for e in events
+                    if e.type == "slot_begin"
+                ),
+                trace_file.pipeline_stage,
+            )
             replica_ranks = ranks_for_stage(target_stage)
 
             active_microbatch_id = -1
@@ -234,11 +243,14 @@ class MegatronDagTracer(DAGTracer):
 
                                 data_size = cast(int, event.metadata.get("bytes", activation_bytes))
 
+                                # PP_Send events occur after slot_end, so active_microbatch_id is -1.
+                                # Use the trace event metadata which carries the correct microbatch_id.
+                                pp_mb = cast(int, event.metadata.get("microbatch_id", active_microbatch_id))
                                 pending_pp_sends.append(_PendingPPSend(
                                     remapped_src=remapped_src,
                                     remapped_dst=remapped_dst,
                                     bytes=data_size,
-                                    microbatch_id=active_microbatch_id,
+                                    microbatch_id=pp_mb,
                                     direction=direction,
                                 ))
                                 continue
