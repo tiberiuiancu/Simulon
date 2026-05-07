@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
 from simulon.backend.dag.nodes import ComputeNode, CommNode, DAGEdge, ExecutionDAG
 from simulon.backend.dag.trace_parser import TraceFileParser
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
-from simulon.backend.dag.pipeline import OneFOneBScheduler
 from simulon.collective import CCLDecomposer
 from simulon.collective.decompose import decompose_collective
 from simulon.config.dc import DatacenterConfig
 from simulon.config.workload import MegatronWorkload
+
+
+@dataclass(frozen=True)
+class _PendingPPSend:
+    remapped_src: int
+    remapped_dst: int
+    bytes: int
+    microbatch_id: int
+    direction: str
 
 
 class MegatronDagTracer(DAGTracer):
@@ -42,9 +51,7 @@ class MegatronDagTracer(DAGTracer):
             )
         )
 
-        scheduler = OneFOneBScheduler(pp, num_microbatches)
-
-        # Activation bytes for PP_Send (seq_len * micro_bs * hidden_size * dtype_bytes)
+        # Activation bytes fallback (used only when trace event has no bytes field)
         seq_len = int(cfg.get("seq-length", 2048))
         micro_bs = int(cfg.get("micro-batch-size", 1))
         hidden_size = int(cfg.get("hidden-size", 0))
@@ -69,6 +76,10 @@ class MegatronDagTracer(DAGTracer):
                         for cp_rank in range(cp):
                             ranks.append(global_rank(dp_rank, pp_stage, ep_rank, tp_rank, cp_rank))
             return ranks
+
+        def _remap_rank(traced_rank: int, traced_stage: int, target_stage: int) -> int:
+            offset = (target_stage - traced_stage) * (ep * cp * tp)
+            return traced_rank + offset
 
         traces_dir = (
             datacenter.datacenter.traces_dir
@@ -116,11 +127,16 @@ class MegatronDagTracer(DAGTracer):
         slot_nodes: dict[tuple[int, int, str], list[int]] = {}
         slot_entry_node: dict[tuple[int, int, str], int] = {}
         slot_last_node: dict[tuple[int, int, str], int] = {}
+        pending_pp_sends: list[_PendingPPSend] = []
 
-        for pp_stage, path in trace_paths.items():
+        # Track first slot_begin timestamp for each key (cross-slot ordering)
+        slot_first_timestamp: dict[tuple[int, int, str], float] = {}
+
+        for target_stage, path in trace_paths.items():
             trace_file = TraceFileParser.parse(path)
             events = sorted(trace_file.events, key=lambda e: e.timestamp_ms)
-            replica_ranks = ranks_for_stage(pp_stage)
+            traced_stage = trace_file.pipeline_stage
+            replica_ranks = ranks_for_stage(target_stage)
 
             active_microbatch_id = -1
             active_direction = ""
@@ -146,6 +162,13 @@ class MegatronDagTracer(DAGTracer):
                         )
                     for r in replica_ranks:
                         slot_node_ids_by_replica[r] = []
+
+                    # Record first timestamp for cross-slot ordering
+                    for r in replica_ranks:
+                        key = (r, active_microbatch_id, active_direction)
+                        if key not in slot_first_timestamp:
+                            slot_first_timestamp[key] = event.timestamp_ms
+
                 elif event.type == "slot_end":
                     for r in replica_ranks:
                         if slot_node_ids_by_replica[r]:
@@ -173,7 +196,7 @@ class MegatronDagTracer(DAGTracer):
                                     kernel="trace_compute",
                                     layer_id=-1,
                                     microbatch_id=active_microbatch_id,
-                                    pipeline_stage=pp_stage,
+                                    pipeline_stage=target_stage,
                                     phase=active_direction,
                                     duration_ms=duration_ms,
                                 )
@@ -186,6 +209,38 @@ class MegatronDagTracer(DAGTracer):
                         if event.type == "collective":
                             collective_type = str(event.metadata.get("collective_type", ""))
                             if collective_type in ("PP_Send", "PP_Recv"):
+                                if collective_type == "PP_Recv":
+                                    continue
+                                # PP_Send: collect for Pass 2
+                                group_ranks_raw = event.metadata.get("group_ranks", [])
+                                group_ranks = cast(
+                                    list[int],
+                                    list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else [],
+                                )
+                                direction = str(event.metadata.get("direction", active_direction))
+
+                                if direction == "fwd":
+                                    traced_src = group_ranks[0] if len(group_ranks) > 0 else -1
+                                    traced_dst = group_ranks[1] if len(group_ranks) > 1 else -1
+                                elif direction == "bwd":
+                                    traced_src = group_ranks[1] if len(group_ranks) > 1 else -1
+                                    traced_dst = group_ranks[0] if len(group_ranks) > 0 else -1
+                                else:
+                                    traced_src = group_ranks[0] if len(group_ranks) > 0 else -1
+                                    traced_dst = group_ranks[1] if len(group_ranks) > 1 else -1
+
+                                remapped_src = _remap_rank(traced_src, traced_stage, target_stage)
+                                remapped_dst = _remap_rank(traced_dst, traced_stage, target_stage)
+
+                                data_size = cast(int, event.metadata.get("bytes", activation_bytes))
+
+                                pending_pp_sends.append(_PendingPPSend(
+                                    remapped_src=remapped_src,
+                                    remapped_dst=remapped_dst,
+                                    bytes=data_size,
+                                    microbatch_id=active_microbatch_id,
+                                    direction=direction,
+                                ))
                                 continue
                             else:
                                 group_ranks_raw = event.metadata.get("group_ranks", [])
@@ -193,11 +248,12 @@ class MegatronDagTracer(DAGTracer):
                                     list[int],
                                     list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else [],
                                 )
+                                remapped_group_ranks = [_remap_rank(r, traced_stage, target_stage) for r in group_ranks]
                                 data_size = cast(int, event.metadata.get("bytes", 0))
 
                                 result, flow_id_counter = decompose_collective(
                                     collective_type=collective_type,
-                                    group_ranks=group_ranks,
+                                    group_ranks=remapped_group_ranks,
                                     data_size=data_size,
                                     num_channels=self.cfg.num_channels,
                                     algorithm=self.cfg.algorithm,
@@ -233,89 +289,63 @@ class MegatronDagTracer(DAGTracer):
             for i in range(len(node_ids) - 1):
                 dag.edges.append(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
 
-        if pp > 1:
-            for dp_rank in range(dp):
-                for pp_stage in range(pp):
-                    if pp_stage not in trace_paths:
-                        continue
-                    slots = scheduler.schedule_for_stage(pp_stage)
-                    for slot in slots:
-                        mb = slot.microbatch_id
-                        direction = slot.direction
-                        if direction == "fwd" and pp_stage < pp - 1:
-                            dst_stage = pp_stage + 1
-                        elif direction == "bwd" and pp_stage > 0:
-                            dst_stage = pp_stage - 1
-                        else:
-                            continue
+        for record in pending_pp_sends:
+            src_key = (record.remapped_src, record.microbatch_id, record.direction)
+            dst_key = (record.remapped_dst, record.microbatch_id, record.direction)
 
-                        for ep_rank in range(ep):
-                            for tp_rank in range(tp):
-                                for cp_rank in range(cp):
-                                    src_gpu = global_rank(dp_rank, pp_stage, ep_rank, tp_rank, cp_rank)
-                                    dst_gpu = global_rank(dp_rank, dst_stage, ep_rank, tp_rank, cp_rank)
+            src_node_id = slot_last_node.get(src_key)
+            dst_node_id = slot_entry_node.get(dst_key)
 
-                                    pp_send = CommNode(
-                                        node_id=node_id_counter,
-                                        src_gpu=src_gpu,
-                                        dst_gpu=dst_gpu,
-                                        bytes=activation_bytes,
-                                        collective_type="PP_Send",
-                                        layer_id=0,
-                                        phase=direction,
-                                        flow_id=flow_id_counter,
-                                    )
-                                    dag.comm_nodes.append(pp_send)
-                                    node_id_counter += 1
-                                    flow_id_counter += 1
+            if dst_node_id is None and record.direction == "bwd":
+                for bwd_phase in ("bwd_ig", "bwd_wg"):
+                    alt_key = (record.remapped_dst, record.microbatch_id, bwd_phase)
+                    if alt_key in slot_entry_node:
+                        dst_node_id = slot_entry_node[alt_key]
+                        break
 
-                                    src_key = (src_gpu, mb, direction)
-                                    if src_key in slot_last_node:
-                                        dag.edges.append(
-                                            DAGEdge(src_node_id=slot_last_node[src_key], dst_node_id=pp_send.node_id)
-                                        )
+            if src_node_id is not None and dst_node_id is not None:
+                pp_send = CommNode(
+                    node_id=node_id_counter,
+                    src_gpu=record.remapped_src,
+                    dst_gpu=record.remapped_dst,
+                    bytes=record.bytes,
+                    collective_type="PP_Send",
+                    layer_id=-1,
+                    phase=record.direction,
+                    flow_id=flow_id_counter,
+                )
+                dag.comm_nodes.append(pp_send)
+                dag.edges.append(DAGEdge(src_node_id=src_node_id, dst_node_id=pp_send.node_id))
+                dag.edges.append(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node_id))
+                node_id_counter += 1
+                flow_id_counter += 1
 
-                                    dst_key = (dst_gpu, mb, direction)
-                                    if dst_key in slot_entry_node:
-                                        dag.edges.append(
-                                            DAGEdge(src_node_id=pp_send.node_id, dst_node_id=slot_entry_node[dst_key])
-                                        )
-                                    else:
-                                        if direction == "bwd":
-                                            for bwd_phase in ("bwd_ig", "bwd_wg"):
-                                                dst_key2 = (dst_gpu, mb, bwd_phase)
-                                                if dst_key2 in slot_entry_node:
-                                                    dag.edges.append(
-                                                        DAGEdge(
-                                                            src_node_id=pp_send.node_id,
-                                                            dst_node_id=slot_entry_node[dst_key2],
-                                                        )
-                                                    )
-                                                    break
+        keys_by_rank: dict[int, list[tuple[int, int, str]]] = {}
+        for key in slot_first_timestamp:
+            rank = key[0]
+            keys_by_rank.setdefault(rank, []).append(key)
 
-        for dp_rank in range(dp):
-            for pp_stage in range(pp):
-                for ep_rank in range(ep):
-                    for tp_rank in range(tp):
-                        for cp_rank in range(cp):
-                            replica_rank = global_rank(dp_rank, pp_stage, ep_rank, tp_rank, cp_rank)
-                            slots = scheduler.schedule_for_stage(pp_stage)
-                            prev_node_id: int | None = None
-                            for slot in slots:
-                                mb = slot.microbatch_id
-                                direction = slot.direction
-                                key = (replica_rank, mb, direction)
-                                if key in slot_last_node:
-                                    if prev_node_id is not None:
-                                        prev_slot_idx = slots.index(slot) - 1
-                                        if prev_slot_idx >= 0:
-                                            prev_slot = slots[prev_slot_idx]
-                                            prev_key = (replica_rank, prev_slot.microbatch_id, prev_slot.direction)
-                                            if prev_key in slot_entry_node:
-                                                prev_last = slot_last_node.get(prev_key)
-                                                this_first = slot_entry_node.get(key)
-                                                if prev_last is not None and this_first is not None:
-                                                    dag.edges.append(DAGEdge(src_node_id=prev_last, dst_node_id=this_first))
-                                    prev_node_id = slot_last_node[key]
+        for rank, keys in keys_by_rank.items():
+            keys.sort(key=lambda k: slot_first_timestamp[k])
+            for i in range(len(keys) - 1):
+                prev_key = keys[i]
+                next_key = keys[i + 1]
+                prev_last = slot_last_node.get(prev_key)
+                next_first = slot_entry_node.get(next_key)
+                if prev_last is not None and next_first is not None:
+                    dag.edges.append(DAGEdge(src_node_id=prev_last, dst_node_id=next_first))
+
+        for target_stage in trace_paths.keys():
+            replica_ranks = ranks_for_stage(target_stage)
+            for r in replica_ranks:
+                bwd_keys = [k for k in slot_last_node if k[0] == r and k[2] == "bwd"]
+                if bwd_keys:
+                    last_bwd_key = max(bwd_keys, key=lambda k: k[1])
+                    step_key = (r, 0, "step")
+                    if step_key in slot_entry_node:
+                        dag.edges.append(DAGEdge(
+                            src_node_id=slot_last_node[last_bwd_key],
+                            dst_node_id=slot_entry_node[step_key],
+                        ))
 
         return dag

@@ -327,14 +327,29 @@ def test_missing_middle_trace_reused():
 
 
 def test_pp_send_has_activation_bytes():
-    events = [
+    events0 = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "collective",
+            "timestamp_ms": 0.5,
+            "metadata": {
+                "collective_type": "PP_Send",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+                "microbatch_id": 0,
+                "direction": "fwd",
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    events1 = [
         {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, pp_stage=0)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, pp_stage=1)
+        _write_trace(_make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, pp_stage=0)
+        _write_trace(_make_trace(events1, rank=0, world_size=2, pipeline_stage=1), traces_dir, pp_stage=1)
         workload = MegatronWorkload(
             framework="megatron",
             config={
