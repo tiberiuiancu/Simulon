@@ -32,12 +32,13 @@ class MegatronDagTracer(DAGTracer):
         ep = int(cfg.get("expert-model-parallel-size", 1))
         cp = 1
         num_gpus = int(cfg.get("num_gpus", tp * pp * ep))
+        dp_pipeline = max(1, num_gpus // (tp * pp * cp))
         dp = max(1, num_gpus // (tp * pp * ep))
         num_microbatches = int(
             cfg.get("num_microbatches")
             or (
                 int(cfg.get("global-batch-size", 0))
-                // max(1, dp * int(cfg.get("micro-batch-size", 1)))
+                // max(1, dp_pipeline * int(cfg.get("micro-batch-size", 1)))
             )
         )
 
@@ -115,17 +116,22 @@ class MegatronDagTracer(DAGTracer):
                         )
                     trace_paths[pp_stage] = fallback_middle
 
+        slot_nodes: dict[tuple[int, int, str], list[int]] = {}
+        pp_events: dict[tuple[int, int], list[tuple[int, str, int, int, int, str]]] = {}
+        slot_entry_node: dict[tuple[int, int, str], int] = {}
+        slot_last_node: dict[tuple[int, int, str], int] = {}
+
         for pp_stage, path in trace_paths.items():
             trace_file = TraceFileParser.parse(path)
             events = sorted(trace_file.events, key=lambda e: e.timestamp_ms)
             replica_ranks = ranks_for_stage(pp_stage)
 
             for replica_rank in replica_ranks:
-                last_node_id: int | None = None
                 active_microbatch_id = -1
-                active_phase = ""
                 active_direction = ""
                 pending_entry = False
+                last_node_id: int | None = None
+                slot_node_ids: list[int] = []
 
                 for i in range(len(events)):
                     event = events[i]
@@ -141,94 +147,148 @@ class MegatronDagTracer(DAGTracer):
                         else:
                             active_direction = str(event.metadata.get("direction", active_phase))
                         pending_entry = True
+                        slot_node_ids = []
                     elif event.type == "slot_end":
+                        key = (replica_rank, active_microbatch_id, active_direction)
+                        if slot_node_ids:
+                            slot_nodes.setdefault(key, []).extend(slot_node_ids)
+                            slot_entry_node[key] = slot_node_ids[0]
+                            slot_last_node[key] = slot_node_ids[-1]
                         active_microbatch_id = -1
-                        active_phase = ""
                         active_direction = ""
                         pending_entry = False
+                        slot_node_ids = []
+                        last_node_id = None
 
-                    if i + 1 < len(events):
+                    if i + 1 < len(events) and active_direction:
                         next_event = events[i + 1]
                         duration_ms = next_event.timestamp_ms - event.timestamp_ms
                         if duration_ms > 0:
-                            cn = ComputeNode(
-                                node_id=node_id_counter,
-                                gpu_rank=replica_rank,
-                                kernel="trace_compute",
-                                layer_id=-1,
-                                microbatch_id=active_microbatch_id,
-                                pipeline_stage=pp_stage,
-                                phase=active_phase,
-                                duration_ms=duration_ms,
-                            )
-                            dag.compute_nodes.append(cn)
-                            if last_node_id is not None:
-                                dag.edges.append(DAGEdge(src_node_id=last_node_id, dst_node_id=node_id_counter))
-                            last_node_id = node_id_counter
-                            node_id_counter += 1
+                            is_pp = False
+                            if event.type == "collective":
+                                ct = str(event.metadata.get("collective_type", ""))
+                                is_pp = ct in ("PP_Send", "PP_Recv")
+                            if event.type == "slot_begin" or (event.type == "collective" and not is_pp):
+                                cn = ComputeNode(
+                                    node_id=node_id_counter,
+                                    gpu_rank=replica_rank,
+                                    kernel="trace_compute",
+                                    layer_id=-1,
+                                    microbatch_id=active_microbatch_id,
+                                    pipeline_stage=pp_stage,
+                                    phase=active_direction,
+                                    duration_ms=duration_ms,
+                                )
+                                dag.compute_nodes.append(cn)
+                                slot_node_ids.append(node_id_counter)
+                                node_id_counter += 1
+                            if event.type == "collective":
+                                collective_type = str(event.metadata.get("collective_type", ""))
+                                if collective_type in ("PP_Send", "PP_Recv"):
+                                    group_ranks_raw = event.metadata.get("group_ranks", [])
+                                    group_ranks = cast(
+                                        list[int],
+                                        list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else [],
+                                    )
+                                    data_size = cast(int, event.metadata.get("bytes", 0))
+                                    mb = cast(int, event.metadata.get("microbatch_id", active_microbatch_id))
+                                    direction = str(event.metadata.get("direction", active_direction))
 
-                            if pending_entry:
-                                slot_key = (replica_rank, active_microbatch_id, active_direction)
-                                if slot_key not in slot_entry_node:
-                                    slot_entry_node[slot_key] = cn.node_id
-                                pending_entry = False
-                            if active_direction:
-                                slot_key = (replica_rank, active_microbatch_id, active_direction)
-                                slot_last_node[slot_key] = cn.node_id
+                                    if len(group_ranks) == 2:
+                                        src_gpu = group_ranks[0]
+                                        dst_gpu = group_ranks[1]
+                                    else:
+                                        src_gpu = replica_rank
+                                        dst_gpu = replica_rank
 
-                    if event.type == "collective":
-                        collective_type = str(event.metadata.get("collective_type", ""))
-                        if collective_type in ("PP_Send", "PP_Recv"):
-                            continue
-                        group_ranks_raw = event.metadata.get("group_ranks", [])
-                        group_ranks = cast(
-                            list[int],
-                            list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else [],
-                        )
-                        data_size = cast(int, event.metadata.get("bytes", 0))
+                                    cn = CommNode(
+                                        node_id=node_id_counter,
+                                        src_gpu=src_gpu,
+                                        dst_gpu=dst_gpu,
+                                        bytes=data_size,
+                                        collective_type=collective_type,
+                                        layer_id=-1,
+                                        phase=direction,
+                                        flow_id=flow_id_counter,
+                                    )
+                                    dag.comm_nodes.append(cn)
+                                    slot_node_ids.append(node_id_counter)
+                                    pp_events.setdefault((pp_stage, replica_rank), []).append(
+                                        (node_id_counter, collective_type, src_gpu, dst_gpu, mb, direction)
+                                    )
+                                    node_id_counter += 1
+                                    flow_id_counter += 1
+                                else:
+                                    group_ranks_raw = event.metadata.get("group_ranks", [])
+                                    group_ranks = cast(
+                                        list[int],
+                                        list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else [],
+                                    )
+                                    data_size = cast(int, event.metadata.get("bytes", 0))
 
-                        result, flow_id_counter = decompose_collective(
-                            collective_type=collective_type,
-                            group_ranks=group_ranks,
-                            data_size=data_size,
-                            num_channels=self.cfg.num_channels,
-                            algorithm=self.cfg.algorithm,
-                            flow_id_start=flow_id_counter,
-                        )
+                                    result, flow_id_counter = decompose_collective(
+                                        collective_type=collective_type,
+                                        group_ranks=group_ranks,
+                                        data_size=data_size,
+                                        num_channels=self.cfg.num_channels,
+                                        algorithm=self.cfg.algorithm,
+                                        flow_id_start=flow_id_counter,
+                                    )
 
-                        flow_node_ids: list[int] = []
-                        for flow in result.flows:
-                            comm_node = CommNode(
-                                node_id=node_id_counter,
-                                src_gpu=flow.src,
-                                dst_gpu=flow.dst,
-                                bytes=flow.flow_size,
-                                collective_type=collective_type,
-                                layer_id=-1,
-                                phase=active_phase,
-                                flow_id=flow.flow_id,
-                                parent_flow_ids=flow.parent_flow_ids,
-                            )
-                            dag.comm_nodes.append(comm_node)
-                            flow_node_ids.append(node_id_counter)
-                            node_id_counter += 1
+                                    flow_ids: list[int] = []
+                                    for flow in result.flows:
+                                        comm_node = CommNode(
+                                            node_id=node_id_counter,
+                                            src_gpu=flow.src,
+                                            dst_gpu=flow.dst,
+                                            bytes=flow.flow_size,
+                                            collective_type=collective_type,
+                                            layer_id=-1,
+                                            phase=active_direction,
+                                            flow_id=flow.flow_id,
+                                            parent_flow_ids=flow.parent_flow_ids,
+                                        )
+                                        dag.comm_nodes.append(comm_node)
+                                        flow_ids.append(node_id_counter)
+                                        node_id_counter += 1
 
-                        if flow_node_ids:
-                            if last_node_id is not None:
-                                for fid in flow_node_ids:
-                                    dag.edges.append(DAGEdge(src_node_id=last_node_id, dst_node_id=fid))
-                            last_node_id = flow_node_ids[-1]
+                                    if flow_ids:
+                                        slot_node_ids.extend(flow_ids)
 
-                            if pending_entry:
-                                slot_key = (replica_rank, active_microbatch_id, active_direction)
-                                if slot_key not in slot_entry_node:
-                                    slot_entry_node[slot_key] = flow_node_ids[0]
-                                pending_entry = False
-                            if active_direction:
-                                slot_key = (replica_rank, active_microbatch_id, active_direction)
-                                slot_last_node[slot_key] = flow_node_ids[-1]
+        for node_ids in slot_nodes.values():
+            for i in range(len(node_ids) - 1):
+                dag.edges.append(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
 
         if pp > 1:
+            for (pp_stage, replica_rank), events_list in pp_events.items():
+                for (node_id, collective_type, src_gpu, dst_gpu, mb, direction) in events_list:
+                    if collective_type == "PP_Send":
+                        dst_stage = pp_stage + 1 if direction == "fwd" else pp_stage - 1
+                        if direction == "fwd" and pp_stage < pp - 1:
+                            dst_stage = pp_stage + 1
+                        elif direction == "bwd" and pp_stage > 0:
+                            dst_stage = pp_stage - 1
+                        else:
+                            continue
+
+                        found_recv = False
+                        for (dst_pp_stage, dst_replica), dst_events in pp_events.items():
+                            if dst_pp_stage != dst_stage:
+                                continue
+                            for (dst_node_id, dst_type, dst_src, dst_dst, dst_mb, dst_dir) in dst_events:
+                                if dst_type == "PP_Recv" and dst_mb == mb and dst_dir == direction:
+                                    dag.edges.append(DAGEdge(src_node_id=node_id, dst_node_id=dst_node_id))
+                                    found_recv = True
+                                    break
+                            if found_recv:
+                                break
+
+                        if not found_recv:
+                            dst_key = (dst_gpu, mb, direction)
+                            if dst_key in slot_entry_node:
+                                dag.edges.append(DAGEdge(src_node_id=node_id, dst_node_id=slot_entry_node[dst_key]))
+
+        if pp > 1 and not pp_events:
             for dp_rank in range(dp):
                 for pp_stage in range(pp):
                     if pp_stage not in trace_paths:
@@ -288,5 +348,28 @@ class MegatronDagTracer(DAGTracer):
                                                         )
                                                     )
                                                     break
+
+        for dp_rank in range(dp):
+            for pp_stage in range(pp):
+                slots = scheduler.schedule_for_stage(pp_stage)
+                prev_node_id: int | None = None
+                for slot in slots:
+                    mb = slot.microbatch_id
+                    direction = slot.direction
+                    replica_rank = global_rank(dp_rank, pp_stage, 0, 0)
+                    key = (replica_rank, mb, direction)
+                    if key in slot_last_node:
+                        if prev_node_id is not None:
+                            prev_key = None
+                            prev_slot_idx = slots.index(slot) - 1
+                            if prev_slot_idx >= 0:
+                                prev_slot = slots[prev_slot_idx]
+                                prev_key = (replica_rank, prev_slot.microbatch_id, prev_slot.direction)
+                                if prev_key in slot_entry_node:
+                                    prev_last = slot_last_node.get(prev_key)
+                                    this_first = slot_entry_node.get(key)
+                                    if prev_last is not None and this_first is not None:
+                                        dag.edges.append(DAGEdge(src_node_id=prev_last, dst_node_id=this_first))
+                        prev_node_id = slot_last_node[key]
 
         return dag
