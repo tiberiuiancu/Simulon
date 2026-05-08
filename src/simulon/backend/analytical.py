@@ -217,6 +217,8 @@ class AnalyticalBackend(Backend):
             total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes)
             logger.info("Replaying DAG (%d nodes) ...", total_nodes)
             result = replay(dag)
+            if dag.total_flops is not None:
+                result.total_flops = dag.total_flops
             logger.info("  Replay done: total_time=%.3f ms", result.total_time_ms)
 
             return dag, result

@@ -88,6 +88,11 @@ def simulate(
         if trackers:
             params = extract_params(sc)
             metrics = extract_metrics(result)
+
+            if isinstance(sc.workload, (MegatronDeprecatedWorkload, MegatronWorkload)):
+                derived = _compute_training_metrics(result, sc.workload, sc.datacenter)
+                metrics.update({k: v for k, v in derived.items() if v is not None})
+
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".yaml", prefix="scenario_", delete=False
             ) as tmp:
@@ -106,9 +111,9 @@ def simulate(
             if isinstance(sc.workload, CollectiveWorkload):
                 _print_collective_summary(sc.workload, result, sc.datacenter)
             elif isinstance(sc.workload, _MW):
-                _print_summary(result, sc.workload)
+                _print_summary(result, sc.workload, sc.datacenter)
             else:
-                _print_summary(result)
+                _print_summary(result, sc.workload, sc.datacenter)
 
         if isinstance(sc.workload, MegatronDeprecatedWorkload):
             energy_result = None
@@ -166,12 +171,73 @@ def simulate(
             tracker.end_run()
 
 
-def _print_summary(result, workload=None) -> None:
+def _compute_training_metrics(result, workload, datacenter):
+    """Compute throughput, TFLOPs, and MFU from a simulation result."""
+    total = result.total_time_ms
+    n_gpus = len(result.per_gpu_times_ms)
+    if total <= 0 or n_gpus == 0:
+        return {}
+
+    from simulon.config.resolve import resolve_gpu_spec
+    from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
+    from simulon.profiling.models import (
+        _model_spec_from_megatron_config,
+        _resolve_model,
+        get_gflops_per_train_token,
+    )
+
+    if isinstance(workload, MegatronDeprecatedWorkload):
+        t = workload.training
+        tokens_per_iter = t.global_batch_size * t.sequence_length
+        model = _resolve_model(workload.model)
+    elif isinstance(workload, MegatronWorkload):
+        cfg = workload.config
+        tokens_per_iter = cfg.get("global-batch-size", 0) * cfg.get("seq-length", 0)
+        model = _model_spec_from_megatron_config(cfg)
+    else:
+        return {}
+
+    iter_time_s = total / 1000.0
+    if iter_time_s <= 0:
+        return {}
+    throughput_tps = tokens_per_iter / iter_time_s
+    per_gpu_tps = throughput_tps / n_gpus
+
+    gflops_per_token = None
+    if isinstance(workload, MegatronWorkload) and result.total_flops is not None:
+        if tokens_per_iter > 0:
+            gflops_per_token = result.total_flops / tokens_per_iter / 1e9
+    else:
+        gflops_per_token = get_gflops_per_train_token(model)
+
+    metrics: dict[str, float] = {
+        "throughput_tps": throughput_tps,
+        "per_gpu_tps": per_gpu_tps,
+    }
+    if gflops_per_token is not None:
+        tflops = throughput_tps * gflops_per_token / 1e3
+        per_gpu_tflops = tflops / n_gpus
+        metrics["gflops_per_token"] = gflops_per_token
+        metrics["tflops"] = tflops
+        metrics["per_gpu_tflops"] = per_gpu_tflops
+
+        if datacenter is not None:
+            try:
+                gpu_spec = resolve_gpu_spec(datacenter)
+                if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
+                    metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
+            except Exception:
+                pass
+    return metrics
+
+
+def _print_summary(result, workload=None, datacenter=None) -> None:
     """Print a human-readable simulation summary to stdout.
 
     Args:
         result: SimulationResult from AnalyticalBackend.simulate().
-        workload: Optional MegatronDeprecatedWorkload for throughput metrics.
+        workload: Optional workload for throughput metrics.
+        datacenter: Optional datacenter config for GPU peak TFLOPs (needed for MFU).
     """
 
     total = result.total_time_ms
@@ -194,19 +260,20 @@ def _print_summary(result, workload=None) -> None:
     typer.echo("")
 
     if workload is not None and total > 0:
-        from simulon.profiling.models import _resolve_model
-        t = workload.training
-        tokens_per_iter = t.global_batch_size * t.sequence_length
-        iter_time_s = total / 1000.0
-        throughput_tps = tokens_per_iter / iter_time_s
-        per_gpu_tps = throughput_tps / n_gpus
-        typer.echo(f"Throughput:           {per_gpu_tps:,.1f} tokens/s ({throughput_tps:,.1f} tokens/s)")
-        resolved = _resolve_model(workload.model)
-        if resolved.gflops_per_train_token is not None:
-            tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
-            per_gpu_tflops = tflops / n_gpus
-            typer.echo(f"                      {per_gpu_tflops:.2f} TFLOPs/s ({tflops:.2f} TFLOPs/s)")
-        typer.echo("")
+        metrics = _compute_training_metrics(result, workload, datacenter)
+        if metrics:
+            typer.echo(
+                f"Throughput:           {metrics['per_gpu_tps']:,.1f} tokens/s "
+                f"({metrics['throughput_tps']:,.1f} tokens/s)"
+            )
+            if metrics.get("per_gpu_tflops") is not None:
+                typer.echo(
+                    f"                      {metrics['per_gpu_tflops']:.2f} TFLOPs/s "
+                    f"({metrics['tflops']:.2f} TFLOPs/s)"
+                )
+            if metrics.get("mfu_pct") is not None:
+                typer.echo(f"  MFU:                {metrics['mfu_pct']:.1f}%")
+            typer.echo("")
 
 
 def _print_collective_summary(workload, result, datacenter) -> None:

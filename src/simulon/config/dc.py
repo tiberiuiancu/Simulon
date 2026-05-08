@@ -100,6 +100,7 @@ class GPUSpec(BaseModel):
     name: Optional[str] = None
     vendor: Optional[str] = None
     flops_multiplier: float = 1.0
+    peak_tflops_bf16: Optional[float] = None
     memory_capacity_gb: Optional[float] = None
     power_model: Optional[PowerModel] = None
     cost: Optional[CostField] = None

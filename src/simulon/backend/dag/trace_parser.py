@@ -20,6 +20,7 @@ class TraceFile:
     world_size: int
     pipeline_stage: int
     events: list[TraceEvent]
+    total_flops: float | None = None
 
 
 class TraceEventInput(TypedDict):
@@ -61,6 +62,12 @@ class TraceFileParser:
             raise ValueError("events must be a list")
         events_data = cast(list[TraceEventInput], events_obj)
 
+        total_flops = None
+        if "total_flops" in data:
+            tf = data["total_flops"]
+            if isinstance(tf, (int, float)):
+                total_flops = float(tf)
+
         events: list[TraceEvent] = []
         for event_data in events_data:
             event_type = event_data["type"]
@@ -92,4 +99,5 @@ class TraceFileParser:
             world_size=world_size_obj,
             pipeline_stage=pipeline_stage_obj,
             events=events,
+            total_flops=total_flops,
         )

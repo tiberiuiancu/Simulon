@@ -134,6 +134,8 @@ class MegatronDagTracer(DAGTracer):
 
         for target_stage, path in trace_paths.items():
             trace_file = TraceFileParser.parse(path)
+            if dag.total_flops is None and trace_file.total_flops is not None:
+                dag.total_flops = trace_file.total_flops
             events = sorted(trace_file.events, key=lambda e: e.timestamp_ms)
             # The file header pipeline_stage is often 0 in fake-process-group runs.
             # Use the first slot_begin event metadata for the actual traced stage.
