@@ -173,62 +173,65 @@ def simulate(
 
 def _compute_training_metrics(result, workload, datacenter):
     """Compute throughput, TFLOPs, and MFU from a simulation result."""
-    total = result.total_time_ms
-    n_gpus = len(result.per_gpu_times_ms)
-    if total <= 0 or n_gpus == 0:
+    try:
+        total = result.total_time_ms
+        n_gpus = len(result.per_gpu_times_ms)
+        if total <= 0 or n_gpus == 0:
+            return {}
+
+        from simulon.config.resolve import resolve_gpu_spec
+        from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
+        from simulon.profiling.models import (
+            _model_spec_from_megatron_config,
+            _resolve_model,
+            get_gflops_per_train_token,
+        )
+
+        if isinstance(workload, MegatronDeprecatedWorkload):
+            t = workload.training
+            tokens_per_iter = t.global_batch_size * t.sequence_length
+            model = _resolve_model(workload.model)
+        elif isinstance(workload, MegatronWorkload):
+            cfg = workload.config
+            tokens_per_iter = cfg.get("global-batch-size", 0) * cfg.get("seq-length", 0)
+            model = _model_spec_from_megatron_config(cfg)
+        else:
+            return {}
+
+        iter_time_s = total / 1000.0
+        if iter_time_s <= 0:
+            return {}
+        throughput_tps = tokens_per_iter / iter_time_s
+        per_gpu_tps = throughput_tps / n_gpus
+
+        gflops_per_token = None
+        if isinstance(workload, MegatronWorkload) and result.total_flops is not None:
+            if tokens_per_iter > 0:
+                gflops_per_token = result.total_flops / tokens_per_iter / 1e9
+        else:
+            gflops_per_token = get_gflops_per_train_token(model)
+
+        metrics: dict[str, float] = {
+            "throughput_tps": throughput_tps,
+            "per_gpu_tps": per_gpu_tps,
+        }
+        if gflops_per_token is not None:
+            tflops = throughput_tps * gflops_per_token / 1e3
+            per_gpu_tflops = tflops / n_gpus
+            metrics["gflops_per_token"] = gflops_per_token
+            metrics["tflops"] = tflops
+            metrics["per_gpu_tflops"] = per_gpu_tflops
+
+            if datacenter is not None:
+                try:
+                    gpu_spec = resolve_gpu_spec(datacenter)
+                    if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
+                        metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
+                except Exception:
+                    pass
+        return metrics
+    except Exception:
         return {}
-
-    from simulon.config.resolve import resolve_gpu_spec
-    from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
-    from simulon.profiling.models import (
-        _model_spec_from_megatron_config,
-        _resolve_model,
-        get_gflops_per_train_token,
-    )
-
-    if isinstance(workload, MegatronDeprecatedWorkload):
-        t = workload.training
-        tokens_per_iter = t.global_batch_size * t.sequence_length
-        model = _resolve_model(workload.model)
-    elif isinstance(workload, MegatronWorkload):
-        cfg = workload.config
-        tokens_per_iter = cfg.get("global-batch-size", 0) * cfg.get("seq-length", 0)
-        model = _model_spec_from_megatron_config(cfg)
-    else:
-        return {}
-
-    iter_time_s = total / 1000.0
-    if iter_time_s <= 0:
-        return {}
-    throughput_tps = tokens_per_iter / iter_time_s
-    per_gpu_tps = throughput_tps / n_gpus
-
-    gflops_per_token = None
-    if isinstance(workload, MegatronWorkload) and result.total_flops is not None:
-        if tokens_per_iter > 0:
-            gflops_per_token = result.total_flops / tokens_per_iter / 1e9
-    else:
-        gflops_per_token = get_gflops_per_train_token(model)
-
-    metrics: dict[str, float] = {
-        "throughput_tps": throughput_tps,
-        "per_gpu_tps": per_gpu_tps,
-    }
-    if gflops_per_token is not None:
-        tflops = throughput_tps * gflops_per_token / 1e3
-        per_gpu_tflops = tflops / n_gpus
-        metrics["gflops_per_token"] = gflops_per_token
-        metrics["tflops"] = tflops
-        metrics["per_gpu_tflops"] = per_gpu_tflops
-
-        if datacenter is not None:
-            try:
-                gpu_spec = resolve_gpu_spec(datacenter)
-                if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
-                    metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
-            except Exception:
-                pass
-    return metrics
 
 
 def _print_summary(result, workload=None, datacenter=None) -> None:

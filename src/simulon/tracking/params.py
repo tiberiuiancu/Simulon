@@ -104,4 +104,6 @@ def extract_metrics(result: SimulationResult) -> dict[str, float]:
     }
     for ctype, ms in result.exposed_comm_by_type.items():
         metrics[f"exposed_comm.{ctype}_ms"] = ms
+    if result.total_flops is not None:
+        metrics["total_flops"] = result.total_flops
     return metrics
