@@ -303,40 +303,50 @@ class MegatronDagTracer(DAGTracer):
 
         seen_transfers: set[tuple[int, int, int, str]] = set()
         for record in pending_pp_transfers:
-            dedup_key = (record.remapped_src, record.remapped_dst, record.microbatch_id, record.direction)
-            if dedup_key in seen_transfers:
-                continue
-            seen_transfers.add(dedup_key)
+            # The trace records one representative PP transfer per stage pair.
+            # Replicate it across all corresponding ranks (TP/EP/CP/DP replicas).
+            ranks_per_stage = ep * cp * tp
+            dp_stride = pp * ranks_per_stage
+            src_stage = (record.remapped_src % dp_stride) // ranks_per_stage
+            dst_stage = (record.remapped_dst % dp_stride) // ranks_per_stage
+            src_ranks = ranks_for_stage(src_stage)
+            dst_ranks = ranks_for_stage(dst_stage)
 
-            src_key = (record.remapped_src, record.microbatch_id, record.direction)
-            dst_key = (record.remapped_dst, record.microbatch_id, record.direction)
+            for src, dst in zip(src_ranks, dst_ranks):
+                dedup_key = (src, dst, record.microbatch_id, record.direction)
+                if dedup_key in seen_transfers:
+                    continue
+                seen_transfers.add(dedup_key)
 
-            src_node_id = slot_last_node.get(src_key)
-            dst_node_id = slot_entry_node.get(dst_key)
+                src_key = (src, record.microbatch_id, record.direction)
+                dst_key = (dst, record.microbatch_id, record.direction)
 
-            if dst_node_id is None and record.direction == "bwd":
-                for bwd_phase in ("bwd_ig", "bwd_wg"):
-                    alt_key = (record.remapped_dst, record.microbatch_id, bwd_phase)
-                    if alt_key in slot_entry_node:
-                        dst_node_id = slot_entry_node[alt_key]
-                        break
+                src_node_id = slot_last_node.get(src_key)
+                dst_node_id = slot_entry_node.get(dst_key)
 
-            if src_node_id is not None and dst_node_id is not None:
-                pp_send = CommNode(
-                    node_id=node_id_counter,
-                    src_gpu=record.remapped_src,
-                    dst_gpu=record.remapped_dst,
-                    bytes=record.bytes,
-                    collective_type="PP_Send",
-                    layer_id=-1,
-                    phase=record.direction,
-                    flow_id=flow_id_counter,
-                )
-                dag.comm_nodes.append(pp_send)
-                dag.edges.append(DAGEdge(src_node_id=src_node_id, dst_node_id=pp_send.node_id))
-                dag.edges.append(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node_id))
-                node_id_counter += 1
-                flow_id_counter += 1
+                if dst_node_id is None and record.direction == "bwd":
+                    for bwd_phase in ("bwd_ig", "bwd_wg"):
+                        alt_key = (dst, record.microbatch_id, bwd_phase)
+                        if alt_key in slot_entry_node:
+                            dst_node_id = slot_entry_node[alt_key]
+                            break
+
+                if src_node_id is not None and dst_node_id is not None:
+                    pp_send = CommNode(
+                        node_id=node_id_counter,
+                        src_gpu=src,
+                        dst_gpu=dst,
+                        bytes=record.bytes,
+                        collective_type="PP_Send",
+                        layer_id=-1,
+                        phase=record.direction,
+                        flow_id=flow_id_counter,
+                    )
+                    dag.comm_nodes.append(pp_send)
+                    dag.edges.append(DAGEdge(src_node_id=src_node_id, dst_node_id=pp_send.node_id))
+                    dag.edges.append(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node_id))
+                    node_id_counter += 1
+                    flow_id_counter += 1
 
         keys_by_rank: dict[int, list[tuple[int, int, str]]] = {}
         for key in slot_first_timestamp:
