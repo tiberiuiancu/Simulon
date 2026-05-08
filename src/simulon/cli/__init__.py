@@ -868,7 +868,7 @@ def generate_trace(
         world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
 
     _TRACE_DEFAULTS = {
-        "--train-iters": 1,
+        "--train-iters": 6,  # 5 warmup + 1 traced iteration
         "--lr": 0.001,
         "--min-lr": 0.0,
         "--eval-interval": 1000000,
