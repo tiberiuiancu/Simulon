@@ -69,9 +69,9 @@ class TraceFileParser:
             bytes_value = metadata.get("bytes", 0)
             if event_type == "collective":
                 if not isinstance(bytes_value, (int, float)):
-                    raise ValueError("collective events must have metadata.bytes > 0")
-                if bytes_value <= 0:
-                    raise ValueError("collective events must have metadata.bytes > 0")
+                    raise ValueError("collective events must have metadata.bytes as int or float")
+                if bytes_value < 0:
+                    raise ValueError("collective events must have metadata.bytes >= 0")
 
             if event_type not in {"collective", "slot_begin", "slot_end"}:
                 raise ValueError(f"Unsupported event type: {event_type!r}")
