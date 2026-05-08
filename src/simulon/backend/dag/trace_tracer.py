@@ -129,8 +129,8 @@ class MegatronDagTracer(DAGTracer):
         slot_last_node: dict[tuple[int, int, str], int] = {}
         pending_pp_transfers: list[_PendingPPTransfer] = []
 
-        # Track first slot_begin timestamp for each key (cross-slot ordering)
         slot_first_timestamp: dict[tuple[int, int, str], float] = {}
+        slot_last_timestamp: dict[tuple[int, int, str], float] = {}
 
         for target_stage, path in trace_paths.items():
             trace_file = TraceFileParser.parse(path)
@@ -185,6 +185,7 @@ class MegatronDagTracer(DAGTracer):
                             slot_nodes.setdefault(key, []).extend(slot_node_ids_by_replica[r])
                             slot_entry_node[key] = slot_node_ids_by_replica[r][0]
                             slot_last_node[key] = slot_node_ids_by_replica[r][-1]
+                            slot_last_timestamp[key] = event.timestamp_ms
                         slot_node_ids_by_replica[r] = []
                     active_microbatch_id = -1
                     active_direction = ""
@@ -332,6 +333,10 @@ class MegatronDagTracer(DAGTracer):
                             break
 
                 if src_node_id is not None and dst_node_id is not None:
+                    src_finish = slot_last_timestamp.get(src_key, float("inf"))
+                    dst_start = slot_first_timestamp.get(dst_key, float("-inf"))
+                    if src_finish > dst_start:
+                        continue
                     pp_send = CommNode(
                         node_id=node_id_counter,
                         src_gpu=src,
