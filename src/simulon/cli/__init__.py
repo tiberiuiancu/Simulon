@@ -84,17 +84,16 @@ def simulate(
 
         backend = AnalyticalBackend()
         dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
-        typer.echo("[DEBUG] backend.simulate() done")
+
+        from simulon.config.resolve import resolve_gpu_spec
+        gpu_spec = resolve_gpu_spec(sc.datacenter)
 
         if trackers:
-            typer.echo("[DEBUG] starting tracker logging")
             params = extract_params(sc)
             metrics = extract_metrics(result)
 
             if isinstance(sc.workload, (MegatronDeprecatedWorkload, MegatronWorkload)):
-                typer.echo("[DEBUG] computing derived metrics")
-                derived = _compute_training_metrics(result, sc.workload, sc.datacenter)
-                typer.echo(f"[DEBUG] derived metrics: {list(derived.keys())}")
+                derived = _compute_training_metrics(result, sc.workload, gpu_spec)
                 metrics.update({k: v for k, v in derived.items() if v is not None})
 
             with tempfile.NamedTemporaryFile(
@@ -104,26 +103,20 @@ def simulate(
                 scenario_artifact_path = Path(tmp.name)
             try:
                 for tracker in trackers:
-                    typer.echo("[DEBUG] tracker.log_params")
                     tracker.log_params(params)
-                    typer.echo("[DEBUG] tracker.log_metrics")
                     tracker.log_metrics(metrics)
-                    typer.echo("[DEBUG] tracker.log_artifact")
                     tracker.log_artifact(scenario_artifact_path)
             finally:
                 scenario_artifact_path.unlink(missing_ok=True)
-            typer.echo("[DEBUG] tracker logging done")
 
         if summary:
-            typer.echo("[DEBUG] printing summary")
             from simulon.config.workload import CollectiveWorkload, MegatronDeprecatedWorkload as _MW
             if isinstance(sc.workload, CollectiveWorkload):
                 _print_collective_summary(sc.workload, result, sc.datacenter)
             elif isinstance(sc.workload, _MW):
-                _print_summary(result, sc.workload, sc.datacenter)
+                _print_summary(result, sc.workload, gpu_spec)
             else:
-                _print_summary(result, sc.workload, sc.datacenter)
-            typer.echo("[DEBUG] summary printed")
+                _print_summary(result, sc.workload, gpu_spec)
 
         if isinstance(sc.workload, MegatronDeprecatedWorkload):
             energy_result = None
@@ -139,7 +132,6 @@ def simulate(
                 _print_cost_summary(cost_result)
 
         if chrome is not None:
-            typer.echo("[DEBUG] writing chrome trace")
             if isinstance(sc.workload, MegatronDeprecatedWorkload):
                 p = sc.workload.parallelism
                 t = sc.workload.training
@@ -164,7 +156,6 @@ def simulate(
                 tracker.log_artifact(chrome)
 
         if dag_out is not None:
-            typer.echo("[DEBUG] writing dag_out")
             with open(dag_out, "w") as f:
                 json.dump(dag.to_dict(), f)
             typer.echo(f"DAG written to {dag_out}")
@@ -172,34 +163,25 @@ def simulate(
                 tracker.log_artifact(dag_out)
 
         if goal is not None:
-            typer.echo("[DEBUG] writing goal trace")
             from simulon.backend.dag.goal_trace import write_goal_trace
             write_goal_trace(dag, goal)
             typer.echo(f"GOAL trace written to {goal}  (feed to ATLAHS/LogGOPSim via txt2bin)")
             for tracker in trackers:
                 tracker.log_artifact(goal)
 
-        typer.echo("[DEBUG] about to enter finally block")
     finally:
-        typer.echo("[DEBUG] in finally block")
         for tracker in trackers:
-            typer.echo("[DEBUG] tracker.end_run()")
             tracker.end_run()
-        typer.echo("[DEBUG] all tracker.end_run() done")
 
 
-def _compute_training_metrics(result, workload, datacenter):
+def _compute_training_metrics(result, workload, gpu_spec=None):
     """Compute throughput, TFLOPs, and MFU from a simulation result."""
-    typer.echo("[DEBUG] _compute_training_metrics ENTER")
     try:
         total = result.total_time_ms
         n_gpus = len(result.per_gpu_times_ms)
         if total <= 0 or n_gpus == 0:
-            typer.echo("[DEBUG] early return: total<=0 or n_gpus==0")
             return {}
 
-        typer.echo("[DEBUG] importing modules")
-        from simulon.config.resolve import resolve_gpu_spec
         from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
         from simulon.profiling.models import (
             _model_spec_from_megatron_config,
@@ -207,7 +189,6 @@ def _compute_training_metrics(result, workload, datacenter):
             get_gflops_per_train_token,
         )
 
-        typer.echo("[DEBUG] checking workload type")
         if isinstance(workload, MegatronDeprecatedWorkload):
             t = workload.training
             tokens_per_iter = t.global_batch_size * t.sequence_length
@@ -217,28 +198,21 @@ def _compute_training_metrics(result, workload, datacenter):
             tokens_per_iter = cfg.get("global-batch-size", 0) * cfg.get("seq-length", 0)
             model = _model_spec_from_megatron_config(cfg)
         else:
-            typer.echo("[DEBUG] early return: unknown workload type")
             return {}
 
-        typer.echo(f"[DEBUG] tokens_per_iter={tokens_per_iter}")
         iter_time_s = total / 1000.0
         if iter_time_s <= 0:
-            typer.echo("[DEBUG] early return: iter_time_s<=0")
             return {}
         throughput_tps = tokens_per_iter / iter_time_s
         per_gpu_tps = throughput_tps / n_gpus
-        typer.echo(f"[DEBUG] throughput_tps={throughput_tps:.1f}")
 
         gflops_per_token = None
         if isinstance(workload, MegatronWorkload) and result.total_flops is not None:
-            typer.echo(f"[DEBUG] using trace total_flops={result.total_flops:.2e}")
             if tokens_per_iter > 0:
                 gflops_per_token = result.total_flops / tokens_per_iter / 1e9
         else:
-            typer.echo("[DEBUG] using get_gflops_per_train_token")
             gflops_per_token = get_gflops_per_train_token(model)
 
-        typer.echo(f"[DEBUG] gflops_per_token={gflops_per_token}")
         metrics: dict[str, float] = {
             "throughput_tps": throughput_tps,
             "per_gpu_tps": per_gpu_tps,
@@ -250,29 +224,20 @@ def _compute_training_metrics(result, workload, datacenter):
             metrics["tflops"] = tflops
             metrics["per_gpu_tflops"] = per_gpu_tflops
 
-            if datacenter is not None:
-                typer.echo("[DEBUG] resolving GPU spec for MFU")
-                try:
-                    gpu_spec = resolve_gpu_spec(datacenter)
-                    if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
-                        metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
-                        typer.echo(f"[DEBUG] MFU={metrics['mfu_pct']:.1f}%")
-                except Exception:
-                    pass
-        typer.echo("[DEBUG] _compute_training_metrics EXIT")
+            if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
+                metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
         return metrics
-    except Exception as e:
-        typer.echo(f"[DEBUG] _compute_training_metrics EXCEPTION: {e}")
+    except Exception:
         return {}
 
 
-def _print_summary(result, workload=None, datacenter=None) -> None:
+def _print_summary(result, workload=None, gpu_spec=None) -> None:
     """Print a human-readable simulation summary to stdout.
 
     Args:
         result: SimulationResult from AnalyticalBackend.simulate().
         workload: Optional workload for throughput metrics.
-        datacenter: Optional datacenter config for GPU peak TFLOPs (needed for MFU).
+        gpu_spec: Optional resolved GPUSpec for GPU peak TFLOPs (needed for MFU).
     """
 
     total = result.total_time_ms
@@ -295,7 +260,7 @@ def _print_summary(result, workload=None, datacenter=None) -> None:
     typer.echo("")
 
     if workload is not None and total > 0:
-        metrics = _compute_training_metrics(result, workload, datacenter)
+        metrics = _compute_training_metrics(result, workload, gpu_spec)
         if metrics:
             typer.echo(
                 f"Throughput:           {metrics['per_gpu_tps']:,.1f} tokens/s "
