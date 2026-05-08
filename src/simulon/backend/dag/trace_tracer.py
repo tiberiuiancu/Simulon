@@ -14,7 +14,7 @@ from simulon.config.workload import MegatronWorkload
 
 
 @dataclass(frozen=True)
-class _PendingPPSend:
+class _PendingPPTransfer:
     remapped_src: int
     remapped_dst: int
     bytes: int
@@ -127,7 +127,7 @@ class MegatronDagTracer(DAGTracer):
         slot_nodes: dict[tuple[int, int, str], list[int]] = {}
         slot_entry_node: dict[tuple[int, int, str], int] = {}
         slot_last_node: dict[tuple[int, int, str], int] = {}
-        pending_pp_sends: list[_PendingPPSend] = []
+        pending_pp_transfers: list[_PendingPPTransfer] = []
 
         # Track first slot_begin timestamp for each key (cross-slot ordering)
         slot_first_timestamp: dict[tuple[int, int, str], float] = {}
@@ -218,9 +218,9 @@ class MegatronDagTracer(DAGTracer):
                         if event.type == "collective":
                             collective_type = str(event.metadata.get("collective_type", ""))
                             if collective_type in ("PP_Send", "PP_Recv"):
-                                if collective_type == "PP_Recv":
-                                    continue
-                                # PP_Send: collect for Pass 2
+                                # Collect both PP_Send and PP_Recv for Pass 2 wiring.
+                                # They represent the same physical transfer; deduplication
+                                # happens later by (src, dst, microbatch, direction).
                                 group_ranks_raw = event.metadata.get("group_ranks", [])
                                 group_ranks = cast(
                                     list[int],
@@ -243,10 +243,10 @@ class MegatronDagTracer(DAGTracer):
 
                                 data_size = cast(int, event.metadata.get("bytes", activation_bytes))
 
-                                # PP_Send events occur after slot_end, so active_microbatch_id is -1.
+                                # PP events may occur after slot_end, so active_microbatch_id is -1.
                                 # Use the trace event metadata which carries the correct microbatch_id.
                                 pp_mb = cast(int, event.metadata.get("microbatch_id", active_microbatch_id))
-                                pending_pp_sends.append(_PendingPPSend(
+                                pending_pp_transfers.append(_PendingPPTransfer(
                                     remapped_src=remapped_src,
                                     remapped_dst=remapped_dst,
                                     bytes=data_size,
@@ -301,7 +301,13 @@ class MegatronDagTracer(DAGTracer):
             for i in range(len(node_ids) - 1):
                 dag.edges.append(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
 
-        for record in pending_pp_sends:
+        seen_transfers: set[tuple[int, int, int, str]] = set()
+        for record in pending_pp_transfers:
+            dedup_key = (record.remapped_src, record.remapped_dst, record.microbatch_id, record.direction)
+            if dedup_key in seen_transfers:
+                continue
+            seen_transfers.add(dedup_key)
+
             src_key = (record.remapped_src, record.microbatch_id, record.direction)
             dst_key = (record.remapped_dst, record.microbatch_id, record.direction)
 
