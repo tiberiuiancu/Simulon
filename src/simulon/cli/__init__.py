@@ -784,6 +784,7 @@ def generate_trace(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     output_dir: Path = typer.Option(Path("./traces"), "--output-dir", "-o", help="Directory to write trace files"),
     stages: Optional[list[int]] = typer.Option(None, "--stage", help="Specific PP stages to trace (default: first, middle, last)"),
+    all_stages: bool = typer.Option(False, "--all-stages", help="Trace all pipeline stages"),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.scenario import ScenarioConfig
@@ -886,6 +887,8 @@ def generate_trace(
             derived_args[flag] = value
     if stages is not None:
         stages_to_trace = stages
+    elif all_stages:
+        stages_to_trace = list(range(pp))
     else:
         if pp == 1:
             stages_to_trace = [0]
