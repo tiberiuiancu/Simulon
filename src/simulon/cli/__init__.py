@@ -82,14 +82,11 @@ def simulate(
         for tracker in trackers:
             tracker.start_run()
 
+        from simulon.config.resolve import resolve_gpu_spec
+        gpu_spec = resolve_gpu_spec(sc.datacenter)
+
         backend = AnalyticalBackend()
         dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
-
-        from simulon.config.dc import GPUSpec
-        gpu_spec = None
-        node = sc.datacenter.node
-        if node is not None and isinstance(node.gpu, GPUSpec) and node.gpu.peak_tflops_bf16 is not None:
-            gpu_spec = node.gpu
 
         if trackers:
             params = extract_params(sc)
