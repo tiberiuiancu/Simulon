@@ -333,9 +333,9 @@ class MegatronDagTracer(DAGTracer):
                             break
 
                 if src_node_id is not None and dst_node_id is not None:
-                    src_finish = slot_last_timestamp.get(src_key, float("inf"))
-                    dst_start = slot_first_timestamp.get(dst_key, float("-inf"))
-                    if src_finish > dst_start:
+                    if record.direction == "fwd" and src_stage > dst_stage:
+                        continue
+                    if record.direction == "bwd" and src_stage < dst_stage:
                         continue
                     pp_send = CommNode(
                         node_id=node_id_counter,
