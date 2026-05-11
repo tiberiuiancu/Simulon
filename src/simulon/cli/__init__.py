@@ -34,7 +34,18 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
     bin_path = prefix.with_suffix(".bin")
     idx_path = prefix.with_suffix(".idx")
     if bin_path.exists() and idx_path.exists():
-        return
+        with open(idx_path, "rb") as f:
+            header = f.read(9)
+            if header == b"MMIDIDX\x00\x00":
+                version = struct.unpack("<Q", f.read(8))[0]
+                if version == 1:
+                    f.read(1)
+                    seq_count = struct.unpack("<Q", f.read(8))[0]
+                    if seq_count >= 200:
+                        return
+        typer.echo("Existing C4 dataset is outdated, regenerating...")
+        bin_path.unlink(missing_ok=True)
+        idx_path.unlink(missing_ok=True)
 
     try:
         from transformers import AutoTokenizer
