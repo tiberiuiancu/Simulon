@@ -49,16 +49,30 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
 
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-    docs = [
-        "The quick brown fox jumps over the lazy dog. " * 200,
-        "In machine learning, neural networks process data through layers of computation. " * 200,
-        "Natural language processing enables computers to understand human text. " * 200,
-        "Deep learning models have transformed artificial intelligence research. " * 200,
-        "The transformer architecture uses self-attention mechanisms for sequence modeling. " * 200,
-        "Large language models are trained on vast amounts of text data from the internet. " * 200,
-        "Distributed training allows models to be trained across multiple GPUs simultaneously. " * 200,
-        "Optimization algorithms like Adam are used to update model parameters during training. " * 200,
+    sentences = [
+        "The quick brown fox jumps over the lazy dog.",
+        "In machine learning, neural networks process data through layers of computation.",
+        "Natural language processing enables computers to understand human text.",
+        "Deep learning models have transformed artificial intelligence research.",
+        "The transformer architecture uses self-attention mechanisms for sequence modeling.",
+        "Large language models are trained on vast amounts of text data from the internet.",
+        "Distributed training allows models to be trained across multiple GPUs simultaneously.",
+        "Optimization algorithms like Adam are used to update model parameters during training.",
+        "Reinforcement learning from human feedback improves model alignment and safety.",
+        "Mixture of experts architectures scale model capacity without proportional compute cost.",
+        "Quantization techniques reduce model size and memory footprint for efficient inference.",
+        "Data parallelism shards batches across devices while model parallelism shards layers.",
+        "Gradient checkpointing trades computation for memory during backpropagation.",
+        "Flash attention reorders memory access patterns to reduce IO bottleneck in transformers.",
+        "Knowledge distillation transfers capabilities from large teacher models to small students.",
+        "Curriculum learning progressively increases task difficulty to improve training stability.",
     ]
+
+    num_docs = 200
+    docs: list[str] = []
+    for i in range(num_docs):
+        lines = [sentences[(i + j) % len(sentences)] for j in range(40)]
+        docs.append(" ".join(lines))
 
     token_ids: list[numpy.ndarray] = []
     lengths: list[int] = []
@@ -79,7 +93,7 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
         pointers.append(curr.item())
         curr += length * itemsize
 
-    document_indices = [0, len(lengths)]
+    document_indices = list(range(len(lengths) + 1))
 
     with open(idx_path, "wb") as f:
         f.write(b"MMIDIDX\x00\x00")
