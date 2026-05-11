@@ -858,7 +858,10 @@ def generate_trace(
     mock_data: Optional[bool] = typer.Option(None, "--mock-data/--no-mock-data", help="Use mock synthetic data (default: from config or True)"),
     data_path: Optional[str] = typer.Option(None, "--data-path", help="Path to tokenized dataset directory (required for real data)"),
     tokenizer_type: Optional[str] = typer.Option(None, "--tokenizer-type", help="Tokenizer type for real data (e.g., GPT2BPETokenizer, HuggingFaceTokenizer)"),
-    dataset: Optional[str] = typer.Option(None, "--dataset", help="Preset dataset (mock, openwebtext, c4, pile) or custom path"),
+    tokenizer_model: Optional[str] = typer.Option(None, "--tokenizer-model", help="Tokenizer model path (required for HuggingFaceTokenizer, SentencePiece, etc.)"),
+    vocab_file: Optional[str] = typer.Option(None, "--vocab-file", help="Vocab file path (required for GPT2BPETokenizer)"),
+    merge_file: Optional[str] = typer.Option(None, "--merge-file", help="Merge file path (required for GPT2BPETokenizer)"),
+    dataset: Optional[str] = typer.Option(None, "--dataset", help="Preset dataset (mock) or custom data path"),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.scenario import ScenarioConfig
@@ -950,9 +953,6 @@ def generate_trace(
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
         "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
-        "openwebtext": {"--mock-data": False, "--data-path": "./data/openwebtext", "--tokenizer-type": "GPT2BPETokenizer", "--vocab-size": 50257},
-        "c4": {"--mock-data": False, "--data-path": "./data/c4", "--tokenizer-type": "HuggingFaceTokenizer", "--vocab-size": 32000},
-        "pile": {"--mock-data": False, "--data-path": "./data/pile", "--tokenizer-type": "HuggingFaceTokenizer", "--vocab-size": 50257},
     }
     if dataset is not None:
         if dataset in _DATASET_PRESETS:
@@ -961,13 +961,18 @@ def generate_trace(
         else:
             _set_arg("--mock-data", False)
             _set_arg("--data-path", dataset)
-            _set_arg("--tokenizer-type", "HuggingFaceTokenizer")
     if mock_data is not None:
         _set_arg("--mock-data", mock_data)
     if data_path is not None:
         _set_arg("--data-path", data_path)
     if tokenizer_type is not None:
         _set_arg("--tokenizer-type", tokenizer_type)
+    if tokenizer_model is not None:
+        _set_arg("--tokenizer-model", tokenizer_model)
+    if vocab_file is not None:
+        _set_arg("--vocab-file", vocab_file)
+    if merge_file is not None:
+        _set_arg("--merge-file", merge_file)
 
     _TRACE_DEFAULTS = {
         "--train-iters": 6,  # 5 warmup + 1 traced iteration
