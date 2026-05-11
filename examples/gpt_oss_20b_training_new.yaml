@@ -78,8 +78,9 @@ workload:
     # Position / attention
     position-embedding-type: rope
     rotary-base: 150000
+    group-query-attention: true
     attention-softmax-in-fp32: false
-    window-size: "128,0"
+    window-size: "127,0"
     window-attn-skip-freq: "[1,0]*12"
 
     # MoE
@@ -98,8 +99,8 @@ workload:
     # Fusion / kernels
     disable-bias-linear: true
     no-bias-dropout-fusion: true
+    no-rope-fusion: true
     gradient-accumulation-fusion: false
-    apply-rope-fusion: false
     multi-latent-attention: false
 
     # Dropout (disabled)
