@@ -30,9 +30,10 @@ def _dump_profile(data: dict, f) -> None:
 
 
 def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
-    data_dir = Path(data_path)
-    prefix = data_dir / "c4_train"
-    if prefix.with_suffix(".bin").exists() and prefix.with_suffix(".idx").exists():
+    prefix = Path(data_path)
+    bin_path = prefix.with_suffix(".bin")
+    idx_path = prefix.with_suffix(".idx")
+    if bin_path.exists() and idx_path.exists():
         return
 
     try:
@@ -43,11 +44,10 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
             "Install it with: uv pip install transformers"
         ) from exc
 
-    typer.echo(f"Preparing small C4 dataset at {data_dir} ...")
-    data_dir.mkdir(parents=True, exist_ok=True)
+    typer.echo(f"Preparing small C4 dataset at {prefix} ...")
+    prefix.parent.mkdir(parents=True, exist_ok=True)
 
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    vocab_size = tokenizer.vocab_size
 
     docs = [
         "The quick brown fox jumps over the lazy dog. " * 200,
@@ -68,14 +68,11 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
         token_ids.append(arr)
         lengths.append(len(arr))
 
-    bin_path = str(prefix.with_suffix(".bin"))
-    idx_path = str(prefix.with_suffix(".idx"))
-
     with open(bin_path, "wb") as f:
         for arr in token_ids:
             f.write(arr.tobytes(order="C"))
 
-    pointers = []
+    pointers: list[int] = []
     curr = numpy.int64(0)
     itemsize = numpy.dtype(numpy.int32).itemsize
     for length in lengths:
