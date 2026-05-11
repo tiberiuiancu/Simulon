@@ -1,0 +1,68 @@
+# GPT-OSS-20B (MoE) training scenario — single-node 4-GPU flat config
+#
+# Parallelism: TP=1, PP=1, EP=4, DP=1
+# Total GPUs:  1 × 1 × 4 × 1 = 4  (1 node × 4 GPUs/node)
+#
+# This uses the trace-driven path (framework: megatron) with a flat "config"
+# dict that mirrors Megatron-LM CLI flags.
+
+# H100 single-node, no scale-out needed for this config
+workload:
+  framework: megatron
+  config:
+    # Parallelism
+    tensor-model-parallel-size: 1
+    pipeline-model-parallel-size: 1
+    expert-model-parallel-size: 4
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+
+    # Model architecture
+    num-layers: 24
+    hidden-size: 2880
+    ffn-hidden-size: 2880
+    num-attention-heads: 64
+    num-query-groups: 8
+    vocab-size: 128256
+    swiglu: true
+
+    # Position / attention
+    position-embedding-type: rope
+    rotary-base: 150000
+    group-query-attention: true
+    kv-channels: 64
+    attention-softmax-in-fp32: false
+    window-size: "128,0"
+    window-attn-skip-freq: "[1,0]*12"
+
+    # MoE
+    num-experts: 32
+    moe-router-topk: 4
+    moe-token-dispatcher-type: alltoall
+    moe-grouped-gemm: true
+    moe-permute-fusion: true
+    moe-ffn-hidden-size: 2880
+    moe-layer-freq: 1
+
+    # Precision
+    bf16: true
+    fp16: false
+
+    # Fusion / kernels
+    disable-bias-linear: true
+    no-rope-fusion: true
+    use-flash-attn: true
+    gradient-accumulation-fusion: false
+    multi-latent-attention: false
+
+    # Dropout (disabled)
+    hidden-dropout: 0.0
+    attention-dropout: 0.0
+
+    # Training shape
+    micro-batch-size: 2
+    global-batch-size: 16
+    seq-length: 8192
+    max-position-embeddings: 131072
+    num-gpus: 4
+    distributed-optimizer: true
