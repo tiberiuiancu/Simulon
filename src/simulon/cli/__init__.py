@@ -1034,7 +1034,7 @@ def generate_trace(
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
         "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
-        "c4": {"--mock-data": False, "--data-path": "./data/c4_en_llama3", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "NousResearch/Meta-Llama-3-8B", "--vocab-size": 128256},
+        "c4": {"--mock-data": False, "--data-path": "./data/c4_en_llama3", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "NousResearch/Meta-Llama-3-8B", "--vocab-size": 128256, "--split": "1000,0,0"},
     }
     if dataset is not None:
         if dataset in _DATASET_PRESETS:
