@@ -1006,8 +1006,12 @@ def generate_trace(
         rank = stage * ranks_per_stage
         cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
         for flag, value in derived_args.items():
-            cmd.append(flag)
-            if value is not True:
+            if value is True:
+                cmd.append(flag)
+            elif value is False:
+                continue
+            else:
+                cmd.append(flag)
                 cmd.append(str(value))
         cmd.extend([
             "--fake-process-group",
