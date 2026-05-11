@@ -63,11 +63,8 @@ workload:
     pipeline-model-parallel-size: 4
     expert-model-parallel-size: 4
     num-layers-per-virtual-pipeline-stage: 3
-    virtual-pipeline-model-parallel-size: 2
     overlap-grad-reduce: true
     overlap-param-gather: true
-    overlap-p2p-comm: true
-    overlap-moe-expert-parallel-comm: true
 
     # Model architecture
     num-layers: 24
