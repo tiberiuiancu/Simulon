@@ -62,21 +62,55 @@ workload:
     tensor-model-parallel-size: 1
     pipeline-model-parallel-size: 4
     expert-model-parallel-size: 4
-    num-layers-per-virtual-pipeline-stage: 2
+    num-layers-per-virtual-pipeline-stage: 3
+    virtual-pipeline-model-parallel-size: 2
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+    overlap-p2p-comm: true
+    overlap-moe-expert-parallel-comm: true
 
     # Model architecture
     num-layers: 24
-    hidden-size: 6144
-    num-attention-heads: 32
-    ffn-hidden-size: 8192
+    hidden-size: 2880
+    ffn-hidden-size: 2880
+    num-attention-heads: 64
+    num-query-groups: 8
+    vocab-size: 128256
     swiglu: true
-    num-experts: 8
-    moe-router-topk: 2
-    moe-token-dispatcher-type: alltoall
 
-    # Training
+    # Position / attention
+    position-embedding-type: rope
+    rotary-base: 150000
+    attention-softmax-in-fp32: false
+    window-size: [128, 0]
+    window-attn-skip-freq: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
+
+    # MoE
+    num-experts: 32
+    moe-router-topk: 4
+    moe-token-dispatcher-type: alltoall
+    moe-grouped-gemm: true
+    moe-permute-fusion: true
+    moe-ffn-hidden-size: 2880
+    moe-layer-freq: 1
+
+    # Precision
+    bf16: true
+    fp16: false
+
+    # Fusion / kernels
+    gradient-accumulation-fusion: false
+    apply-rope-fusion: false
+    multi-latent-attention: false
+
+    # Dropout (disabled)
+    hidden-dropout: 0.0
+    attention-dropout: 0.0
+
+    # Training shape
     micro-batch-size: 1
     global-batch-size: 16
-    seq-length: 2048
+    seq-length: 8192
+    max-position-embeddings: 131072
     num-gpus: 16
     distributed-optimizer: true
