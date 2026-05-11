@@ -59,7 +59,7 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
     typer.echo("Downloading C4/en from HuggingFace and tokenizing with Llama-3-8B tokenizer ...")
     prefix.parent.mkdir(parents=True, exist_ok=True)
 
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B")
+    tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B")
     vocab_size = tokenizer.vocab_size
 
     ds = load_dataset("allenai/c4", "en", split="train", streaming=True)
@@ -1034,7 +1034,7 @@ def generate_trace(
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
         "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
-        "c4": {"--mock-data": False, "--data-path": "./data/c4_en_llama3", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "meta-llama/Meta-Llama-3-8B", "--vocab-size": 128256},
+        "c4": {"--mock-data": False, "--data-path": "./data/c4_en_llama3", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "NousResearch/Meta-Llama-3-8B", "--vocab-size": 128256},
     }
     if dataset is not None:
         if dataset in _DATASET_PRESETS:
