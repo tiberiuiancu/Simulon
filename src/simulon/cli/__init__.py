@@ -855,6 +855,10 @@ def generate_trace(
     output_dir: Path = typer.Option(Path("./traces"), "--output-dir", "-o", help="Directory to write trace files"),
     stages: Optional[list[int]] = typer.Option(None, "--stage", help="Specific PP stages to trace (default: first, middle, last)"),
     all_stages: bool = typer.Option(False, "--all-stages", help="Trace all pipeline stages"),
+    mock_data: Optional[bool] = typer.Option(None, "--mock-data/--no-mock-data", help="Use mock synthetic data (default: from config or True)"),
+    data_path: Optional[str] = typer.Option(None, "--data-path", help="Path to tokenized dataset directory (required for real data)"),
+    tokenizer_type: Optional[str] = typer.Option(None, "--tokenizer-type", help="Tokenizer type for real data (e.g., GPT2BPETokenizer, HuggingFaceTokenizer)"),
+    dataset: Optional[str] = typer.Option(None, "--dataset", help="Preset dataset (mock, openwebtext, c4, pile) or custom path"),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.scenario import ScenarioConfig
@@ -868,6 +872,11 @@ def generate_trace(
         raise typer.BadParameter("Scenario workload must be a Megatron workload")
 
     derived_args: dict[str, str | int | bool]
+    explicitly_set: set[str] = set()
+
+    def _set_arg(flag: str, value: str | int | bool) -> None:
+        derived_args[flag] = value
+        explicitly_set.add(flag)
 
     if isinstance(sc.workload, MegatronDeprecatedWorkload):
         workload = sc.workload
@@ -881,30 +890,32 @@ def generate_trace(
             "--global-batch-size": t.global_batch_size,
             "--seq-length": t.sequence_length,
         }
+        explicitly_set.update(derived_args.keys())
         if p.ep > 1:
-            derived_args["--expert-model-parallel-size"] = p.ep
+            _set_arg("--expert-model-parallel-size", p.ep)
 
         model = workload.model
         if isinstance(model, LLMSpec):
             if model.num_layers is not None:
-                derived_args["--num-layers"] = model.num_layers
+                _set_arg("--num-layers", model.num_layers)
             if model.hidden_size is not None:
-                derived_args["--hidden-size"] = model.hidden_size
+                _set_arg("--hidden-size", model.hidden_size)
             if model.num_heads is not None:
-                derived_args["--num-attention-heads"] = model.num_heads
+                _set_arg("--num-attention-heads", model.num_heads)
             if model.ffn_hidden_size is not None:
-                derived_args["--ffn-hidden-size"] = model.ffn_hidden_size
+                _set_arg("--ffn-hidden-size", model.ffn_hidden_size)
 
         if workload.megatron_args:
             for key, value in workload.megatron_args.items():
                 flag = f"--{key}"
                 if isinstance(value, bool):
                     if value:
-                        derived_args[flag] = True
+                        _set_arg(flag, True)
                     elif flag in derived_args:
                         del derived_args[flag]
+                        explicitly_set.add(flag)
                 else:
-                    derived_args[flag] = value
+                    _set_arg(flag, value)
 
         pp = p.pp
         tp = p.tp
@@ -918,9 +929,9 @@ def generate_trace(
                     "expert-model-parallel-size", "num-layers", "hidden-size",
                     "num-attention-heads", "ffn-hidden-size"):
             if key in cfg:
-                derived_args[f"--{key}"] = cfg[key]
+                _set_arg(f"--{key}", cfg[key])
         if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
-            derived_args["--max-position-embeddings"] = derived_args["--seq-length"]
+            _set_arg("--max-position-embeddings", derived_args["--seq-length"])
         skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
         for key, value in cfg.items():
             if key == "distributed-optimizer":
@@ -929,14 +940,34 @@ def generate_trace(
                 flag = f"--{key}"
             if flag not in derived_args and key not in skip:
                 if isinstance(value, bool):
-                    if value:
-                        derived_args[flag] = True
+                    _set_arg(flag, value)
                 else:
-                    derived_args[flag] = value
+                    _set_arg(flag, value)
 
         pp = int(cfg.get("pipeline-model-parallel-size", 1))
         tp = int(cfg.get("tensor-model-parallel-size", 1))
         world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
+
+    _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
+        "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
+        "openwebtext": {"--mock-data": False, "--data-path": "./data/openwebtext", "--tokenizer-type": "GPT2BPETokenizer", "--vocab-size": 50257},
+        "c4": {"--mock-data": False, "--data-path": "./data/c4", "--tokenizer-type": "HuggingFaceTokenizer", "--vocab-size": 32000},
+        "pile": {"--mock-data": False, "--data-path": "./data/pile", "--tokenizer-type": "HuggingFaceTokenizer", "--vocab-size": 50257},
+    }
+    if dataset is not None:
+        if dataset in _DATASET_PRESETS:
+            for flag, value in _DATASET_PRESETS[dataset].items():
+                _set_arg(flag, value)
+        else:
+            _set_arg("--mock-data", False)
+            _set_arg("--data-path", dataset)
+            _set_arg("--tokenizer-type", "HuggingFaceTokenizer")
+    if mock_data is not None:
+        _set_arg("--mock-data", mock_data)
+    if data_path is not None:
+        _set_arg("--data-path", data_path)
+    if tokenizer_type is not None:
+        _set_arg("--tokenizer-type", tokenizer_type)
 
     _TRACE_DEFAULTS = {
         "--train-iters": 6,  # 5 warmup + 1 traced iteration
@@ -953,7 +984,7 @@ def generate_trace(
         "--vocab-size": 32000,
     }
     for flag, value in _TRACE_DEFAULTS.items():
-        if flag not in derived_args:
+        if flag not in explicitly_set:
             derived_args[flag] = value
     if stages is not None:
         stages_to_trace = stages
