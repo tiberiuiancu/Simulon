@@ -1,5 +1,6 @@
 import json
 import os
+import struct
 from itertools import product
 from pathlib import Path
 from typing import Optional
@@ -7,6 +8,7 @@ from typing import Optional
 import subprocess
 import sys
 
+import numpy
 import typer
 import yaml
 
@@ -25,6 +27,74 @@ def _dump_profile(data: dict, f) -> None:
         f.write("oom_kernel_runs:\n")
         for run in oom_kr:
             f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
+
+
+def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
+    data_dir = Path(data_path)
+    prefix = data_dir / "c4_train"
+    if prefix.with_suffix(".bin").exists() and prefix.with_suffix(".idx").exists():
+        return
+
+    try:
+        from transformers import AutoTokenizer
+    except ImportError as exc:
+        raise typer.BadParameter(
+            "C4 dataset requires the 'transformers' library. "
+            "Install it with: uv pip install transformers"
+        ) from exc
+
+    typer.echo(f"Preparing small C4 dataset at {data_dir} ...")
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    vocab_size = tokenizer.vocab_size
+
+    docs = [
+        "The quick brown fox jumps over the lazy dog. " * 200,
+        "In machine learning, neural networks process data through layers of computation. " * 200,
+        "Natural language processing enables computers to understand human text. " * 200,
+        "Deep learning models have transformed artificial intelligence research. " * 200,
+        "The transformer architecture uses self-attention mechanisms for sequence modeling. " * 200,
+        "Large language models are trained on vast amounts of text data from the internet. " * 200,
+        "Distributed training allows models to be trained across multiple GPUs simultaneously. " * 200,
+        "Optimization algorithms like Adam are used to update model parameters during training. " * 200,
+    ]
+
+    token_ids: list[numpy.ndarray] = []
+    lengths: list[int] = []
+    for doc in docs:
+        tokens = tokenizer.encode(doc, add_special_tokens=False)
+        arr = numpy.array(tokens, dtype=numpy.int32)
+        token_ids.append(arr)
+        lengths.append(len(arr))
+
+    bin_path = str(prefix.with_suffix(".bin"))
+    idx_path = str(prefix.with_suffix(".idx"))
+
+    with open(bin_path, "wb") as f:
+        for arr in token_ids:
+            f.write(arr.tobytes(order="C"))
+
+    pointers = []
+    curr = numpy.int64(0)
+    itemsize = numpy.dtype(numpy.int32).itemsize
+    for length in lengths:
+        pointers.append(curr.item())
+        curr += length * itemsize
+
+    document_indices = [0, len(lengths)]
+
+    with open(idx_path, "wb") as f:
+        f.write(b"MMIDIDX\x00\x00")
+        f.write(struct.pack("<Q", 1))
+        f.write(struct.pack("<B", 4))
+        f.write(struct.pack("<Q", len(lengths)))
+        f.write(struct.pack("<Q", len(document_indices)))
+        f.write(numpy.array(lengths, dtype=numpy.int32).tobytes(order="C"))
+        f.write(numpy.array(pointers, dtype=numpy.int64).tobytes(order="C"))
+        f.write(numpy.array(document_indices, dtype=numpy.int64).tobytes(order="C"))
+
+    typer.echo(f"Dataset ready: {bin_path}, {idx_path}")
 
 
 app = typer.Typer(name="simulon", help="AI cluster simulator")
@@ -953,6 +1023,7 @@ def generate_trace(
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
         "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
+        "c4": {"--mock-data": False, "--data-path": "./data/c4", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "gpt2", "--vocab-size": 50257},
     }
     if dataset is not None:
         if dataset in _DATASET_PRESETS:
@@ -973,6 +1044,10 @@ def generate_trace(
         _set_arg("--vocab-file", vocab_file)
     if merge_file is not None:
         _set_arg("--merge-file", merge_file)
+
+    if dataset == "c4" or (data_path is not None and "c4" in data_path):
+        seq_len = derived_args.get("--seq-length", 8192)
+        _ensure_c4_dataset(str(derived_args.get("--data-path", "./data/c4")), seq_length=int(seq_len))
 
     _TRACE_DEFAULTS = {
         "--train-iters": 6,  # 5 warmup + 1 traced iteration
