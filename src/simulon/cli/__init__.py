@@ -48,50 +48,39 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
         idx_path.unlink(missing_ok=True)
 
     try:
+        from datasets import load_dataset
         from transformers import AutoTokenizer
     except ImportError as exc:
         raise typer.BadParameter(
-            "C4 dataset requires the 'transformers' library. "
-            "Install it with: uv pip install transformers"
+            "C4 dataset requires 'transformers' and 'datasets' libraries. "
+            "Install them with: uv pip install transformers datasets"
         ) from exc
 
-    typer.echo(f"Preparing small C4 dataset at {prefix} ...")
+    typer.echo("Downloading C4/en from HuggingFace and tokenizing with Llama-3-8B tokenizer ...")
     prefix.parent.mkdir(parents=True, exist_ok=True)
 
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B")
+    vocab_size = tokenizer.vocab_size
 
-    sentences = [
-        "The quick brown fox jumps over the lazy dog.",
-        "In machine learning, neural networks process data through layers of computation.",
-        "Natural language processing enables computers to understand human text.",
-        "Deep learning models have transformed artificial intelligence research.",
-        "The transformer architecture uses self-attention mechanisms for sequence modeling.",
-        "Large language models are trained on vast amounts of text data from the internet.",
-        "Distributed training allows models to be trained across multiple GPUs simultaneously.",
-        "Optimization algorithms like Adam are used to update model parameters during training.",
-        "Reinforcement learning from human feedback improves model alignment and safety.",
-        "Mixture of experts architectures scale model capacity without proportional compute cost.",
-        "Quantization techniques reduce model size and memory footprint for efficient inference.",
-        "Data parallelism shards batches across devices while model parallelism shards layers.",
-        "Gradient checkpointing trades computation for memory during backpropagation.",
-        "Flash attention reorders memory access patterns to reduce IO bottleneck in transformers.",
-        "Knowledge distillation transfers capabilities from large teacher models to small students.",
-        "Curriculum learning progressively increases task difficulty to improve training stability.",
-    ]
-
-    num_docs = 200
-    docs: list[str] = []
-    for i in range(num_docs):
-        lines = [sentences[(i + j) % len(sentences)] for j in range(40)]
-        docs.append(" ".join(lines))
-
+    ds = load_dataset("allenai/c4", "en", split="train", streaming=True)
+    num_docs = 500
     token_ids: list[numpy.ndarray] = []
     lengths: list[int] = []
-    for doc in docs:
-        tokens = tokenizer.encode(doc, add_special_tokens=False)
+    for i, example in enumerate(ds):
+        if i >= num_docs:
+            break
+        tokens = tokenizer.encode(example["text"], add_special_tokens=False)
+        if len(tokens) < 10:
+            continue
         arr = numpy.array(tokens, dtype=numpy.int32)
         token_ids.append(arr)
         lengths.append(len(arr))
+
+    if len(lengths) < 200:
+        raise typer.BadParameter(
+            f"Only got {len(lengths)} valid C4 documents; "
+            "the dataset stream may have been empty or truncated."
+        )
 
     with open(bin_path, "wb") as f:
         for arr in token_ids:
@@ -116,7 +105,7 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
         f.write(numpy.array(pointers, dtype=numpy.int64).tobytes(order="C"))
         f.write(numpy.array(document_indices, dtype=numpy.int64).tobytes(order="C"))
 
-    typer.echo(f"Dataset ready: {bin_path}, {idx_path}")
+    typer.echo(f"Dataset ready: {bin_path}, {idx_path} ({len(lengths)} docs, vocab={vocab_size})")
 
 
 app = typer.Typer(name="simulon", help="AI cluster simulator")
@@ -1045,7 +1034,7 @@ def generate_trace(
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
         "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
-        "c4": {"--mock-data": False, "--data-path": "./data/c4", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "gpt2", "--vocab-size": 50257},
+        "c4": {"--mock-data": False, "--data-path": "./data/c4_en_llama3", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "meta-llama/Meta-Llama-3-8B", "--vocab-size": 128256},
     }
     if dataset is not None:
         if dataset in _DATASET_PRESETS:
@@ -1069,7 +1058,7 @@ def generate_trace(
 
     if dataset == "c4" or (data_path is not None and "c4" in data_path):
         seq_len = derived_args.get("--seq-length", 8192)
-        _ensure_c4_dataset(str(derived_args.get("--data-path", "./data/c4")), seq_length=int(seq_len))
+        _ensure_c4_dataset(str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len))
 
     _TRACE_DEFAULTS = {
         "--train-iters": 6,  # 5 warmup + 1 traced iteration
