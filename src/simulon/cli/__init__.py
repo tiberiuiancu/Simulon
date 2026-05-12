@@ -943,6 +943,7 @@ def generate_trace(
     vocab_file: Optional[str] = typer.Option(None, "--vocab-file", help="Vocab file path (required for GPT2BPETokenizer)"),
     merge_file: Optional[str] = typer.Option(None, "--merge-file", help="Merge file path (required for GPT2BPETokenizer)"),
     dataset: Optional[str] = typer.Option(None, "--dataset", help="Preset dataset (mock) or custom data path"),
+    memory_snapshot: Optional[Path] = typer.Option(None, "--memory-snapshot", help="Dump a PyTorch CUDA memory snapshot to the given path (for OOM debugging)"),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.scenario import ScenarioConfig
@@ -1109,6 +1110,11 @@ def generate_trace(
             "--rank", str(rank),
             "--trace-dir", str(output_dir),
         ])
+        if memory_snapshot is not None:
+            cmd.extend([
+                "--record-memory-history",
+                "--memory-snapshot-path", str(memory_snapshot),
+            ])
 
         typer.echo(f"Tracing PP stage {stage} (rank {rank}) ...")
         env = os.environ.copy()
@@ -1122,6 +1128,16 @@ def generate_trace(
         except subprocess.CalledProcessError as exc:
             typer.echo(f"Error: Megatron exited with code {exc.returncode} for PP stage {stage}", err=True)
             raise typer.Exit(1)
+
+    if memory_snapshot is not None:
+        typer.echo(f"\nMemory snapshot: {memory_snapshot}")
+        visualize_cmd = (
+            'python -c "import pickle, torch; '
+            f"d=pickle.load(open('{memory_snapshot}','rb')); "
+            'torch.cuda.memory._record_memory_history(d)"'
+        )
+        typer.echo(f"  Visualize with:  {visualize_cmd}")
+        typer.echo("  Or load in https://pytorch.org/memory_viz")
 
     trace_files = sorted(output_dir.glob("trace_pp_stage_*.json"))
     typer.echo(f"\nTrace generation complete. {len(trace_files)} file(s) in {output_dir}:")
