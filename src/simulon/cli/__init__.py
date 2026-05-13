@@ -63,7 +63,7 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
     vocab_size = tokenizer.vocab_size
 
     ds = load_dataset("allenai/c4", "en", split="train", streaming=True)
-    num_docs = 500
+    num_docs = 1000
     token_ids: list[numpy.ndarray] = []
     lengths: list[int] = []
     for i, example in enumerate(ds):
@@ -76,7 +76,7 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
         token_ids.append(arr)
         lengths.append(len(arr))
 
-    if len(lengths) < 200:
+    if len(lengths) < 400:
         raise typer.BadParameter(
             f"Only got {len(lengths)} valid C4 documents; "
             "the dataset stream may have been empty or truncated."
