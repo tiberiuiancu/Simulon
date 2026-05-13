@@ -8,7 +8,7 @@ from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import ExecutionDAG
 from simulon.config.dc import DatacenterConfig, GPUSpec, NICSpec, SwitchSpec
 from simulon.config.resolve import resolve_node_spec, resolve_scale_out
-from simulon.config.workload import MegatronWorkload
+from simulon.config.workload import MegatronDeprecatedWorkload
 from simulon.profiling.lookup import is_kernel_oom, lookup_kernel_time
 
 logger = logging.getLogger(__name__)
@@ -169,7 +169,7 @@ def _handle_missing(
 
 def populate_dag(
     dag: ExecutionDAG,
-    workload: MegatronWorkload,
+    workload: MegatronDeprecatedWorkload,
     gpu_spec: GPUSpec,
     ignore_oom: bool = False,
     ignore_missing: bool = False,
@@ -285,7 +285,7 @@ def populate_network(
     return dag
 
 
-def _model_hidden_size(workload: MegatronWorkload) -> int | None:
+def _model_hidden_size(workload: MegatronDeprecatedWorkload) -> int | None:
     from simulon.profiling.models import _resolve_model
 
     model = _resolve_model(workload.model)

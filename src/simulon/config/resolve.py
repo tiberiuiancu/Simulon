@@ -39,7 +39,7 @@ def _load_profile_data(template_path: Path) -> dict:
     return {}
 
 
-def load_gpu_template(name: str) -> GPUSpec:
+def load_gpu_template(name: str, include_profile: bool = True) -> GPUSpec:
     """Load a GPU spec from a named YAML template file.
 
     Searches templates/gpu/<name>.yaml (case-insensitive fallback).
@@ -62,7 +62,8 @@ def load_gpu_template(name: str) -> GPUSpec:
             )
     with open(template_path) as f:
         data = yaml.safe_load(f)
-    data.update(_load_profile_data(template_path))
+    if include_profile:
+        data.update(_load_profile_data(template_path))
     return GPUSpec.model_validate(data)
 
 
@@ -128,7 +129,7 @@ def resolve_node_spec(dc: DatacenterConfig) -> NodeSpec:
     return node
 
 
-def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
+def resolve_gpu_spec(dc: DatacenterConfig, include_profile: bool = True) -> GPUSpec:
     """Return the effective GPUSpec for a datacenter config.
 
     Handles three forms:
@@ -140,9 +141,9 @@ def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
     node = resolve_node_spec(dc)
     gpu = node.gpu
     if isinstance(gpu, str):
-        return load_gpu_template(gpu)
+        return load_gpu_template(gpu, include_profile=include_profile)
     if isinstance(gpu, GPUSpec) and gpu.from_:
-        base = load_gpu_template(gpu.from_)
+        base = load_gpu_template(gpu.from_, include_profile=include_profile)
         # Merge override fields into the base dict and re-validate so that nested
         # objects (cost, power_model, …) are properly coerced by Pydantic, not stored
         # as raw dicts from model_dump().

@@ -9,7 +9,7 @@ by injecting profiling data.
 
 ## What it does
 
-1. **Execution DAG extraction** — parses a `MegatronWorkload` config (model
+1. **Execution DAG extraction** — parses a `MegatronDeprecatedWorkload` config (model
    architecture + parallelism strategy) and produces an `ExecutionDAG`: a dependency
    graph of `ComputeNode` (kernel ops) and `CommNode` (P2P flows) records representing
    one training iteration across all GPUs, including 1F1B pipeline scheduling.
@@ -23,7 +23,12 @@ by injecting profiling data.
    This data is injected into a DAG replay to produce GPU-specific timing estimates.
 
 4. **Chrome/Perfetto trace export** — `simulon simulate` replays the DAG and writes a
-   Chrome trace JSON readable in [Perfetto](https://ui.perfetto.dev) or `chrome://tracing`.
+    Chrome trace JSON readable in [Perfetto](https://ui.perfetto.dev) or `chrome://tracing`.
+
+5. **Trace-driven DAG extraction** — `MegatronWorkload` reads real GPU execution traces
+    emitted by the instrumented Megatron-LM fork and builds the DAG from observed compute
+    timings and collective operations instead of analytical layer expansion. The tracer
+    infers trace file paths from the datacenter's `traces_dir` if one is configured.
 
 ---
 
@@ -35,7 +40,7 @@ simulon/
 │   ├── config/
 │   │   ├── common.py        # DType, Cost
 │   │   ├── dc.py            # DatacenterConfig, GPUSpec, KernelRun, ...
-│   │   ├── workload.py      # MegatronWorkload, InferenceWorkload, LLMSpec
+│   │   ├── workload.py      # MegatronDeprecatedWorkload, MegatronWorkload, InferenceWorkload, LLMSpec
 │   │   └── scenario.py      # ScenarioConfig (datacenter + workload + collective)
 │   ├── collective/
 │   │   ├── common.py        # P2PFlow dataclass
@@ -46,23 +51,27 @@ simulon/
 │   │   └── decompose.py     # decompose_collective() top-level dispatcher
 │   ├── backend/
 │   │   ├── base.py          # Backend ABC
-│   │   ├── analytical.py    # AnalyticalBackend — thin wrapper around MegatronDAGTracer
+│   │   ├── analytical.py    # AnalyticalBackend — dispatches MegatronDeprecatedDAGTracer / MegatronDagTracer
 │   │   └── dag/
 │   │       ├── nodes.py          # ComputeNode, CommNode, DAGEdge, ExecutionDAG
 │   │       ├── pipeline.py       # PipelineScheduler ABC, OneFOneBScheduler, make_scheduler
 │   │       ├── layer_expander.py # per-sublayer kernel + comm stub expansion
 │   │       ├── tracer.py         # DAGTracer (ABC) + DAGTracerConfig
-│   │       ├── megatron_tracer.py # MegatronDAGTracer — assembles full multi-GPU DAG
+│   │       ├── megatron_tracer.py # MegatronDeprecatedDAGTracer — assembles full multi-GPU DAG
+│   │       ├── trace_tracer.py     # MegatronDagTracer — builds DAG from real GPU execution traces
+│   │       ├── trace_parser.py     # TraceFileParser — validates and loads trace JSON files
 │   │       ├── populate.py       # injects GPU kernel timing into DAG nodes
 │   │       ├── replayer.py       # critical-path replay → SimulationResult
 │   │       └── chrome_trace.py   # Chrome/Perfetto trace export
 │   ├── workload/
 │   │   ├── trace.py         # WorkloadTrace, CommOp, ComputeOp (legacy types)
-│   │   └── megatron.py      # generate_megatron_trace() — legacy stub (use MegatronDAGTracer)
+│   │   └── megatron.py      # generate_megatron_trace() — legacy stub (use MegatronDeprecatedDAGTracer)
 │   ├── profiling/
 │   │   └── kernels.py       # benchmark_kernels() — CUDA event timing
 │   └── cli/
 │       └── __init__.py      # `simulon simulate`, `simulon profile gpu`
+│   └── trace/
+│       └── __init__.py      # `simulon trace generate`
 ├── templates/
 │   ├── gpu/                 # GPU hardware profiles (YAML)
 │   ├── cpu/                 # CPU profiles
@@ -75,7 +84,7 @@ simulon/
 └── tests/
     ├── test_collective.py   # Collective decomposition unit tests
     ├── test_dag.py          # DAG nodes, pipeline scheduler, LayerExpander
-    ├── test_e2e.py          # MegatronDAGTracer + AnalyticalBackend integration
+    ├── test_e2e.py          # MegatronDeprecatedDAGTracer + MegatronDagTracer + AnalyticalBackend integration
     ├── test_moe.py          # MoE/EP layer expansion and DAG tracing
     ├── test_step.py         # DP gradient sync step phase
     ├── test_legacy_compare.py # Parity record: tracer vs legacy workload model
@@ -127,7 +136,7 @@ collective:
   num_channels: 1
 
 workload:
-  framework: megatron
+  framework: megatron-deprecated
   model:
     name: llama-7b
     hidden_size: 4096
@@ -166,6 +175,28 @@ Add `-v` to also print per-GPU timing breakdown:
 simulon simulate scenario.yaml -v
 ```
 
+### Flat-config workload (optional)
+
+Use the `megatron` framework with a flat `config` dictionary instead of nested blocks:
+
+```yaml
+workload:
+  framework: megatron
+  config:
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 4
+    micro-batch-size: 2
+    global-batch-size: 1024
+    seq-length: 4096
+    num-layers: 40
+    hidden-size: 5120
+    num-attention-heads: 40
+    ffn-hidden-size: 13824
+    vocab-size: 32000
+    num_gpus: 64
+    dtype: bf16
+```
+
 ### 3. Use the Python API directly
 
 ```python
@@ -198,6 +229,9 @@ simulon profile gpu \
 
 Run with different `--tp`, `--seq-len`, or `--hidden-size` values to build a richer
 profile. The command appends new `kernel_runs` entries to the existing file.
+
+`simulon trace generate` — run the instrumented Megatron-LM fork with fake process groups
+to generate per-PP-stage execution traces.
 
 ---
 

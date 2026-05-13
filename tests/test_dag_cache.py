@@ -9,17 +9,17 @@ import pytest
 from simulon.backend.dag import cache as dag_cache
 from simulon.backend.dag.nodes import ExecutionDAG
 from simulon.backend.dag.tracer import DAGTracerConfig
-from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
-from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
+from simulon.backend.dag.megatron_tracer import MegatronDeprecatedDAGTracer
+from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronDeprecatedWorkload
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _small_workload(tp: int = 1, pp: int = 1) -> MegatronWorkload:
-    return MegatronWorkload(
-        framework="megatron",
+def _small_workload(tp: int = 1, pp: int = 1) -> MegatronDeprecatedWorkload:
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="tiny",
             hidden_size=64,
@@ -38,11 +38,11 @@ def _small_workload(tp: int = 1, pp: int = 1) -> MegatronWorkload:
     )
 
 
-def _tracer(cache_dir: Path) -> MegatronDAGTracer:
-    return MegatronDAGTracer(DAGTracerConfig(cache_dir=cache_dir))
+def _tracer(cache_dir: Path) -> MegatronDeprecatedDAGTracer:
+    return MegatronDeprecatedDAGTracer(DAGTracerConfig(cache_dir=cache_dir))
 
 
-def _trace(workload: MegatronWorkload, cache_dir: Path) -> ExecutionDAG:
+def _trace(workload: MegatronDeprecatedWorkload, cache_dir: Path) -> ExecutionDAG:
     # datacenter is unused by trace(), so pass None
     return _tracer(cache_dir).trace(workload, None)  # type: ignore[arg-type]
 
@@ -164,7 +164,7 @@ def test_same_workload_reuses_single_cache_file(tmp_path):
 def test_cache_disabled_when_none(tmp_path):
     """cache_dir=None → no files written, trace still works."""
     workload = _small_workload()
-    tracer = MegatronDAGTracer(DAGTracerConfig(cache_dir=None))
+    tracer = MegatronDeprecatedDAGTracer(DAGTracerConfig(cache_dir=None))
     dag = tracer.trace(workload, None)  # type: ignore[arg-type]
     assert len(list(tmp_path.glob("*.npz"))) == 0
     assert len(dag.compute_nodes) > 0
@@ -192,8 +192,8 @@ def test_cache_hit_is_faster(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def _compact_trace(workload: MegatronWorkload, cache_dir: Path) -> ExecutionDAG:
-    tracer = MegatronDAGTracer(DAGTracerConfig(compact=True, cache_dir=cache_dir))
+def _compact_trace(workload: MegatronDeprecatedWorkload, cache_dir: Path) -> ExecutionDAG:
+    tracer = MegatronDeprecatedDAGTracer(DAGTracerConfig(compact=True, cache_dir=cache_dir))
     return tracer.trace(workload, None)  # type: ignore[arg-type]
 
 
@@ -256,14 +256,14 @@ def test_string_and_inline_model_share_cache(tmp_path):
     inline_spec = LLMSpec.model_validate(spec_data)
 
     num_gpus = 4
-    w_str = MegatronWorkload(
-        framework="megatron",
+    w_str = MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model="llama-7b",
         parallelism=MegatronParallelism(tp=2, pp=2),
         training=MegatronTraining(num_gpus=num_gpus, global_batch_size=num_gpus, micro_batch_size=1, sequence_length=128),
     )
-    w_inline = MegatronWorkload(
-        framework="megatron",
+    w_inline = MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=inline_spec,
         parallelism=MegatronParallelism(tp=2, pp=2),
         training=MegatronTraining(num_gpus=num_gpus, global_batch_size=num_gpus, micro_batch_size=1, sequence_length=128),

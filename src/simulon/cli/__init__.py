@@ -1,8 +1,14 @@
 import json
+import os
+import struct
 from itertools import product
 from pathlib import Path
 from typing import Optional
 
+import subprocess
+import sys
+
+import numpy
 import typer
 import yaml
 
@@ -23,9 +29,91 @@ def _dump_profile(data: dict, f) -> None:
             f.write(f"  - {yaml.dump(run, default_flow_style=True, sort_keys=False).strip()}\n")
 
 
+def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
+    prefix = Path(data_path)
+    bin_path = prefix.with_suffix(".bin")
+    idx_path = prefix.with_suffix(".idx")
+    if bin_path.exists() and idx_path.exists():
+        with open(idx_path, "rb") as f:
+            header = f.read(9)
+            if header == b"MMIDIDX\x00\x00":
+                version = struct.unpack("<Q", f.read(8))[0]
+                if version == 1:
+                    f.read(1)
+                    seq_count = struct.unpack("<Q", f.read(8))[0]
+                    if seq_count >= 400:
+                        return
+        typer.echo("Existing C4 dataset is outdated, regenerating...")
+        bin_path.unlink(missing_ok=True)
+        idx_path.unlink(missing_ok=True)
+
+    try:
+        from datasets import load_dataset
+        from transformers import AutoTokenizer
+    except ImportError as exc:
+        raise typer.BadParameter(
+            "C4 dataset requires 'transformers' and 'datasets' libraries. "
+            "Install them with: uv pip install transformers datasets"
+        ) from exc
+
+    typer.echo("Downloading C4/en from HuggingFace and tokenizing with Llama-3-8B tokenizer ...")
+    prefix.parent.mkdir(parents=True, exist_ok=True)
+
+    tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B")
+    vocab_size = tokenizer.vocab_size
+
+    ds = load_dataset("allenai/c4", "en", split="train", streaming=True)
+    num_docs = 1000
+    token_ids: list[numpy.ndarray] = []
+    lengths: list[int] = []
+    for i, example in enumerate(ds):
+        if i >= num_docs:
+            break
+        tokens = tokenizer.encode(example["text"], add_special_tokens=False)
+        if len(tokens) < 10:
+            continue
+        arr = numpy.array(tokens, dtype=numpy.int32)
+        token_ids.append(arr)
+        lengths.append(len(arr))
+
+    if len(lengths) < 400:
+        raise typer.BadParameter(
+            f"Only got {len(lengths)} valid C4 documents; "
+            "the dataset stream may have been empty or truncated."
+        )
+
+    with open(bin_path, "wb") as f:
+        for arr in token_ids:
+            f.write(arr.tobytes(order="C"))
+
+    pointers: list[int] = []
+    curr = numpy.int64(0)
+    itemsize = numpy.dtype(numpy.int32).itemsize
+    for length in lengths:
+        pointers.append(curr.item())
+        curr += length * itemsize
+
+    document_indices = list(range(len(lengths) + 1))
+
+    with open(idx_path, "wb") as f:
+        f.write(b"MMIDIDX\x00\x00")
+        f.write(struct.pack("<Q", 1))
+        f.write(struct.pack("<B", 4))
+        f.write(struct.pack("<Q", len(lengths)))
+        f.write(struct.pack("<Q", len(document_indices)))
+        f.write(numpy.array(lengths, dtype=numpy.int32).tobytes(order="C"))
+        f.write(numpy.array(pointers, dtype=numpy.int64).tobytes(order="C"))
+        f.write(numpy.array(document_indices, dtype=numpy.int64).tobytes(order="C"))
+
+    typer.echo(f"Dataset ready: {bin_path}, {idx_path} ({len(lengths)} docs, vocab={vocab_size})")
+
+
 app = typer.Typer(name="simulon", help="AI cluster simulator")
 profile_app = typer.Typer(help="Profile local hardware and save templates.")
 app.add_typer(profile_app, name="profile")
+
+trace_app = typer.Typer(help="Trace generation commands.")
+app.add_typer(trace_app, name="trace")
 
 from simulon.cli.install import app as install_app  # noqa: E402
 app.add_typer(install_app, name="install", help="Install third-party components (apex, deepgemm, m4).")
@@ -57,7 +145,7 @@ def simulate(
     from simulon.backend.analytical import AnalyticalBackend
     from simulon.backend.dag.chrome_trace import to_chrome_trace
     from simulon.config.scenario import ScenarioConfig
-    from simulon.config.workload import MegatronWorkload
+    from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
     from simulon.tracking import get_trackers
     from simulon.tracking.params import extract_metrics, extract_params
 
@@ -75,12 +163,23 @@ def simulate(
         for tracker in trackers:
             tracker.start_run()
 
+        from simulon.config.resolve import resolve_gpu_spec
+        try:
+            gpu_spec = resolve_gpu_spec(sc.datacenter, include_profile=False)
+        except Exception:
+            gpu_spec = None
+
         backend = AnalyticalBackend()
         dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
 
         if trackers:
             params = extract_params(sc)
             metrics = extract_metrics(result)
+
+            if isinstance(sc.workload, (MegatronDeprecatedWorkload, MegatronWorkload)):
+                derived = _compute_training_metrics(result, sc.workload, gpu_spec)
+                metrics.update({k: v for k, v in derived.items() if v is not None})
+
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".yaml", prefix="scenario_", delete=False
             ) as tmp:
@@ -95,15 +194,15 @@ def simulate(
                 scenario_artifact_path.unlink(missing_ok=True)
 
         if summary:
-            from simulon.config.workload import CollectiveWorkload, MegatronWorkload as _MW
+            from simulon.config.workload import CollectiveWorkload, MegatronDeprecatedWorkload as _MW
             if isinstance(sc.workload, CollectiveWorkload):
                 _print_collective_summary(sc.workload, result, sc.datacenter)
             elif isinstance(sc.workload, _MW):
-                _print_summary(result, sc.workload)
+                _print_summary(result, sc.workload, gpu_spec)
             else:
-                _print_summary(result)
+                _print_summary(result, sc.workload, gpu_spec)
 
-        if isinstance(sc.workload, MegatronWorkload):
+        if isinstance(sc.workload, MegatronDeprecatedWorkload):
             energy_result = None
             if energy or cost:
                 from simulon.energy import compute_energy
@@ -116,19 +215,29 @@ def simulate(
                 cost_result = compute_cost(sc, energy_result)
                 _print_cost_summary(cost_result)
 
-            if chrome is not None:
+        if chrome is not None:
+            if isinstance(sc.workload, MegatronDeprecatedWorkload):
                 p = sc.workload.parallelism
                 t = sc.workload.training
                 tp = p.tp
                 pp_val = p.pp
                 ep = p.ep
                 dp = p.dp if p.dp is not None else t.num_gpus // (tp * pp_val * ep)
-                trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
-                with open(chrome, "w") as f:
-                    json.dump(trace_dict, f)
-                typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
-                for tracker in trackers:
-                    tracker.log_artifact(chrome)
+            elif isinstance(sc.workload, MegatronWorkload):
+                cfg = sc.workload.config
+                tp = int(cfg.get("tensor-model-parallel-size", 1))
+                pp_val = int(cfg.get("pipeline-model-parallel-size", 1))
+                ep = int(cfg.get("expert-model-parallel-size", 1))
+                num_gpus = int(cfg.get("num_gpus", tp * pp_val * ep))
+                dp = max(1, num_gpus // (tp * pp_val * ep))
+            else:
+                tp = pp_val = ep = dp = 1
+            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+            with open(chrome, "w") as f:
+                json.dump(trace_dict, f)
+            typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
+            for tracker in trackers:
+                tracker.log_artifact(chrome)
 
         if dag_out is not None:
             with open(dag_out, "w") as f:
@@ -149,12 +258,70 @@ def simulate(
             tracker.end_run()
 
 
-def _print_summary(result, workload=None) -> None:
+def _compute_training_metrics(result, workload, gpu_spec=None):
+    """Compute throughput, TFLOPs, and MFU from a simulation result."""
+    try:
+        total = result.total_time_ms
+        n_gpus = len(result.per_gpu_times_ms)
+        if total <= 0 or n_gpus == 0:
+            return {}
+
+        from simulon.config.workload import MegatronDeprecatedWorkload, MegatronWorkload
+        from simulon.profiling.models import (
+            _model_spec_from_megatron_config,
+            _resolve_model,
+            get_gflops_per_train_token,
+        )
+
+        if isinstance(workload, MegatronDeprecatedWorkload):
+            t = workload.training
+            tokens_per_iter = t.global_batch_size * t.sequence_length
+            model = _resolve_model(workload.model)
+        elif isinstance(workload, MegatronWorkload):
+            cfg = workload.config
+            tokens_per_iter = cfg.get("global-batch-size", 0) * cfg.get("seq-length", 0)
+            model = _model_spec_from_megatron_config(cfg)
+        else:
+            return {}
+
+        iter_time_s = total / 1000.0
+        if iter_time_s <= 0:
+            return {}
+        throughput_tps = tokens_per_iter / iter_time_s
+        per_gpu_tps = throughput_tps / n_gpus
+
+        gflops_per_token = None
+        if isinstance(workload, MegatronWorkload) and result.total_flops is not None:
+            if tokens_per_iter > 0:
+                gflops_per_token = result.total_flops / tokens_per_iter / 1e9
+        else:
+            gflops_per_token = get_gflops_per_train_token(model)
+
+        metrics: dict[str, float] = {
+            "throughput_tps": throughput_tps,
+            "per_gpu_tps": per_gpu_tps,
+        }
+        if gflops_per_token is not None:
+            tflops = throughput_tps * gflops_per_token / 1e3
+            per_gpu_tflops = tflops / n_gpus
+            metrics["gflops_per_token"] = gflops_per_token
+            metrics["tflops"] = tflops
+            metrics["per_gpu_tflops"] = per_gpu_tflops
+
+            if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
+                metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
+        return metrics
+    except Exception:
+        return {}
+
+
+def _print_summary(result, workload=None, gpu_spec=None) -> None:
     """Print a human-readable simulation summary to stdout.
 
     Args:
         result: SimulationResult from AnalyticalBackend.simulate().
-        workload: Optional MegatronWorkload for throughput metrics.
+        workload: Optional workload for throughput metrics.
+        gpu_spec: Optional resolved GPUSpec for GPU peak TFLOPs (needed for MFU).
     """
 
     total = result.total_time_ms
@@ -177,19 +344,20 @@ def _print_summary(result, workload=None) -> None:
     typer.echo("")
 
     if workload is not None and total > 0:
-        from simulon.profiling.models import _resolve_model
-        t = workload.training
-        tokens_per_iter = t.global_batch_size * t.sequence_length
-        iter_time_s = total / 1000.0
-        throughput_tps = tokens_per_iter / iter_time_s
-        per_gpu_tps = throughput_tps / n_gpus
-        typer.echo(f"Throughput:           {per_gpu_tps:,.1f} tokens/s ({throughput_tps:,.1f} tokens/s)")
-        resolved = _resolve_model(workload.model)
-        if resolved.gflops_per_train_token is not None:
-            tflops = throughput_tps * resolved.gflops_per_train_token / 1e3
-            per_gpu_tflops = tflops / n_gpus
-            typer.echo(f"                      {per_gpu_tflops:.2f} TFLOPs/s ({tflops:.2f} TFLOPs/s)")
-        typer.echo("")
+        metrics = _compute_training_metrics(result, workload, gpu_spec)
+        if metrics:
+            typer.echo(
+                f"Throughput:           {metrics['per_gpu_tps']:,.1f} tokens/s "
+                f"({metrics['throughput_tps']:,.1f} tokens/s)"
+            )
+            if metrics.get("per_gpu_tflops") is not None:
+                typer.echo(
+                    f"                      {metrics['per_gpu_tflops']:.2f} TFLOPs/s "
+                    f"({metrics['tflops']:.2f} TFLOPs/s)"
+                )
+            if metrics.get("mfu_pct") is not None:
+                typer.echo(f"  MFU:                {metrics['mfu_pct']:.1f}%")
+            typer.echo("")
 
 
 def _print_collective_summary(workload, result, datacenter) -> None:
@@ -753,3 +921,225 @@ def profile_node(
         typer.echo(f"Written to {out_path}")
         NodeSpec.model_validate(yaml.safe_load(out_path.read_text()))
         typer.echo("Validated successfully.")
+
+
+# ---------------------------------------------------------------------------
+# simulon trace generate
+# ---------------------------------------------------------------------------
+
+_MEGATRON_ENTRYPOINT = Path(__file__).parents[3] / "vendor" / "Megatron-LM-traced" / "pretrain_gpt.py"
+
+
+@trace_app.command("generate")
+def generate_trace(
+    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    output_dir: Path = typer.Option(Path("./traces"), "--output-dir", "-o", help="Directory to write trace files"),
+    stages: Optional[list[int]] = typer.Option(None, "--stage", help="Specific PP stages to trace (default: first, middle, last)"),
+    all_stages: bool = typer.Option(False, "--all-stages", help="Trace all pipeline stages"),
+    mock_data: Optional[bool] = typer.Option(None, "--mock-data/--no-mock-data", help="Use mock synthetic data (default: from config or True)"),
+    data_path: Optional[str] = typer.Option(None, "--data-path", help="Path to tokenized dataset directory (required for real data)"),
+    tokenizer_type: Optional[str] = typer.Option(None, "--tokenizer-type", help="Tokenizer type for real data (e.g., GPT2BPETokenizer, HuggingFaceTokenizer)"),
+    tokenizer_model: Optional[str] = typer.Option(None, "--tokenizer-model", help="Tokenizer model path (required for HuggingFaceTokenizer, SentencePiece, etc.)"),
+    vocab_file: Optional[str] = typer.Option(None, "--vocab-file", help="Vocab file path (required for GPT2BPETokenizer)"),
+    merge_file: Optional[str] = typer.Option(None, "--merge-file", help="Merge file path (required for GPT2BPETokenizer)"),
+    dataset: Optional[str] = typer.Option(None, "--dataset", help="Preset dataset (mock) or custom data path"),
+    memory_snapshot: Optional[Path] = typer.Option(None, "--memory-snapshot", help="Dump a PyTorch CUDA memory snapshot to the given path (for OOM debugging)"),
+):
+    """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
+    from simulon.config.scenario import ScenarioConfig
+    from simulon.config.workload import LLMSpec, MegatronDeprecatedWorkload, MegatronWorkload
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    if not isinstance(sc.workload, (MegatronWorkload, MegatronDeprecatedWorkload)):
+        raise typer.BadParameter("Scenario workload must be a Megatron workload")
+
+    derived_args: dict[str, str | int | bool]
+    explicitly_set: set[str] = set()
+
+    def _set_arg(flag: str, value: str | int | bool) -> None:
+        derived_args[flag] = value
+        explicitly_set.add(flag)
+
+    if isinstance(sc.workload, MegatronDeprecatedWorkload):
+        workload = sc.workload
+        p = workload.parallelism
+        t = workload.training
+
+        derived_args = {
+            "--tensor-model-parallel-size": p.tp,
+            "--pipeline-model-parallel-size": p.pp,
+            "--micro-batch-size": t.micro_batch_size,
+            "--global-batch-size": t.global_batch_size,
+            "--seq-length": t.sequence_length,
+        }
+        explicitly_set.update(derived_args.keys())
+        if p.ep > 1:
+            _set_arg("--expert-model-parallel-size", p.ep)
+
+        model = workload.model
+        if isinstance(model, LLMSpec):
+            if model.num_layers is not None:
+                _set_arg("--num-layers", model.num_layers)
+            if model.hidden_size is not None:
+                _set_arg("--hidden-size", model.hidden_size)
+            if model.num_heads is not None:
+                _set_arg("--num-attention-heads", model.num_heads)
+            if model.ffn_hidden_size is not None:
+                _set_arg("--ffn-hidden-size", model.ffn_hidden_size)
+
+        if workload.megatron_args:
+            for key, value in workload.megatron_args.items():
+                flag = f"--{key}"
+                if isinstance(value, bool):
+                    if value:
+                        _set_arg(flag, True)
+                    elif flag in derived_args:
+                        del derived_args[flag]
+                        explicitly_set.add(flag)
+                else:
+                    _set_arg(flag, value)
+
+        pp = p.pp
+        tp = p.tp
+        world_size = t.num_gpus
+    else:
+        workload = sc.workload
+        cfg = workload.config
+        derived_args = {}
+        for key in ("tensor-model-parallel-size", "pipeline-model-parallel-size",
+                    "micro-batch-size", "global-batch-size", "seq-length",
+                    "expert-model-parallel-size", "num-layers", "hidden-size",
+                    "num-attention-heads", "ffn-hidden-size"):
+            if key in cfg:
+                _set_arg(f"--{key}", cfg[key])
+        if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
+            _set_arg("--max-position-embeddings", derived_args["--seq-length"])
+        skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
+        for key, value in cfg.items():
+            if key == "distributed-optimizer":
+                flag = "--use-distributed-optimizer"
+            else:
+                flag = f"--{key}"
+            if flag not in derived_args and key not in skip:
+                if isinstance(value, bool):
+                    _set_arg(flag, value)
+                else:
+                    _set_arg(flag, value)
+
+        pp = int(cfg.get("pipeline-model-parallel-size", 1))
+        tp = int(cfg.get("tensor-model-parallel-size", 1))
+        world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
+
+    _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
+        "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
+        "c4": {"--mock-data": False, "--data-path": "./data/c4_en_llama3", "--tokenizer-type": "HuggingFaceTokenizer", "--tokenizer-model": "NousResearch/Meta-Llama-3-8B", "--vocab-size": 128256, "--split": "1000,0,0"},
+    }
+    if dataset is not None:
+        if dataset in _DATASET_PRESETS:
+            for flag, value in _DATASET_PRESETS[dataset].items():
+                _set_arg(flag, value)
+        else:
+            _set_arg("--mock-data", False)
+            _set_arg("--data-path", dataset)
+    if mock_data is not None:
+        _set_arg("--mock-data", mock_data)
+    if data_path is not None:
+        _set_arg("--data-path", data_path)
+    if tokenizer_type is not None:
+        _set_arg("--tokenizer-type", tokenizer_type)
+    if tokenizer_model is not None:
+        _set_arg("--tokenizer-model", tokenizer_model)
+    if vocab_file is not None:
+        _set_arg("--vocab-file", vocab_file)
+    if merge_file is not None:
+        _set_arg("--merge-file", merge_file)
+
+    if dataset == "c4" or (data_path is not None and "c4" in data_path):
+        seq_len = derived_args.get("--seq-length", 8192)
+        _ensure_c4_dataset(str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len))
+
+    _TRACE_DEFAULTS = {
+        "--train-iters": 6,  # 5 warmup + 1 traced iteration
+        "--lr": 0.001,
+        "--min-lr": 0.0,
+        "--eval-interval": 1000000,
+        "--eval-iters": 0,
+        "--save-interval": 1000000,
+        "--log-interval": 1,
+        "--mock-data": True,
+        "--no-masked-softmax-fusion": True,
+        "--no-bias-swiglu-fusion": True,
+        "--tokenizer-type": "NullTokenizer",
+        "--vocab-size": 32000,
+    }
+    for flag, value in _TRACE_DEFAULTS.items():
+        if flag not in explicitly_set:
+            derived_args[flag] = value
+    if stages is not None:
+        stages_to_trace = stages
+    elif all_stages:
+        stages_to_trace = list(range(pp))
+    else:
+        if pp == 1:
+            stages_to_trace = [0]
+        elif pp == 2:
+            stages_to_trace = [0, pp - 1]
+        else:
+            stages_to_trace = [0, pp // 2, pp - 1]
+
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for stage in stages_to_trace:
+        ranks_per_stage = world_size // pp if world_size and pp else tp
+        rank = stage * ranks_per_stage
+        cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
+        for flag, value in derived_args.items():
+            if value is True:
+                cmd.append(flag)
+            elif value is False:
+                continue
+            else:
+                cmd.append(flag)
+                cmd.append(str(value))
+        cmd.extend([
+            "--fake-process-group",
+            "--rank", str(rank),
+            "--trace-dir", str(output_dir),
+        ])
+        if memory_snapshot is not None:
+            cmd.extend([
+                "--record-memory-history",
+                "--memory-snapshot-path", str(memory_snapshot),
+            ])
+
+        typer.echo(f"Tracing PP stage {stage} (rank {rank}) ...")
+        env = os.environ.copy()
+        if world_size is not None:
+            env["WORLD_SIZE"] = str(world_size)
+        try:
+            subprocess.run(cmd, check=True, env=env)
+        except FileNotFoundError as exc:
+            typer.echo(f"Error: could not run Megatron entry point: {exc}", err=True)
+            raise typer.Exit(1)
+        except subprocess.CalledProcessError as exc:
+            typer.echo(f"Error: Megatron exited with code {exc.returncode} for PP stage {stage}", err=True)
+            raise typer.Exit(1)
+
+    if memory_snapshot is not None:
+        typer.echo(f"\nMemory snapshot: {memory_snapshot}")
+        visualize_cmd = (
+            'python -c "import pickle, torch; '
+            f"d=pickle.load(open('{memory_snapshot}','rb')); "
+            'torch.cuda.memory._record_memory_history(d)"'
+        )
+        typer.echo(f"  Visualize with:  {visualize_cmd}")
+        typer.echo("  Or load in https://pytorch.org/memory_viz")
+
+    trace_files = sorted(output_dir.glob("trace_pp_stage_*.json"))
+    typer.echo(f"\nTrace generation complete. {len(trace_files)} file(s) in {output_dir}:")
+    for tf in trace_files:
+        typer.echo(f"  {tf.name}")

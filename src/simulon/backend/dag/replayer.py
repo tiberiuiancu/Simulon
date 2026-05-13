@@ -52,6 +52,7 @@ class SimulationResult:
 
     # --- raw per-GPU ---
     per_gpu_times_ms: dict[int, float] = field(default_factory=dict)
+    total_flops: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------

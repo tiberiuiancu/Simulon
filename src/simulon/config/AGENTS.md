@@ -12,7 +12,7 @@ Pydantic v2 models for all configuration: datacenter hardware, workload specific
 config/
 ├── common.py       # DType enum, Cost dataclass, PowerModel (TDP/idle/load curves)
 ├── dc.py           # DatacenterConfig, GPUSpec, KernelRun, NodeSpec, NICSpec, SwitchSpec, ClusterConfig
-├── workload.py     # MegatronWorkload, CollectiveWorkload, InferenceWorkload, LLMSpec, Parallelism, Training
+├── workload.py     # MegatronDeprecatedWorkload, MegatronWorkload, CollectiveWorkload, InferenceWorkload, LLMSpec, Parallelism, Training
 ├── scenario.py     # ScenarioConfig — top-level container (datacenter + workload + collective)
 ├── nccl_profile.py # NCCLProfile, NCCLEntry — parsed nccl-tests JSON bandwidth data
 ├── resolve.py      # Factory functions: resolve_gpu_spec, resolve_node_spec, resolve_nccl_profile, resolve_scale_out
@@ -34,7 +34,7 @@ config/
 ## CONVENTIONS
 
 - **All models inherit `BaseModel`** — Pydantic v2 with `model_validate` / `model_dump`
-- **Discriminated unions** — `ScenarioConfig.workload` uses `framework` field to dispatch: `megatron` → `MegatronWorkload`, `collective` → `CollectiveWorkload`
+- **Discriminated unions** — `ScenarioConfig.workload` uses `framework` field to dispatch: `megatron-deprecated` → `MegatronDeprecatedWorkload`, `megatron` → `MegatronWorkload`, `collective` → `CollectiveWorkload`
 - **Template resolution is lazy** — `resolve.py` factory functions load YAML templates on demand, not at config parse time
 - **Speed/latency as strings** — `"400Gbps"`, `"0.005ms"` parsed by `populate.py:_parse_speed/_parse_latency`
 - **`kernel_runs`** — `GPUSpec.kernel_runs: list[KernelRun]` stores profiled timing data. Each run = (kernel, params_dict, duration_ms)

@@ -1,0 +1,111 @@
+# GPT-OSS-20B (MoE) training scenario — single-node 4-GPU flat config
+#
+# Parallelism: TP=1, PP=1, EP=4, DP=1
+# Total GPUs:  1 × 1 × 4 × 1 = 4  (1 node × 4 GPUs/node)
+#
+# This uses the trace-driven path (framework: megatron) with a flat "config"
+# dict that mirrors Megatron-LM CLI flags.
+
+datacenter:
+  datacenter:
+    name: h100-4gpu
+    pue: 1.3
+    electricity_cost_per_kwh: 0.10
+    datacenter_lifetime_years: 5
+    idle_fraction: 0.4
+    traces_dir: ./traces
+  cluster:
+    num_nodes: 1
+  node:
+    gpus_per_node: 4
+    gpu:
+      from: h100
+      cost:
+        value: 25000
+        min: 20000
+        max: 32000
+  network:
+    scale_up:
+      switch:
+        port_speed: 3600Gbps
+        latency: 0.000025ms
+        power_model:
+          tdp_w: 110
+        cost: 3000
+    scale_out:
+      nic:
+        speed: 100Gbps
+        latency: 0.005ms
+        power_model:
+          tdp_w: 25
+        cost: 2000
+      topology:
+        type: fat_tree
+        params:
+          k: 8
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workload:
+  framework: megatron
+  config:
+    # Parallelism
+    tensor-model-parallel-size: 1
+    pipeline-model-parallel-size: 1
+    expert-model-parallel-size: 4
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+
+    # Model architecture
+    num-layers: 24
+    hidden-size: 2880
+    ffn-hidden-size: 2880
+    num-attention-heads: 64
+    num-query-groups: 8
+    vocab-size: 128256
+    swiglu: true
+
+    # Position / attention
+    position-embedding-type: rope
+    rotary-base: 150000
+    group-query-attention: true
+    kv-channels: 64
+    attention-softmax-in-fp32: false
+    window-size: "128,0"
+    window-attn-skip-freq: "[1,0]*12"
+
+    # MoE
+    num-experts: 32
+    moe-router-topk: 4
+    moe-token-dispatcher-type: alltoall
+    moe-grouped-gemm: true
+    moe-permute-fusion: true
+    moe-ffn-hidden-size: 2880
+    moe-layer-freq: 1
+
+    # Precision
+    bf16: true
+    fp16: false
+
+    # Fusion / kernels
+    transformer-impl: transformer_engine
+    disable-bias-linear: true
+    no-rope-fusion: true
+    use-flash-attn: true
+    gradient-accumulation-fusion: false
+    multi-latent-attention: false
+
+    # Dropout (disabled)
+    hidden-dropout: 0.0
+    attention-dropout: 0.0
+
+    # Training shape
+    micro-batch-size: 2
+    global-batch-size: 16
+    seq-length: 8192
+    max-position-embeddings: 131072
+    num-gpus: 4
+    distributed-optimizer: true
