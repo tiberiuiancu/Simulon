@@ -41,7 +41,7 @@ def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
                 if version == 1:
                     f.read(1)
                     seq_count = struct.unpack("<Q", f.read(8))[0]
-                    if seq_count >= 200:
+                    if seq_count >= 400:
                         return
         typer.echo("Existing C4 dataset is outdated, regenerating...")
         bin_path.unlink(missing_ok=True)
