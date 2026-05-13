@@ -1066,7 +1066,7 @@ def generate_trace(
         "--lr": 0.001,
         "--min-lr": 0.0,
         "--eval-interval": 1000000,
-        "--eval-iters": 1,
+        "--eval-iters": 0,
         "--save-interval": 1000000,
         "--log-interval": 1,
         "--mock-data": True,
