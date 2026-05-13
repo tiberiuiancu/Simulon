@@ -3,7 +3,7 @@
 import pytest
 
 from simulon.backend.dag import DAGTracerConfig, ExecutionDAG
-from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.dag.megatron_tracer import MegatronDeprecatedDAGTracer
 from simulon.backend.analytical import AnalyticalBackend
 from simulon.config.common import DType
 from simulon.config.dc import (
@@ -25,7 +25,7 @@ from simulon.config.workload import (
     LLMSpec,
     MegatronParallelism,
     MegatronTraining,
-    MegatronWorkload,
+    MegatronDeprecatedWorkload,
 )
 
 
@@ -63,9 +63,9 @@ def make_workload(
     global_batch_size: int = 8,
     micro_batch_size: int = 1,
     seq_len: int = 128,
-) -> MegatronWorkload:
-    return MegatronWorkload(
-        framework="megatron",
+) -> MegatronDeprecatedWorkload:
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-model",
             hidden_size=hidden_size,
@@ -98,21 +98,21 @@ def simple_scenario():
 
 def test_dag_tracer_returns_execution_dag(simple_scenario):
     """DAGTracer.trace() returns an ExecutionDAG instance."""
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     assert isinstance(dag, ExecutionDAG)
 
 
 def test_dag_tracer_has_compute_nodes(simple_scenario):
     """DAG has compute nodes."""
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     assert len(dag.compute_nodes) > 0
 
 
 def test_dag_tracer_tp1_no_comm_stubs(simple_scenario):
     """With tp=1, no AllGather/ReduceScatter comm nodes are generated."""
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     tp_collectives = [
         n for n in dag.comm_nodes
@@ -125,7 +125,7 @@ def test_dag_tracer_tp2_generates_comm_nodes():
     """With tp=2, AllGather and ReduceScatter comm nodes are generated."""
     wl = make_workload(tp=2, pp=1, num_gpus=4, num_layers=1)
     dc = make_datacenter()
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(wl, dc)
 
     ag_nodes = [n for n in dag.comm_nodes if n.collective_type == "AllGather"]
@@ -138,7 +138,7 @@ def test_dag_tracer_pp2_generates_pp_sends():
     """With pp=2, PP_Send comm nodes are generated at stage boundaries."""
     wl = make_workload(tp=1, pp=2, num_gpus=4, num_layers=1, global_batch_size=4)
     dc = make_datacenter()
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(wl, dc)
 
     pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
@@ -148,7 +148,7 @@ def test_dag_tracer_pp2_generates_pp_sends():
 def test_dag_to_json_is_valid_json(simple_scenario):
     """ExecutionDAG.to_json() returns valid JSON."""
     import json
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     json_str = dag.to_json()
     data = json.loads(json_str)
@@ -159,7 +159,7 @@ def test_dag_to_json_is_valid_json(simple_scenario):
 
 def test_dag_to_dict_structure(simple_scenario):
     """ExecutionDAG.to_dict() has correct keys."""
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     d = dag.to_dict()
     assert isinstance(d["compute_nodes"], list)
@@ -169,7 +169,7 @@ def test_dag_to_dict_structure(simple_scenario):
 
 def test_compute_node_fields(simple_scenario):
     """ComputeNodes have expected fields."""
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(simple_scenario.workload, simple_scenario.datacenter)
     cn = dag.compute_nodes[0]
     assert hasattr(cn, "node_id")
@@ -185,7 +185,7 @@ def test_flow_ids_nonnegative():
     """All flow_ids in comm nodes (from actual flows) are >= 0."""
     wl = make_workload(tp=2, pp=1, num_gpus=4, num_layers=1)
     dc = make_datacenter()
-    tracer = MegatronDAGTracer()
+    tracer = MegatronDeprecatedDAGTracer()
     dag = tracer.trace(wl, dc)
     for n in dag.comm_nodes:
         assert n.flow_id >= 0 or n.flow_id == -1, f"Unexpected flow_id={n.flow_id}"
@@ -219,7 +219,7 @@ def test_astra_sim_backend_run_trace(simple_scenario):
 
 
 def test_astra_sim_backend_rejects_non_megatron():
-    """AnalyticalBackend raises ValueError for non-MegatronWorkload."""
+    """AnalyticalBackend raises ValueError for non-MegatronDeprecatedWorkload."""
     from simulon.config.workload import InferenceWorkload, InferenceParallelism, InferenceRun
     dc = make_datacenter()
     wl = InferenceWorkload(

@@ -4,7 +4,7 @@ from simulon.backend.base import Backend
 from simulon.backend.dag import DAGTracer, DAGTracerConfig, ExecutionDAG, populate_dag, replay, SimulationResult
 from simulon.config.dc import DatacenterConfig, GPUSpec
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import MegatronWorkload
+from simulon.config.workload import MegatronDeprecatedWorkload
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +73,14 @@ class AstraSimBackend(Backend):
         }
 
     def run_trace(self, scenario: ScenarioConfig) -> ExecutionDAG:
-        if not isinstance(scenario.workload, MegatronWorkload):
-            raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
+        if not isinstance(scenario.workload, MegatronDeprecatedWorkload):
+            raise ValueError(f"AstraSimBackend only supports MegatronDeprecatedWorkload, got {type(scenario.workload).__name__}")
         tracer = DAGTracer(_tracer_config_from_scenario(scenario))
         return tracer.trace(scenario.workload, scenario.datacenter)
 
     def simulate(self, scenario: ScenarioConfig) -> tuple[ExecutionDAG, SimulationResult]:
-        if not isinstance(scenario.workload, MegatronWorkload):
-            raise ValueError(f"AstraSimBackend only supports MegatronWorkload, got {type(scenario.workload).__name__}")
+        if not isinstance(scenario.workload, MegatronDeprecatedWorkload):
+            raise ValueError(f"AstraSimBackend only supports MegatronDeprecatedWorkload, got {type(scenario.workload).__name__}")
 
         p = scenario.workload.parallelism
         t = scenario.workload.training

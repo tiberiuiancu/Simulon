@@ -1,4 +1,4 @@
-"""Tests for EP-aware data-parallel group modeling in MegatronDAGTracer.
+"""Tests for EP-aware data-parallel group modeling in MegatronDeprecatedDAGTracer.
 
 Covers:
   - _non_expert_params_per_tp_rank / _expert_params_per_tp_rank helpers
@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 
 from simulon.backend.dag.megatron_tracer import (
-    MegatronDAGTracer,
+    MegatronDeprecatedDAGTracer,
     ParallelGroups,
     _expert_params_per_tp_rank,
     _non_expert_params_per_tp_rank,
@@ -22,7 +22,7 @@ from simulon.backend.dag.nodes import CommNode
 from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.config.common import DType
 from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
-from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
+from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronDeprecatedWorkload
 
 
 # ---------------------------------------------------------------------------
@@ -41,8 +41,8 @@ def _minimal_dc(num_gpus: int) -> DatacenterConfig:
     )
 
 
-def _no_cache_tracer(compact: bool = True) -> MegatronDAGTracer:
-    return MegatronDAGTracer(config=DAGTracerConfig(cache_dir=None, compact=compact))
+def _no_cache_tracer(compact: bool = True) -> MegatronDeprecatedDAGTracer:
+    return MegatronDeprecatedDAGTracer(config=DAGTracerConfig(cache_dir=None, compact=compact))
 
 
 def _dense_model(
@@ -89,10 +89,10 @@ def _workload(
     distributed_optimizer: bool = False,
     seq_len: int = 128,
     micro_batch_size: int = 1,
-) -> MegatronWorkload:
+) -> MegatronDeprecatedWorkload:
     num_gpus = tp * pp * ep * dp
-    return MegatronWorkload(
-        framework="megatron",
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=model,
         parallelism=MegatronParallelism(
             tp=tp, pp=pp, ep=ep, dp=dp,
@@ -110,7 +110,7 @@ def _workload(
 
 def _global_rank(dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int,
                  pp: int, ep: int, tp: int) -> int:
-    """Match the rank formula in MegatronDAGTracer (tp-cp-ep-dp-pp order, cp=1)."""
+    """Match the rank formula in MegatronDeprecatedDAGTracer (tp-cp-ep-dp-pp order, cp=1)."""
     return dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
 
 
@@ -194,7 +194,7 @@ class TestParallelGroupsRankMembership:
 
     def _build_groups(self, dp: int, pp: int, ep: int, tp: int,
                       dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int) -> ParallelGroups:
-        """Directly replicates the group-construction logic from MegatronDAGTracer.trace()."""
+        """Directly replicates the group-construction logic from MegatronDeprecatedDAGTracer.trace()."""
         def gr(dp_r, pp_s, ep_r, tp_r):
             return _global_rank(dp_r, pp_s, ep_r, tp_r, pp, ep, tp)
 

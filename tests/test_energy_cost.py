@@ -31,9 +31,9 @@ from simulon.config.dc import (
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import (
     LLMSpec,
+    MegatronDeprecatedWorkload,
     MegatronParallelism,
     MegatronTraining,
-    MegatronWorkload,
 )
 from simulon.config.common import DType
 from simulon.energy import _power_w, compute_energy, EnergyResult
@@ -47,10 +47,10 @@ from simulon.cost import compute_cost, CostResult
 _MS_PER_HOUR = 3_600_000  # 1 hour in milliseconds
 
 
-def _make_workload() -> MegatronWorkload:
-    """Minimal MegatronWorkload that satisfies ScenarioConfig validation."""
-    return MegatronWorkload(
-        framework="megatron",
+def _make_workload() -> MegatronDeprecatedWorkload:
+    """Minimal MegatronDeprecatedWorkload that satisfies ScenarioConfig validation."""
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-model",
             hidden_size=1024,

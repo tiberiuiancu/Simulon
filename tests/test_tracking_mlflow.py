@@ -29,9 +29,9 @@ from simulon.config.dc import (
 from simulon.config.scenario import NcclConfig, ScenarioConfig
 from simulon.config.workload import (
     LLMSpec,
+    MegatronDeprecatedWorkload,
     MegatronParallelism,
     MegatronTraining,
-    MegatronWorkload,
 )
 from simulon.tracking.factory import get_trackers
 from simulon.tracking.mlflow_tracker import MLflowTracker
@@ -75,9 +75,9 @@ def _make_workload(
     pp: int = 1,
     num_gpus: int = 4,
     num_layers: int = 2,
-) -> MegatronWorkload:
-    return MegatronWorkload(
-        framework="megatron",
+) -> MegatronDeprecatedWorkload:
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-model",
             hidden_size=512,
@@ -164,8 +164,8 @@ def test_extract_params_path_dc():
 
 def test_extract_params_model_as_string():
     """When the workload model is a plain string, extract_params() sets model.name to that string."""
-    wl = MegatronWorkload(
-        framework="megatron",
+    wl = MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model="llama-7b",
         parallelism=MegatronParallelism(),
         training=MegatronTraining(

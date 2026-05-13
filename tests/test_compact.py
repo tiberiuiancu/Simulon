@@ -32,7 +32,7 @@ from simulon.config.workload import (
     LLMSpec,
     MegatronParallelism,
     MegatronTraining,
-    MegatronWorkload,
+    MegatronDeprecatedWorkload,
 )
 
 
@@ -92,9 +92,9 @@ def _make_workload(
     pp: int = 1,
     num_gpus: int = 1,
     num_layers: int = 2,
-) -> MegatronWorkload:
-    return MegatronWorkload(
-        framework="megatron",
+) -> MegatronDeprecatedWorkload:
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-model",
             hidden_size=512,

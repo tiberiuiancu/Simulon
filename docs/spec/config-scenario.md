@@ -22,7 +22,7 @@ A scenario config has the following top-level keys:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `datacenter` | path or inline | yes | The datacenter configuration. See `config-dc.md` for the full field reference. |
-| `workload` | path or inline | yes | The workload configuration. See `config-workload.md` for the full field reference. |
+| `workload` | path or inline | yes | The workload configuration. See `config-workload.md` for the full field reference. Trace-driven DAG extraction is configured inside the workload block. |
 | `collective` | inline | no | Collective communication library and algorithm settings. Defaults to `library: nccl, algorithm: ring, num_channels: 1`. |
 
 Each of `datacenter` and `workload` accepts either a **file path** (string) pointing to a
@@ -55,7 +55,7 @@ workload:
 datacenter: ./dc.yaml
 
 workload:
-  framework: megatron
+  framework: megatron-deprecated
   # ...
 ```
 
@@ -119,7 +119,7 @@ collective:
   num_channels: 1
 
 workload:
-  framework: megatron
+  framework: megatron-deprecated
 
   model:
     from: llama-13b

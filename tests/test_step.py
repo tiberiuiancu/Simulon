@@ -3,7 +3,7 @@
 import pytest
 
 from simulon.backend.dag import DAGTracerConfig
-from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+from simulon.backend.dag.megatron_tracer import MegatronDeprecatedDAGTracer
 from simulon.backend.dag.megatron_tracer import (
     _params_per_tp_rank,
     _non_expert_params_per_tp_rank,
@@ -14,7 +14,7 @@ from simulon.config.common import DType
 from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, KernelRun, NodeSpec
 from typing import Optional
 
-from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronWorkload
+from simulon.config.workload import LLMSpec, MegatronParallelism, MegatronTraining, MegatronDeprecatedWorkload
 
 
 def make_workload(
@@ -28,10 +28,10 @@ def make_workload(
     num_experts: Optional[int] = None,
     distributed_optimizer: bool = False,
     num_microbatches: int = 2,
-) -> MegatronWorkload:
+) -> MegatronDeprecatedWorkload:
     num_gpus = tp * pp * dp * ep
-    return MegatronWorkload(
-        framework="megatron",
+    return MegatronDeprecatedWorkload(
+        framework="megatron-deprecated",
         model=LLMSpec(
             name="test-model",
             hidden_size=hidden_size,
@@ -65,10 +65,10 @@ def make_dc(gpus: int = 8) -> DatacenterConfig:
     )
 
 
-def trace(wl: MegatronWorkload, dc: DatacenterConfig | None = None):
+def trace(wl: MegatronDeprecatedWorkload, dc: DatacenterConfig | None = None):
     if dc is None:
         dc = make_dc()
-    return MegatronDAGTracer(DAGTracerConfig()).trace(wl, dc)
+    return MegatronDeprecatedDAGTracer(DAGTracerConfig()).trace(wl, dc)
 
 
 # ---------------------------------------------------------------------------
@@ -225,11 +225,11 @@ def test_step_ordered_after_bwd():
 # ---------------------------------------------------------------------------
 
 
-def no_cache_trace(wl: MegatronWorkload, dc: DatacenterConfig | None = None):
+def no_cache_trace(wl: MegatronDeprecatedWorkload, dc: DatacenterConfig | None = None):
     """Trace without the on-disk DAG cache so tests always use the current implementation."""
     if dc is None:
         dc = make_dc()
-    return MegatronDAGTracer(DAGTracerConfig(cache_dir=None)).trace(wl, dc)
+    return MegatronDeprecatedDAGTracer(DAGTracerConfig(cache_dir=None)).trace(wl, dc)
 
 
 # ---------------------------------------------------------------------------

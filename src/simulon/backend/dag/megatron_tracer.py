@@ -10,7 +10,7 @@ from simulon.backend.dag.layer_expander import LayerExpander
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
 from simulon.collective import CCLDecomposer, NCCLDecomposer
 from simulon.config.dc import DatacenterConfig
-from simulon.config.workload import LLMSpec, MegatronWorkload
+from simulon.config.workload import LLMSpec, MegatronDeprecatedWorkload
 from simulon.profiling.models import _resolve_model
 
 logger = logging.getLogger(__name__)
@@ -223,12 +223,12 @@ def _emit_collective_nodes(
     return node_id_counter, flow_id_counter, slot_first_entry_set
 
 
-class MegatronDAGTracer(DAGTracer):
+class MegatronDeprecatedDAGTracer(DAGTracer):
     def __init__(self, config: DAGTracerConfig | None = None, ccl: CCLDecomposer | None = None):
         self.config = config or DAGTracerConfig()
         self._ccl = ccl or NCCLDecomposer()
 
-    def trace(self, workload: MegatronWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
+    def trace(self, workload: MegatronDeprecatedWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
         from simulon.backend.dag import cache as _cache
 
         cfg = self.config

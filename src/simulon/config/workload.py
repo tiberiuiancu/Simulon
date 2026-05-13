@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .common import DType
 
@@ -57,6 +57,14 @@ class MegatronParallelism(BaseModel):
     distributed_optimizer: bool = False
     num_microbatches: Optional[int] = None
     pipeline_schedule: str = "1f1b"
+    cp: int = 1
+
+    @field_validator("cp")
+    @classmethod
+    def _validate_cp(cls, value: int) -> int:
+        if value > 1:
+            raise ValueError("Context Parallelism > 1 not supported")
+        return value
 
 
 class MegatronTraining(BaseModel):
@@ -69,13 +77,21 @@ class MegatronTraining(BaseModel):
     iterations: int = 1
 
 
+class MegatronDeprecatedWorkload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    framework: Literal["megatron-deprecated"]
+    model: Union[str, LLMSpec]
+    parallelism: MegatronParallelism
+    training: MegatronTraining
+    megatron_args: dict[str, Any] | None = None
+
+
 class MegatronWorkload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     framework: Literal["megatron"]
-    model: Union[str, LLMSpec]
-    parallelism: MegatronParallelism
-    training: MegatronTraining
+    config: dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +150,6 @@ class CollectiveWorkload(BaseModel):
 # ---------------------------------------------------------------------------
 
 WorkloadConfig = Annotated[
-    Union[MegatronWorkload, InferenceWorkload, CollectiveWorkload],
+    Union[MegatronDeprecatedWorkload, MegatronWorkload, InferenceWorkload, CollectiveWorkload],
     Field(discriminator="framework"),
 ]

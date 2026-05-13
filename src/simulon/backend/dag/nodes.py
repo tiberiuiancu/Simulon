@@ -48,12 +48,14 @@ class ExecutionDAG:
     compute_nodes: list[ComputeNode] = field(default_factory=list)
     comm_nodes: list[CommNode] = field(default_factory=list)
     edges: list[DAGEdge] = field(default_factory=list)
+    total_flops: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
             "compute_nodes": [asdict(n) for n in self.compute_nodes],
             "comm_nodes": [asdict(n) for n in self.comm_nodes],
             "edges": [asdict(e) for e in self.edges],
+            "total_flops": self.total_flops,
         }
 
     def to_json(self) -> str:

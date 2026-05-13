@@ -59,3 +59,25 @@ def model_to_kernel_params(tmpl: dict[str, Any]) -> dict[str, Any]:
     keys = ["hidden_size", "num_heads", "ffn_hidden_size", "vocab_size",
             "num_experts", "top_k", "swiglu", "num_layers"]
     return {k: tmpl[k] for k in keys if k in tmpl and tmpl[k] is not None}
+
+
+def _model_spec_from_megatron_config(config: dict[str, Any]) -> "Any":
+    """Build an LLMSpec from a flat MegatronWorkload config dict."""
+    from simulon.config.workload import LLMSpec
+
+    return LLMSpec.model_validate({
+        "hidden_size": config.get("hidden-size"),
+        "num_layers": config.get("num-layers"),
+        "num_heads": config.get("num-attention-heads"),
+        "ffn_hidden_size": config.get("ffn-hidden-size"),
+        "vocab_size": config.get("vocab-size"),
+        "swiglu": config.get("swiglu", True),
+        "num_experts": config.get("num-experts"),
+        "top_k": config.get("moe-router-topk") or config.get("top-k"),
+        "gflops_per_train_token": config.get("gflops-per-train-token"),
+    })
+
+
+def get_gflops_per_train_token(model: "Any") -> float | None:
+    """Return the user-provided GFLOPs per training token, if any."""
+    return model.gflops_per_train_token

@@ -27,7 +27,7 @@ from simulon.config.workload import (
     LLMSpec,
     MegatronParallelism,
     MegatronTraining,
-    MegatronWorkload,
+    MegatronDeprecatedWorkload,
 )
 
 
@@ -127,8 +127,8 @@ def make_scenario() -> ScenarioConfig:
                 ),
             ),
         ),
-        workload=MegatronWorkload(
-            framework="megatron",
+        workload=MegatronDeprecatedWorkload(
+            framework="megatron-deprecated",
             model=LLMSpec(
                 name="LLaMA-13B",
                 hidden_size=5120,
