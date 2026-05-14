@@ -96,8 +96,9 @@ _MEGATRON_ENTRYPOINT = Path(__file__).parents[3] / "vendor" / "Megatron-LM-trace
 
 @trace_app.command("generate")
 def generate_trace(
-    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
-    output_dir: Path = typer.Option(Path("./traces"), "--output-dir", "-o", help="Directory to write trace files"),
+    scenario: str = typer.Argument(..., help="Path to scenario.yaml or workload.yaml"),
+    output_dir: Optional[Path] = typer.Option(None, "--output-dir", "-o", help="Directory to write trace files (overrides default)"),
+    gpu: Optional[str] = typer.Option(None, "--gpu", help="GPU name (required for workload.yaml input)"),
     stages: Optional[list[int]] = typer.Option(None, "--stage", help="Specific PP stages to trace (default: first, middle, last)"),
     all_stages: bool = typer.Option(False, "--all-stages", help="Trace all pipeline stages"),
     mock_data: Optional[bool] = typer.Option(None, "--mock-data/--no-mock-data", help="Use mock synthetic data (default: from config or True)"),
@@ -112,13 +113,41 @@ def generate_trace(
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.scenario import ScenarioConfig
     from simulon.config.workload import LLMSpec, MegatronDeprecatedWorkload, MegatronWorkload
+    from simulon.config.resolve import resolve_workload, workload_hash, resolve_gpu_spec
 
     with open(scenario) as f:
         raw = yaml.safe_load(f)
-    sc = ScenarioConfig.model_validate(raw)
 
-    if not isinstance(sc.workload, (MegatronWorkload, MegatronDeprecatedWorkload)):
-        raise typer.BadParameter("Scenario workload must be a Megatron workload")
+    # Try scenario first; fall back to pure workload YAML.
+    try:
+        sc = ScenarioConfig.model_validate(raw)
+        is_scenario = True
+        workload = sc.workload
+    except Exception:
+        workload = resolve_workload(scenario)
+        is_scenario = False
+        if gpu is None:
+            raise typer.BadParameter("--gpu is required when input is a workload YAML")
+
+    if not isinstance(workload, (MegatronWorkload, MegatronDeprecatedWorkload)):
+        raise typer.BadParameter("Workload must be a Megatron workload")
+
+    # Determine GPU name and compute default trace path if no --output-dir
+    if output_dir is None:
+        if is_scenario:
+            try:
+                gpu_spec = resolve_gpu_spec(sc.datacenter, include_profile=False)
+                gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+            except Exception:
+                gpu_name = "default"
+        else:
+            gpu_name = gpu.lower().replace(" ", "-")
+
+        if isinstance(workload, MegatronWorkload):
+            h = workload_hash(workload)
+        else:
+            h = "default"
+        output_dir = Path("templates/gpu") / gpu_name / "traces" / h
 
     derived_args: dict[str, str | int | bool]
     explicitly_set: set[str] = set()
@@ -127,8 +156,7 @@ def generate_trace(
         derived_args[flag] = value
         explicitly_set.add(flag)
 
-    if isinstance(sc.workload, MegatronDeprecatedWorkload):
-        workload = sc.workload
+    if isinstance(workload, MegatronDeprecatedWorkload):
         p = workload.parallelism
         t = workload.training
 
@@ -170,7 +198,6 @@ def generate_trace(
         tp = p.tp
         world_size = t.num_gpus
     else:
-        workload = sc.workload
         cfg = workload.config
         derived_args = {}
         for key in ("tensor-model-parallel-size", "pipeline-model-parallel-size",
@@ -303,7 +330,81 @@ def generate_trace(
         typer.echo(f"  Visualize with:  {visualize_cmd}")
         typer.echo("  Or load in https://pytorch.org/memory_viz")
 
+    # Save resolved workload alongside traces
+    if isinstance(workload, MegatronWorkload):
+        workload_yaml_path = output_dir / "workload.yaml"
+        with open(workload_yaml_path, "w") as f:
+            yaml.dump(workload.model_dump(by_alias=False, exclude_none=True), f, default_flow_style=False, sort_keys=False)
+
     trace_files = sorted(output_dir.glob("trace_pp_stage_*.json"))
     typer.echo(f"\nTrace generation complete. {len(trace_files)} file(s) in {output_dir}:")
     for tf in trace_files:
         typer.echo(f"  {tf.name}")
+
+
+@trace_app.command("list")
+def list_traces(
+    all: bool = typer.Option(False, "--all", "-a", help="Show all traces (no pagination)"),
+    n: int = typer.Option(5, "-n", help="Number of traces to show"),
+    offset: int = typer.Option(0, "--offset", help="Number of traces to skip"),
+    gpu: Optional[str] = typer.Option(None, "--gpu", help="Filter by GPU name (case-insensitive)"),
+):
+    """List resolved workloads from generated trace directories."""
+    from simulon.config.resolve import resolve_workload, workload_hash
+    from simulon.config.workload import MegatronWorkload
+
+    base = Path("templates/gpu")
+    if not base.exists():
+        typer.echo("No trace directories found.")
+        return
+
+    entries: list[tuple[Path, str]] = []
+    for gpu_dir in sorted(base.iterdir()):
+        if not gpu_dir.is_dir():
+            continue
+        gpu_name = gpu_dir.name
+        if gpu is not None and gpu.lower() != gpu_name.lower():
+            continue
+        traces_dir = gpu_dir / "traces"
+        if not traces_dir.is_dir():
+            continue
+        for trace_dir in sorted(traces_dir.iterdir()):
+            if not trace_dir.is_dir():
+                continue
+            workload_yaml = trace_dir / "workload.yaml"
+            if workload_yaml.exists():
+                entries.append((trace_dir, gpu_name))
+
+    if not entries:
+        typer.echo("No traces found.")
+        return
+
+    # Sort by modification time (newest first)
+    entries.sort(key=lambda e: e[0].stat().st_mtime, reverse=True)
+
+    # Apply pagination
+    count = len(entries) if all else n
+    sliced = entries[offset: offset + count]
+
+    for i, (trace_dir, gpu_name) in enumerate(sliced):
+        if i > 0:
+            typer.echo("---")
+        trace_hash = trace_dir.name
+        workload_yaml = trace_dir / "workload.yaml"
+        try:
+            workload = resolve_workload(str(workload_yaml))
+            h = workload_hash(workload)
+        except Exception:
+            h = trace_hash
+            workload = None
+
+        typer.echo(f"[{gpu_name}] hash={h}")
+        if isinstance(workload, MegatronWorkload):
+            cfg = workload.config
+            pp = cfg.get("pipeline-model-parallel-size", cfg.get("pp", "?"))
+            tp = cfg.get("tensor-model-parallel-size", cfg.get("tp", "?"))
+            seq = cfg.get("seq-length", cfg.get("seq_length", cfg.get("sequence_length", "?")))
+            hidden = cfg.get("hidden-size", cfg.get("hidden_size", "?"))
+            layers = cfg.get("num-layers", cfg.get("num_layers", "?"))
+            heads = cfg.get("num-attention-heads", cfg.get("num_attention_heads", "?"))
+            typer.echo(f"  tp={tp} pp={pp} seq={seq} hidden={hidden} layers={layers} heads={heads}")
