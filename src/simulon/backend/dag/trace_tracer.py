@@ -86,11 +86,23 @@ class MegatronDagTracer(DAGTracer):
             if datacenter and datacenter.datacenter
             else None
         )
-        if traces_dir is None:
-            raise ValueError(
-                "traces_dir must be set in datacenter.datacenter for trace-driven workloads"
-            )
-        traces_dir = Path(traces_dir)
+        if traces_dir is not None:
+            traces_dir = Path(traces_dir)
+        else:
+            from simulon.config.resolve import workload_hash, resolve_gpu_spec
+            try:
+                gpu_spec = resolve_gpu_spec(datacenter, include_profile=False)
+                gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+            except Exception:
+                gpu_name = "default"
+            h = workload_hash(workload)
+            traces_dir = Path("templates/gpu") / gpu_name / "traces" / h
+            if not traces_dir.exists():
+                raise ValueError(
+                    f"Traces not found at {traces_dir}. "
+                    "Either set traces_dir in datacenter.datacenter or ensure traces exist "
+                    "in the GPU-specific hashed path."
+                )
 
         trace_paths: dict[int, str] = {}
         for pp_stage in range(pp):

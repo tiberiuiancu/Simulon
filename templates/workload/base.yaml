@@ -1,0 +1,13 @@
+framework: megatron
+config:
+  tensor-model-parallel-size: 1
+  pipeline-model-parallel-size: 1
+  micro-batch-size: 1
+  global-batch-size: 8
+  seq-length: 2048
+  num-layers: 12
+  hidden-size: 4096
+  num-attention-heads: 32
+  ffn-hidden-size: 16384
+  vocab-size: 32000
+  dtype: bf16
