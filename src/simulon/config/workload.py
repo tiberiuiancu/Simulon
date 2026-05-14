@@ -88,9 +88,10 @@ class MegatronDeprecatedWorkload(BaseModel):
 
 
 class MegatronWorkload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     framework: Literal["megatron"]
+    from_: Optional[str] = Field(None, alias="from")
     config: dict[str, Any]
 
 
