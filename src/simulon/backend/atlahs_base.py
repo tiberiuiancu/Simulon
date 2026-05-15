@@ -52,7 +52,7 @@ class ATLAHSBackendBase(Backend):
         """Build an ExecutionDAG for *scenario*.
 
         Subclasses typically delegate to a DAG tracer (e.g.
-        :class:`MegatronDAGTracer`) or collective tracer.
+        :class:`MegatronDagTracer`) or collective tracer.
         """
         ...
 
