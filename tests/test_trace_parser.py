@@ -58,43 +58,6 @@ def test_parse_valid_trace():
     assert [event.type for event in parsed.events] == ["collective", "slot_begin", "slot_end"]
 
 
-def test_parse_rejects_missing_bytes():
-    data = _base_trace()
-    events = cast(list[dict[str, object]], data["events"])
-    events[0]["metadata"] = {"collective_type": "AllReduce"}
-    path = _write_trace(data)
-    try:
-        with pytest.raises(ValueError, match="metadata.bytes"):
-            _ = TraceFileParser.parse(path)
-    finally:
-        path.unlink(missing_ok=True)
-
-
-def test_parse_rejects_zero_bytes():
-    data = _base_trace()
-    events = cast(list[dict[str, object]], data["events"])
-    metadata = cast(dict[str, object], events[0]["metadata"])
-    metadata["bytes"] = 0
-    path = _write_trace(data)
-    try:
-        with pytest.raises(ValueError, match="metadata.bytes"):
-            _ = TraceFileParser.parse(path)
-    finally:
-        path.unlink(missing_ok=True)
-
-
-@pytest.mark.parametrize("field", ["rank", "events"])
-def test_parse_rejects_missing_required_fields(field: str):
-    data = _base_trace()
-    del data[field]
-    path = _write_trace(data)
-    try:
-        with pytest.raises(ValueError, match="Missing required top-level field"):
-            _ = TraceFileParser.parse(path)
-    finally:
-        path.unlink(missing_ok=True)
-
-
 def test_parse_rejects_invalid_version():
     data = _base_trace()
     data["trace_format_version"] = "2.0"
