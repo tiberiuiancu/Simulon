@@ -50,7 +50,7 @@ def dag_to_goal(dag: ExecutionDAG) -> str:
     """Convert a timing-populated ExecutionDAG to GOAL text format.
 
     Args:
-        dag: ExecutionDAG after populate_dag() and replay() have been called
+        dag: ExecutionDAG after trace-driven build and replay() have been called
              so that ComputeNode.duration_ms is set on every compute node.
 
     Returns:
@@ -68,7 +68,7 @@ def dag_to_goal(dag: ExecutionDAG) -> str:
         if n.duration_ms is None:
             raise ValueError(
                 f"ComputeNode {n.node_id} (kernel={n.kernel!r}, gpu={n.gpu_rank}) "
-                "has no duration_ms. Run populate_dag() before exporting to GOAL."
+                "has no duration_ms. Run trace generation first, then replay()."
             )
 
     # Collect all GPU ranks and derive num_ranks.
@@ -174,7 +174,7 @@ def write_goal_trace(dag: ExecutionDAG, path: str | Path) -> None:
     """Write a GOAL trace file from a timing-populated ExecutionDAG.
 
     Args:
-        dag:  ExecutionDAG after populate_dag() and replay() have been called.
+        dag:  ExecutionDAG after trace-driven build and replay() have been called.
         path: Output path for the .goal file.
 
     Raises:
