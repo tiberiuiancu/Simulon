@@ -55,8 +55,10 @@ workload:
 datacenter: ./dc.yaml
 
 workload:
-  framework: megatron-deprecated
-  # ...
+  framework: megatron
+  config:
+    num-layers: 32
+    # ...
 ```
 
 ---
@@ -108,7 +110,7 @@ datacenter: ./dc.yaml
 workload: ./workload.yaml
 ```
 
-### Datacenter from file, workload inline (Megatron)
+### Datacenter from file, workload inline (flat config)
 
 ```yaml
 datacenter: ./h100-cluster.yaml
@@ -119,29 +121,22 @@ collective:
   num_channels: 1
 
 workload:
-  framework: megatron-deprecated
-
-  model:
-    from: llama-13b
-
-  parallelism:
-    tp: 4
-    pp: 4
-    sp: true
-    distributed_optimizer: true
-    pipeline_schedule: 1f1b
-
-  training:
+  framework: megatron
+  config:
+    num-layers: 40
+    hidden-size: 5120
+    num-attention-heads: 40
+    ffn-hidden-size: 13824
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 4
+    micro-batch-size: 2
+    global-batch-size: 1024
+    seq-length: 4096
     num_gpus: 64
-    global_batch_size: 1024
-    micro_batch_size: 2
-    sequence_length: 4096
     dtype: bf16
-    flash_attention: true
-    iterations: 500
 ```
 
-### Fully inline (Inference)
+### Fully inline (Megatron flat config)
 
 ```yaml
 datacenter:

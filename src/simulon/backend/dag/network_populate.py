@@ -4,12 +4,9 @@ import logging
 import re
 import warnings
 
-from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import ExecutionDAG
-from simulon.config.dc import DatacenterConfig, GPUSpec, NICSpec, SwitchSpec
+from simulon.config.dc import DatacenterConfig, NICSpec, SwitchSpec
 from simulon.config.resolve import resolve_node_spec, resolve_scale_out
-from simulon.config.workload import MegatronDeprecatedWorkload
-from simulon.profiling.lookup import is_kernel_oom, lookup_kernel_time
 
 logger = logging.getLogger(__name__)
 
@@ -128,118 +125,6 @@ def _get_link_params(
     return bw, latency_ms
 
 
-# ---------------------------------------------------------------------------
-# Populate functions
-# ---------------------------------------------------------------------------
-
-
-def _handle_missing(
-    kernel: str,
-    params: dict,
-    gpu_spec: GPUSpec,
-    ignore_oom: bool,
-    ignore_missing: bool,
-) -> None:
-    """Called when lookup_kernel_time returns None.
-
-    - If the kernel+params match a known OOM profiling entry: raise RuntimeError
-      (unless ignore_oom=True, in which case silently proceed with None timing).
-    - Otherwise: raise RuntimeError for missing profiling data (unless
-      ignore_missing=True, in which case emit a warning and proceed with None).
-    """
-    if is_kernel_oom(kernel, params, gpu_spec):
-        if not ignore_oom:
-            raise RuntimeError(
-                f"Kernel '{kernel}' matches a known OOM profiling entry. "
-                "Pass --ignore-oom to suppress this error and simulate anyway."
-            )
-    else:
-        if not ignore_missing:
-            raise RuntimeError(
-                f"No profiling data found for kernel '{kernel}' with params {params}. "
-                "Reprofile the GPU or pass --ignore-missing to proceed with 0 timing."
-            )
-        warnings.warn(
-            f"No profiling data found for kernel '{kernel}'. "
-            "Timing will be None — results may be incomplete.",
-            UserWarning,
-            stacklevel=4,
-        )
-
-
-def populate_dag(
-    dag: ExecutionDAG,
-    workload: MegatronDeprecatedWorkload,
-    gpu_spec: GPUSpec,
-    ignore_oom: bool = False,
-    ignore_missing: bool = False,
-) -> ExecutionDAG:
-    """Fill ComputeNode.duration_ms by looking up kernel times in gpu_spec.
-
-    For each kernel node, if no timing data is found and the kernel+params
-    combination matches a known OOM profiling entry in gpu_spec.oom_kernel_runs,
-    a RuntimeError is raised unless ignore_oom=True.
-
-    Sets ComputeNode.is_extrapolated=True when the duration was obtained via
-    linear extrapolation rather than an exact or partial profile match.
-
-    Mutates nodes in-place and returns the dag.
-    """
-    from simulon.profiling.models import _resolve_model
-
-    t = workload.training
-    p = workload.parallelism
-    model = _resolve_model(workload.model)
-
-    # Build a comprehensive params dict covering all kernel types.
-    # lookup_kernel_time will filter to only the params relevant to each kernel.
-    all_params: dict = {
-        "hidden_size": model.hidden_size,
-        "num_heads": model.num_heads,
-        "ffn_hidden_size": model.ffn_hidden_size,
-        "vocab_size": model.vocab_size,
-        "seq_len": t.sequence_length,
-        "batch_size": t.micro_batch_size,
-        "dtype": t.dtype.value,
-        "tp": p.tp,
-        "ep": p.ep,
-    }
-    if model.num_experts is not None:
-        all_params["num_experts"] = model.num_experts
-    if model.top_k is not None:
-        all_params["top_k"] = model.top_k
-
-    adamw_base = {"dtype": t.dtype.value}
-
-    with log_progress("  resolving compute", len(dag.compute_nodes), logger) as advance:
-        for node in dag.compute_nodes:
-            if node.kernel == "adamw":
-                mp = {**adamw_base, "num_params": node.extra_params.get("num_params")}
-                time_ms, extrap = lookup_kernel_time("adamw", mp, gpu_spec)
-                if time_ms is None:
-                    _handle_missing("adamw", mp, gpu_spec, ignore_oom, ignore_missing)
-            elif node.fused_kernels:
-                fused_results = [(k, lookup_kernel_time(k, all_params, gpu_spec)) for k in node.fused_kernels]
-                times = [r[0] for _, r in fused_results]
-                time_ms = None if any(t is None for t in times) else sum(times)  # type: ignore[arg-type]
-                extrap = any(r[1] for _, r in fused_results)
-                if time_ms is None:
-                    for k, (t, _) in fused_results:
-                        if t is None:
-                            _handle_missing(k, all_params, gpu_spec, ignore_oom, ignore_missing)
-            else:
-                time_ms, extrap = lookup_kernel_time(node.kernel, all_params, gpu_spec)
-                if time_ms is None:
-                    _handle_missing(node.kernel, all_params, gpu_spec, ignore_oom, ignore_missing)
-
-            node.duration_ms = time_ms
-            node.is_extrapolated = extrap
-            advance()
-
-    return dag
-
-
-
 def populate_network(
     dag: ExecutionDAG,
     datacenter: DatacenterConfig,
@@ -283,10 +168,3 @@ def populate_network(
         )
 
     return dag
-
-
-def _model_hidden_size(workload: MegatronDeprecatedWorkload) -> int | None:
-    from simulon.profiling.models import _resolve_model
-
-    model = _resolve_model(workload.model)
-    return model.hidden_size
