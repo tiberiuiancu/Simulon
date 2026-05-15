@@ -1,6 +1,6 @@
 # tests — Test Suite
 
-25+ test files. pytest framework, no conftest.py.
+11 test files. pytest framework, no conftest.py.
 
 ## OVERVIEW
 
@@ -9,20 +9,17 @@ Each test file is self-contained with inline fixtures and `make_*` factory funct
 ## STRUCTURE
 
 Key test files by domain:
-- `test_dag.py` — DAGEdge, pipeline scheduler, LayerExpander
-- `test_e2e.py` — Full pipeline: MegatronDAGTracer + AnalyticalBackend
+- `test_chrome_trace.py` — Chrome/Perfetto trace JSON export
 - `test_collective.py` — Ring decomposition, flow counts, dependency chains
+- `test_collective_workload.py` — CollectiveWorkload end-to-end simulation
+- `test_goal_trace.py` — GOAL format export (for ATLAS/LogGOPSim)
+- `test_node_template.py` — NodeSpec YAML template resolution
 - `test_replayer.py` — Critical-path replay, timing breakdown (parametrized)
-- `test_moe.py` — MoE/EP layer expansion and DAG tracing
-- `test_step.py` — DP gradient sync step phase
-- `test_compact.py` — Compact vs non-compact DAG equivalence
-- `test_scenario.py` — Config serialization round-trip
-- `test_chrome_trace.py` — Trace export with test classes
-- `test_lookup.py` — Kernel timing lookup with autouse cache-clearing fixture
-- `test_cli_profile.py` — CLI profiling with `tmp_path`
-- `test_energy_cost.py` — Power + cost models
-- `test_kernels.py` — Kernel profiling (requires torch)
-- `test_tracking_mlflow.py` — MLflow tracking (`@pytest.mark.slow`)
+- `test_trace_e2e.py` — Trace-driven DAG + AnalyticalBackend integration
+- `test_trace_parser.py` — TraceFileParser validation and JSON loading
+- `test_trace_refactor.py` — Trace model and collector unit tests
+- `test_trace_tracer.py` — MegatronDagTracer from real GPU traces
+- `test_tree_nvls_calbusbw.py` — Tree/NVLS algorithms and bandwidth calibration
 
 ## CONVENTIONS
 
@@ -36,7 +33,7 @@ Key test files by domain:
 
 ## ANTI-PATTERNS
 
-- **Some test files are very large** — `test_collective_workload.py` (17k lines), `test_goal_trace.py` (12k lines) contain massive inline fixture data
+- **Some test files contain large inline fixture data** — `test_collective_workload.py` (~390 lines), `test_goal_trace.py` (~315 lines) both embed sizeable test data
 - **No coverage config** — no pytest-cov or coverage.py setup
 - **No CI integration** — tests run manually via `uv run pytest`
 

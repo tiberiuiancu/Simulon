@@ -3,7 +3,7 @@
 import pytest
 
 from simulon.backend.dag.nodes import CommNode, ComputeNode, DAGEdge, ExecutionDAG
-from simulon.backend.dag.populate import (
+from simulon.backend.dag.network_populate import (
     _get_link_params,
     _parse_latency,
     _parse_speed,

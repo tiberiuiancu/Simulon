@@ -1,6 +1,8 @@
 """Utilities for resolving hardware specs that may reference named templates."""
 from __future__ import annotations
 
+import hashlib
+import json
 import warnings
 from pathlib import Path
 
@@ -29,6 +31,7 @@ from simulon.config.dc import (
     ScaleOutSpec,
 )
 from simulon.config.nccl_profile import NcclProfile
+from simulon.config.workload import MegatronWorkload
 
 
 def _load_profile_data(template_path: Path) -> dict:
@@ -39,7 +42,7 @@ def _load_profile_data(template_path: Path) -> dict:
     return {}
 
 
-def load_gpu_template(name: str) -> GPUSpec:
+def load_gpu_template(name: str, include_profile: bool = True) -> GPUSpec:
     """Load a GPU spec from a named YAML template file.
 
     Searches templates/gpu/<name>.yaml (case-insensitive fallback).
@@ -62,7 +65,8 @@ def load_gpu_template(name: str) -> GPUSpec:
             )
     with open(template_path) as f:
         data = yaml.safe_load(f)
-    data.update(_load_profile_data(template_path))
+    if include_profile:
+        data.update(_load_profile_data(template_path))
     return GPUSpec.model_validate(data)
 
 
@@ -128,7 +132,7 @@ def resolve_node_spec(dc: DatacenterConfig) -> NodeSpec:
     return node
 
 
-def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
+def resolve_gpu_spec(dc: DatacenterConfig, include_profile: bool = True) -> GPUSpec:
     """Return the effective GPUSpec for a datacenter config.
 
     Handles three forms:
@@ -140,9 +144,9 @@ def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
     node = resolve_node_spec(dc)
     gpu = node.gpu
     if isinstance(gpu, str):
-        return load_gpu_template(gpu)
+        return load_gpu_template(gpu, include_profile=include_profile)
     if isinstance(gpu, GPUSpec) and gpu.from_:
-        base = load_gpu_template(gpu.from_)
+        base = load_gpu_template(gpu.from_, include_profile=include_profile)
         # Merge override fields into the base dict and re-validate so that nested
         # objects (cost, power_model, …) are properly coerced by Pydantic, not stored
         # as raw dicts from model_dump().
@@ -202,3 +206,111 @@ def resolve_scale_out(dc: DatacenterConfig) -> ScaleOutSpec | None:
         )
         return dc.network.scale_out
     return None
+
+
+def _load_workload_yaml(path_or_name: str, source_file: Path | None) -> dict:
+    """Load workload YAML, checking templates/workload/ first, then relative path."""
+    template_path = Path("templates/workload") / f"{path_or_name}.yaml"
+    if template_path.exists():
+        with open(template_path) as f:
+            return yaml.safe_load(f)
+
+    if source_file is not None:
+        rel_path = source_file.parent / path_or_name
+    else:
+        rel_path = Path(path_or_name)
+    return yaml.safe_load(rel_path.read_text())
+
+
+def resolve_workload(
+    path_or_dict: Path | str | dict,
+    _visited: set[str] | None = None,
+    _source_file: Path | None = None,
+) -> MegatronWorkload:
+    """Resolve a MegatronWorkload from a path, YAML string, or inline dict.
+
+    Supports ``from:`` inheritance: loads the base workload YAML
+    (from ``templates/workload/<name>.yaml`` or a relative path),
+    deep-merges overrides, and validates the result.
+
+    Raises ``ValueError`` on circular ``from:`` chains.
+    """
+    if _visited is None:
+        _visited = set()
+
+    if isinstance(path_or_dict, (Path, str)):
+        source = Path(path_or_dict) if isinstance(path_or_dict, str) else path_or_dict
+        with open(source) as f:
+            data = yaml.safe_load(f)
+        source_file = source
+    else:
+        data = path_or_dict
+        source_file = _source_file
+
+    from_name = data.get("from")
+    if from_name is not None:
+        if from_name in _visited:
+            raise ValueError("Circular workload inheritance detected")
+        _visited.add(from_name)
+        base_data = _load_workload_yaml(from_name, source_file)
+        base_wl = resolve_workload(base_data, _visited=_visited, _source_file=source_file)
+        base_dict = base_wl.model_dump(by_alias=False)
+        overrides = {k: v for k, v in data.items() if k != "from"}
+        merged = _deep_merge(base_dict, overrides)
+        return MegatronWorkload.model_validate(merged)
+
+    return MegatronWorkload.model_validate(data)
+
+
+# Compute-relevant config keys for workload hashing.
+# Data-path / runtime keys are intentionally excluded.
+_COMPUTE_KEYS = frozenset({
+    "tensor-model-parallel-size",
+    "tp",
+    "pipeline-model-parallel-size",
+    "pp",
+    "expert-model-parallel-size",
+    "ep",
+    "num_microbatches",
+    "num-microbatches",
+    "pipeline_schedule",
+    "num_layers",
+    "num-layers",
+    "hidden_size",
+    "hidden-size",
+    "num_attention_heads",
+    "num-attention-heads",
+    "ffn_hidden_size",
+    "ffn-hidden-size",
+    "vocab_size",
+    "vocab-size",
+    "seq_length",
+    "seq-length",
+    "sequence_length",
+    "global_batch_size",
+    "global-batch-size",
+    "micro_batch_size",
+    "micro-batch-size",
+    "dtype",
+    "num_gpus",
+    "num-gpus",
+    "flash_attention",
+    "flash-attention",
+    "swiglu",
+    "num_experts",
+    "num-experts",
+    "top_k",
+    "top-k",
+})
+
+
+def workload_hash(workload: MegatronWorkload) -> str:
+    """Return a 16-character hex hash of the workload's compute-relevant config.
+
+    Only fields in ``_COMPUTE_KEYS`` are included, so changing dataset paths,
+    tokenizer choices, or memory snapshots does not change the hash.
+    """
+    filtered = {k: v for k, v in workload.config.items() if k in _COMPUTE_KEYS}
+    return hashlib.sha256(
+        json.dumps(filtered, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]

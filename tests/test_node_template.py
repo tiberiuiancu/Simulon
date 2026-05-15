@@ -1,19 +1,14 @@
 """Tests for node template loading and resolution: load_node_template,
-resolve_node_spec, resolve_nccl_profile, resolve_scale_out, and the
-`simulon profile node` CLI command.
+resolve_node_spec, resolve_nccl_profile, and resolve_scale_out.
 """
 
 from __future__ import annotations
 
-import json
 import warnings
 from pathlib import Path
 
 import pytest
 import yaml
-from typer.testing import CliRunner
-
-from simulon.cli import app
 from simulon.config.dc import (
     ClusterSpec,
     DatacenterConfig,
@@ -30,9 +25,6 @@ from simulon.config.resolve import (
     resolve_node_spec,
     resolve_scale_out,
 )
-
-runner = CliRunner()
-
 
 # ---------------------------------------------------------------------------
 # Minimal YAML content for a node template
@@ -64,15 +56,6 @@ nccl:
       - {size_bytes: 8388608, bus_bw_GBps: 200.0}
       - {size_bytes: 16777216, bus_bw_GBps: 220.0}
 """
-
-_MINIMAL_NCCL_JSON = {
-    "config": {"devices": [0, 1, 2, 3]},
-    "results": [
-        {"size": 8388608, "out_of_place": {"bus_bw": 200.0}},
-        {"size": 16777216, "out_of_place": {"bus_bw": 220.0}},
-    ],
-}
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -309,237 +292,3 @@ class TestResolveScaleOut:
         assert len(w) == 0  # no deprecation warning when top-level is used
 
 
-# ---------------------------------------------------------------------------
-# CLI: simulon profile node
-# ---------------------------------------------------------------------------
-
-
-def _write_json(path: Path, data: dict) -> None:
-    path.write_text(json.dumps(data))
-
-
-class TestProfileNodeCli:
-    def test_input_json_generates_template(self, tmp_path: Path) -> None:
-        """profile node --input-json writes a valid NodeSpec YAML with correct data."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        _write_json(json_dir / "allreduce.json", _MINIMAL_NCCL_JSON)
-
-        result = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--out",
-                str(tmp_path / "templates" / "node" / "h100-4g.yaml"),
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        out_path = tmp_path / "templates" / "node" / "h100-4g.yaml"
-        assert out_path.exists()
-
-        data = yaml.safe_load(out_path.read_text())
-        spec = NodeSpec.model_validate(data)
-        assert spec.gpus_per_node == 4
-        assert spec.nccl is not None
-        assert len(spec.nccl.AllReduce.ring) == 2
-        assert spec.nccl.AllReduce.ring[0].size_bytes == 8388608
-        assert spec.nccl.AllReduce.ring[0].bus_bw_GBps == pytest.approx(200.0)
-
-    def test_dry_run_prints_yaml_without_writing(self, tmp_path: Path) -> None:
-        """profile node --dry-run prints YAML to stdout and does not write any file."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        _write_json(json_dir / "allreduce.json", _MINIMAL_NCCL_JSON)
-
-        out_path = tmp_path / "templates" / "node" / "h100-4g.yaml"
-        result = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--out",
-                str(out_path),
-                "--dry-run",
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert not out_path.exists()
-        # YAML content should appear in stdout
-        assert "gpus_per_node" in result.output
-
-    def test_missing_input_exits_with_error(self, tmp_path: Path) -> None:
-        """profile node exits with code 1 when neither --input-json nor --nccl-tests-dir is given."""
-        result = runner.invoke(
-            app,
-            ["profile", "node", "--gpu", "h100"],
-        )
-        assert result.exit_code != 0
-        assert "Error" in result.output or (
-            result.stderr_bytes and b"Error" in result.stderr_bytes
-        )
-
-    def test_latency_always_written(self, tmp_path: Path) -> None:
-        """profile node always writes the latency field regardless of whether --port-speed was passed."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        _write_json(json_dir / "allreduce.json", _MINIMAL_NCCL_JSON)
-
-        result = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--dry-run",
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert "latency" in result.output
-
-    def test_port_speed_included_only_when_provided(self, tmp_path: Path) -> None:
-        """profile node omits port_speed from scale_up.switch when --port-speed is not passed."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        _write_json(json_dir / "allreduce.json", _MINIMAL_NCCL_JSON)
-
-        result_without = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--dry-run",
-            ],
-            catch_exceptions=False,
-        )
-        result_with = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--port-speed",
-                "7200Gbps",
-                "--dry-run",
-            ],
-            catch_exceptions=False,
-        )
-        assert result_without.exit_code == 0
-        assert result_with.exit_code == 0
-        assert "port_speed" not in result_without.output
-        assert "7200Gbps" in result_with.output
-
-    def test_multiple_json_files_warns_and_uses_first(self, tmp_path: Path) -> None:
-        """profile node emits a warning and uses the first file when multiple JSONs match a collective."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        data_a = {
-            **_MINIMAL_NCCL_JSON,
-            "results": [{"size": 8388608, "out_of_place": {"bus_bw": 111.0}}],
-        }
-        data_b = {
-            **_MINIMAL_NCCL_JSON,
-            "results": [{"size": 8388608, "out_of_place": {"bus_bw": 222.0}}],
-        }
-        # Both filenames match *allreduce*.json
-        _write_json(json_dir / "allreduce_run1.json", data_a)
-        _write_json(json_dir / "allreduce_run2.json", data_b)
-
-        result = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--dry-run",
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        # Warning must appear in stderr or stdout
-        combined = result.output + (
-            result.stderr_bytes.decode() if result.stderr_bytes else ""
-        )
-        assert "Warning" in combined or "warning" in combined.lower()
-
-    def test_custom_name_and_latency(self, tmp_path: Path) -> None:
-        """profile node respects --name and --latency overrides in the generated template."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        _write_json(json_dir / "allreduce.json", _MINIMAL_NCCL_JSON)
-
-        result = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--name",
-                "my-custom-node",
-                "--latency",
-                "0.0001ms",
-                "--dry-run",
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert "my-custom-node" in result.output
-        assert "0.0001ms" in result.output
-
-    def test_all_four_collectives_in_output(self, tmp_path: Path) -> None:
-        """profile node includes all measured collectives in the nccl profile."""
-        json_dir = tmp_path / "nccl_results"
-        json_dir.mkdir()
-        for coll in ("allreduce", "allgather", "reducescatter", "alltoall"):
-            _write_json(json_dir / f"{coll}.json", _MINIMAL_NCCL_JSON)
-
-        out_path = tmp_path / "templates" / "node" / "h100-4g.yaml"
-        result = runner.invoke(
-            app,
-            [
-                "profile",
-                "node",
-                "--gpu",
-                "h100",
-                "--input-json",
-                str(json_dir),
-                "--out",
-                str(out_path),
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        data = yaml.safe_load(out_path.read_text())
-        spec = NodeSpec.model_validate(data)
-        assert spec.nccl is not None
-        assert len(spec.nccl.AllReduce.ring) == 2
-        assert len(spec.nccl.AllGather.ring) == 2
-        assert len(spec.nccl.ReduceScatter.ring) == 2
-        assert len(spec.nccl.AllToAll.ring) == 2
