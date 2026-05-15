@@ -1,0 +1,30 @@
+datacenter:
+  datacenter:
+    name: snellius-h100-4g
+  cluster:
+    num_nodes: 1
+  node:
+    from: snellius-h100-4g
+    gpus_per_node: 1
+    gpu:
+      from: h100
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workload:
+  framework: megatron-deprecated
+  model: validation-model-dense
+  parallelism:
+    tp: 1
+    pp: 1
+    ep: 1
+    dp: 1
+    num_microbatches: 1
+  training:
+    num_gpus: 1
+    global_batch_size: 2
+    micro_batch_size: 2
+    sequence_length: 4096

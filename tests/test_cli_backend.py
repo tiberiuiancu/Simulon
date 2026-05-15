@@ -43,22 +43,18 @@ collective:
 
 workload:
   framework: megatron
-  model:
-    name: test-model
-    hidden_size: 256
-    num_layers: 2
-    num_heads: 4
-    ffn_hidden_size: 1024
-    vocab_size: 32000
-  parallelism:
-    tp: 1
-    pp: 1
-    num_microbatches: 2
-  training:
-    num_gpus: 2
-    global_batch_size: 2
-    micro_batch_size: 1
-    sequence_length: 128
+  config:
+    tensor-model-parallel-size: 1
+    pipeline-model-parallel-size: 1
+    num-layers: 2
+    hidden-size: 256
+    num-attention-heads: 4
+    ffn-hidden-size: 1024
+    vocab-size: 32000
+    micro-batch-size: 1
+    global-batch-size: 2
+    seq-length: 128
+    num-gpus: 2
 """
 
 

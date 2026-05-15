@@ -18,11 +18,9 @@ from pathlib import Path
 
 from simulon.backend.atlahs_binary_finder import find_binaries
 from simulon.backend.base import Backend, BackendResult
-from simulon.backend.dag import ExecutionDAG, populate_dag
+from simulon.backend.dag import ExecutionDAG
 from simulon.backend.dag.goal_trace import write_goal_trace
-from simulon.config.resolve import resolve_gpu_spec
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import MegatronWorkload
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +42,9 @@ class ATLAHSBackendBase(Backend):
     The :meth:`simulate` orchestration follows this flow:
 
         1. ``run_trace()`` → build the ExecutionDAG
-        2. ``populate_dag()`` → inject GPU kernel durations
-        3. ``write_goal_trace()`` → export DAG to GOAL text
-        4. ``txt2bin`` → convert GOAL text to binary
-        5. ``_run_simulator()`` → subclass-specific simulator invocation
+        2. ``write_goal_trace()`` → export DAG to GOAL text
+        3. ``txt2bin`` → convert GOAL text to binary
+        4. ``_run_simulator()`` → subclass-specific simulator invocation
     """
 
     @abstractmethod
@@ -112,12 +109,6 @@ class ATLAHSBackendBase(Backend):
             len(dag.comm_nodes),
             len(dag.edges),
         )
-
-        if isinstance(scenario.workload, MegatronWorkload):
-            gpu_spec = resolve_gpu_spec(scenario.datacenter)
-            logger.info("ATLAHS: resolving compute durations (%d nodes) ...", len(dag.compute_nodes))
-            _ = populate_dag(dag, scenario.workload, gpu_spec, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
-            logger.info("  Compute durations resolved")
 
         tmp_dir: tempfile.TemporaryDirectory[str] | None = None
         try:

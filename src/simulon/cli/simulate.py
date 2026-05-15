@@ -1,0 +1,233 @@
+import json
+from pathlib import Path
+from typing import Optional
+
+import typer
+import yaml
+
+from simulon.backend.analytical import AnalyticalBackend
+from simulon.backend.dag.chrome_trace import to_chrome_trace
+from simulon.config.resolve import resolve_node_spec
+from simulon.config.scenario import ScenarioConfig
+from simulon.config.workload import CollectiveWorkload, MegatronWorkload
+from simulon.tracking import get_trackers
+from simulon.tracking.params import extract_metrics, extract_params
+
+
+def _make_backend(name: str):
+    if name == "analytical":
+        return AnalyticalBackend()
+    if name == "atlahs-lgs":
+        from simulon.backend.atlahs_lgs import ATLAHSLGSBackend
+        return ATLAHSLGSBackend()
+    if name == "atlahs-htsim":
+        from simulon.backend.atlahs_htsim import ATLAHShtsimBackend
+        return ATLAHShtsimBackend()
+    raise typer.BadParameter(f"Unknown backend: {name!r}. Must be one of: analytical, atlahs-lgs, atlahs-htsim")
+
+
+def simulate(
+    scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    backend: str = typer.Option("analytical", "--backend", help="Simulation backend to use (analytical, atlahs-lgs, atlahs-htsim)"),
+    summary: bool = typer.Option(True, "--summary/--no-summary", help="Print iteration summary to stdout"),
+    chrome: Optional[Path] = typer.Option(None, "--chrome", help="Write Chrome/Perfetto trace to this path"),
+    dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
+    goal: Optional[Path] = typer.Option(None, "--goal", help="Write GOAL trace to this path for use with ATLAHS/LogGOPSim"),
+    compact: bool = typer.Option(False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
+    energy: bool = typer.Option(False, "--energy", help="Compute and print per-iteration energy breakdown"),
+    cost: bool = typer.Option(False, "--cost", help="Compute and print cost breakdown (implies --energy)"),
+    ignore_oom: bool = typer.Option(False, "--ignore-oom", help="Suppress errors for configs matching OOM profile entries"),
+    ignore_missing: bool = typer.Option(False, "--ignore-missing", help="Suppress errors for kernels with no profiling data (treat as 0 duration)"),
+):
+    """Run simulation and print an iteration summary.
+
+    Optionally export a Chrome/Perfetto trace (--chrome) and/or a
+    timing-populated DAG JSON (--dag) for offline analysis.
+    """
+    import tempfile
+
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
+    sc = ScenarioConfig.model_validate(raw)
+
+    if verbose:
+        import logging
+        logging.basicConfig(format="%(message)s", level=logging.INFO)
+
+    trackers = get_trackers()
+
+    try:
+        for tracker in trackers:
+            tracker.start_run()
+
+        from simulon.config.resolve import resolve_gpu_spec
+        try:
+            gpu_spec = resolve_gpu_spec(sc.datacenter, include_profile=False)
+        except Exception:
+            gpu_spec = None
+
+        if chrome is not None and backend != "analytical":
+            raise typer.BadParameter("--chrome is only supported with the analytical backend")
+
+        sim_backend = _make_backend(backend)
+        dag, result = sim_backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+
+        if trackers:
+            params = extract_params(sc)
+            metrics = extract_metrics(result)
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", prefix="scenario_", delete=False
+            ) as tmp:
+                yaml.dump(raw, tmp)
+                scenario_artifact_path = Path(tmp.name)
+            try:
+                for tracker in trackers:
+                    tracker.log_params(params)
+                    numeric_metrics = {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
+                    tracker.log_metrics(numeric_metrics)
+                    tracker.log_artifact(scenario_artifact_path)
+            finally:
+                scenario_artifact_path.unlink(missing_ok=True)
+
+        if summary:
+            from simulon.config.workload import CollectiveWorkload
+            if isinstance(sc.workload, CollectiveWorkload):
+                _print_collective_summary(sc.workload, result, sc.datacenter)
+            else:
+                _print_summary(result, sc.workload, gpu_spec)
+
+        if isinstance(sc.workload, MegatronWorkload):
+            energy_result = None
+            if energy or cost:
+                from simulon.energy import compute_energy
+                energy_result = compute_energy(dag, sc, result.total_time_ms)
+                if energy_result is not None:
+                    _print_energy_summary(energy_result)
+
+            if cost and energy_result is not None:
+                from simulon.cost import compute_cost
+                cost_result = compute_cost(sc, energy_result)
+                _print_cost_summary(cost_result)
+
+        if chrome is not None:
+            if isinstance(sc.workload, MegatronWorkload):
+                cfg = sc.workload.config
+                tp = int(cfg.get("tensor-model-parallel-size", 1))
+                pp_val = int(cfg.get("pipeline-model-parallel-size", 1))
+                ep = int(cfg.get("expert-model-parallel-size", 1))
+                num_gpus = int(cfg.get("num_gpus", tp * pp_val * ep))
+                dp = max(1, num_gpus // (tp * pp_val * ep))
+            else:
+                tp = pp_val = ep = dp = 1
+            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+            with open(chrome, "w") as f:
+                json.dump(trace_dict, f)
+            typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")
+            for tracker in trackers:
+                tracker.log_artifact(chrome)
+
+        if dag_out is not None:
+            with open(dag_out, "w") as f:
+                json.dump(dag.to_dict(), f)
+            typer.echo(f"DAG written to {dag_out}")
+            for tracker in trackers:
+                tracker.log_artifact(dag_out)
+
+        if goal is not None:
+            from simulon.backend.dag.goal_trace import write_goal_trace
+            write_goal_trace(dag, goal)
+            typer.echo(f"GOAL trace written to {goal}  (feed to ATLAHS/LogGOPSim via txt2bin)")
+            for tracker in trackers:
+                tracker.log_artifact(goal)
+
+    finally:
+        for tracker in trackers:
+            tracker.end_run()
+
+
+def _print_summary(result, workload=None, gpu_spec=None) -> None:
+    """Print a human-readable simulation summary to stdout.
+
+    Args:
+        result: SimulationResult from AnalyticalBackend.simulate().
+        workload: Optional workload for throughput metrics.
+        gpu_spec: Optional resolved GPUSpec for GPU peak TFLOPs (needed for MFU).
+    """
+
+    total = result.total_time_ms
+    n_gpus = len(result.per_gpu_times_ms)
+
+    def _pct(ms: float) -> str:
+        return f"{ms / total * 100:5.1f}%" if total > 0 else "  n/a"
+
+    if hasattr(result, "summary"):
+        typer.echo(result.summary)
+        return
+
+    typer.echo(f"\nIteration wall time:  {total:.3f} ms")
+    typer.echo(f"  (metrics below averaged across {n_gpus} GPUs)")
+    typer.echo("")
+    typer.echo(f"  Compute:        {result.compute_ms:9.3f} ms  {_pct(result.compute_ms)}")
+    typer.echo(f"  Exposed comm:   {result.exposed_comm_ms:9.3f} ms  {_pct(result.exposed_comm_ms)}")
+    for ctype, ms in sorted(result.exposed_comm_by_type.items(), key=lambda x: -x[1]):
+        typer.echo(f"    {ctype + ':':22s} {ms:9.3f} ms")
+    typer.echo(f"  Bubble:         {result.bubble_ms:9.3f} ms  {_pct(result.bubble_ms)}")
+    typer.echo("")
+    typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
+               "  (hidden by compute, not in totals above)")
+    typer.echo("")
+
+
+def _print_collective_summary(workload, result, datacenter) -> None:
+    node = resolve_node_spec(datacenter)
+    gpus_per_node = node.gpus_per_node
+    if gpus_per_node is None:
+        gpus_per_node = 0
+    num_ranks = datacenter.cluster.num_nodes * gpus_per_node
+    typer.echo(f"\nCollective wall time:  {result.total_time_ms:.3f} ms")
+    typer.echo(f"  Type:          {workload.collective_type.value}")
+    typer.echo(f"  Message size:  {workload.message_size_bytes:,} bytes")
+    typer.echo(f"  Ranks:         {num_ranks}")
+    typer.echo("")
+
+
+def _print_energy_summary(result) -> None:
+    """Print a human-readable energy summary to stdout."""
+    typer.echo(f"Energy per iteration:  {result.total_wh:.4f} Wh"
+               f"   (avg cluster power: {result.avg_power_kw:.2f} kW)")
+    typer.echo(f"  Hardware subtotal:   {result.hardware_subtotal_wh:.4f} Wh")
+    for comp in result.breakdown:
+        label = comp.component + ":"
+        typer.echo(f"    {label:26s} {comp.wh:10.4f} Wh  ({comp.pct:5.1f}%)")
+    typer.echo(f"  PUE overhead:        {result.pue_overhead_wh:.4f} Wh")
+    typer.echo("")
+
+
+def _print_cost_summary(result) -> None:
+    """Print a human-readable cost summary to stdout."""
+
+    def _fmt(v: float) -> str:
+        return f"${v:,.0f}"
+
+    typer.echo("Cost model")
+    capex = result.capex
+    range_str = ""
+    if capex.min is not None and capex.max is not None:
+        range_str = f"  [ {_fmt(capex.min)} \u2013 {_fmt(capex.max)}]"
+    typer.echo(f"  CAPEX total:    {_fmt(capex.total)}{range_str}")
+    for comp in capex.breakdown:
+        label = comp.component + ":"
+        range_comp = ""
+        if comp.min is not None and comp.max is not None:
+            range_comp = f"  [{_fmt(comp.min)} \u2013 {_fmt(comp.max)}]"
+        typer.echo(f"    {label:26s} {_fmt(comp.total):>14s}{range_comp}  ({comp.pct:5.1f}%)")
+    typer.echo(f"  OPEX per run:   {_fmt(result.opex_per_run)}")
+    if result.cost_per_run is not None:
+        cpr = result.cost_per_run
+        typer.echo(
+            f"  Cost per run:   {_fmt(cpr.total)}"
+            f"  (capex {_fmt(cpr.capex_component)} + opex {_fmt(cpr.opex_component)})"
+        )
+    typer.echo("")

@@ -73,10 +73,10 @@ class ATLAHShtsimBackend(ATLAHSBackendBase):
         datacenter = cast(DatacenterConfig, scenario.datacenter)
 
         if isinstance(scenario.workload, MegatronWorkload):
-            from simulon.backend.dag.megatron_tracer import MegatronDAGTracer
+            from simulon.backend.dag.trace_tracer import MegatronDagTracer
             from simulon.collective import NCCLDecomposer
 
-            tracer = MegatronDAGTracer(cfg, ccl=NCCLDecomposer())
+            tracer = MegatronDagTracer(cfg, ccl=NCCLDecomposer())
             return tracer.trace(scenario.workload, datacenter)
 
         if isinstance(scenario.workload, CollectiveWorkload):

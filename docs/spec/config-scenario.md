@@ -22,7 +22,7 @@ A scenario config has the following top-level keys:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `datacenter` | path or inline | yes | The datacenter configuration. See `config-dc.md` for the full field reference. |
-| `workload` | path or inline | yes | The workload configuration. See `config-workload.md` for the full field reference. |
+| `workload` | path or inline | yes | The workload configuration. See `config-workload.md` for the full field reference. Trace-driven DAG extraction is configured inside the workload block. |
 | `collective` | inline | no | Collective communication library and algorithm settings. Defaults to `library: nccl, algorithm: ring, num_channels: 1`. |
 
 Each of `datacenter` and `workload` accepts either a **file path** (string) pointing to a
@@ -56,7 +56,9 @@ datacenter: ./dc.yaml
 
 workload:
   framework: megatron
-  # ...
+  config:
+    num-layers: 32
+    # ...
 ```
 
 ---
@@ -108,7 +110,7 @@ datacenter: ./dc.yaml
 workload: ./workload.yaml
 ```
 
-### Datacenter from file, workload inline (Megatron)
+### Datacenter from file, workload inline (flat config)
 
 ```yaml
 datacenter: ./h100-cluster.yaml
@@ -120,28 +122,21 @@ collective:
 
 workload:
   framework: megatron
-
-  model:
-    from: llama-13b
-
-  parallelism:
-    tp: 4
-    pp: 4
-    sp: true
-    distributed_optimizer: true
-    pipeline_schedule: 1f1b
-
-  training:
+  config:
+    num-layers: 40
+    hidden-size: 5120
+    num-attention-heads: 40
+    ffn-hidden-size: 13824
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 4
+    micro-batch-size: 2
+    global-batch-size: 1024
+    seq-length: 4096
     num_gpus: 64
-    global_batch_size: 1024
-    micro_batch_size: 2
-    sequence_length: 4096
     dtype: bf16
-    flash_attention: true
-    iterations: 500
 ```
 
-### Fully inline (Inference)
+### Fully inline (Megatron flat config)
 
 ```yaml
 datacenter:
