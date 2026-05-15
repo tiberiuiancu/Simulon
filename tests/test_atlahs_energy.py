@@ -16,7 +16,7 @@ from __future__ import annotations
 import pytest
 
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
-from simulon.config.common import ConstantPowerModel, LinearPowerModel, DType
+from simulon.config.common import ConstantPowerModel, LinearPowerModel
 from simulon.config.dc import (
     ClusterSpec,
     CPUSpec,
@@ -26,12 +26,7 @@ from simulon.config.dc import (
     NodeSpec,
 )
 from simulon.config.scenario import ScenarioConfig
-from simulon.config.workload import (
-    LLMSpec,
-    MegatronParallelism,
-    MegatronTraining,
-    MegatronWorkload,
-)
+from simulon.config.workload import MegatronWorkload
 from simulon.energy import compute_energy, EnergyResult
 
 
@@ -46,22 +41,20 @@ def _make_workload() -> MegatronWorkload:
     """Minimal MegatronWorkload that satisfies ScenarioConfig validation."""
     return MegatronWorkload(
         framework="megatron",
-        model=LLMSpec(
-            name="test-model",
-            hidden_size=1024,
-            num_layers=2,
-            num_heads=8,
-            vocab_size=32000,
-            ffn_hidden_size=4096,
-        ),
-        parallelism=MegatronParallelism(tp=1, pp=1, ep=1, dp=1),
-        training=MegatronTraining(
-            num_gpus=1,
-            global_batch_size=1,
-            micro_batch_size=1,
-            sequence_length=512,
-            dtype=DType.bf16,
-        ),
+        config={
+            "tensor-model-parallel-size": 1,
+            "pipeline-model-parallel-size": 1,
+            "expert-model-parallel-size": 1,
+            "num-layers": 2,
+            "hidden-size": 1024,
+            "num-attention-heads": 8,
+            "vocab-size": 32000,
+            "ffn-hidden-size": 4096,
+            "micro-batch-size": 1,
+            "global-batch-size": 1,
+            "seq-length": 512,
+            "num-gpus": 1,
+        },
     )
 
 

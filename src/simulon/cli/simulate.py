@@ -156,15 +156,16 @@ def _print_summary(result, workload=None, gpu_spec=None) -> None:
         gpu_spec: Optional resolved GPUSpec for GPU peak TFLOPs (needed for MFU).
     """
 
+    # ATLAHS backends return a summary string — print it directly.
+    if hasattr(result, "summary"):
+        typer.echo(result.summary)
+        return
+
     total = result.total_time_ms
     n_gpus = len(result.per_gpu_times_ms)
 
     def _pct(ms: float) -> str:
         return f"{ms / total * 100:5.1f}%" if total > 0 else "  n/a"
-
-    if hasattr(result, "summary"):
-        typer.echo(result.summary)
-        return
 
     typer.echo(f"\nIteration wall time:  {total:.3f} ms")
     typer.echo(f"  (metrics below averaged across {n_gpus} GPUs)")
