@@ -56,9 +56,7 @@ simulon/
 │   │   ├── analytical.py    # AnalyticalBackend — dispatches MegatronDagTracer
 │   │   └── dag/
 │   │       ├── nodes.py          # ComputeNode, CommNode, DAGEdge, ExecutionDAG
-│   │       ├── pipeline.py       # PipelineScheduler ABC, OneFOneBScheduler, make_scheduler
-│   │       ├── layer_expander.py # per-sublayer kernel + comm stub expansion
-│   │       ├── tracer.py         # DAGTracer (ABC) + DAGTracerConfig
+│   │       ├── tracer.py         # DAGTracerConfig + DAGTracer (ABC)
 │   │       ├── trace_tracer.py   # MegatronDagTracer — builds DAG from real GPU execution traces
 │   │       ├── trace_parser.py   # TraceFileParser — validates and loads trace JSON files
 │   │       ├── network_populate.py # injects GPU kernel timing and network bandwidth into DAG nodes

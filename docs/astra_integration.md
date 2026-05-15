@@ -23,10 +23,6 @@ ScenarioConfig (DatacenterConfig + WorkloadConfig)
     ▼
 MegatronDagTracer.trace()
     │
-    ├─ PipelineScheduler   — 1F1B schedule per pipeline stage
-    │
-    ├─ LayerExpander       — per sublayer: AG → kernels → RS (Megatron SP pattern)
-    │
     └─ CCLDecomposer.decompose()  (default: DefaultCCLDecomposer → decompose_collective)
            │
            ├─ ring.py      — AllGather / ReduceScatter / AllReduce / AllToAll
@@ -63,9 +59,7 @@ Top-level dispatcher: `decompose_collective(collective_type, group_ranks, data_s
 | Module | Responsibility |
 |---|---|---|
 | `nodes.py` | `ComputeNode`, `CommNode`, `DAGEdge`, `ExecutionDAG` (with `to_dict` / `to_json`) |
-| `pipeline.py` | `PipelineScheduler` — 1F1B warmup / steady-state / cooldown schedule |
-| `layer_expander.py` | Expands one sublayer (attn or mlp) into: `AllGather → kernels → ReduceScatter` for fwd/bwd_ig; `kernels` only for bwd_wg |
-| `tracer.py` | `DAGTracer` (ABC) + `DAGTracerConfig` |
+| `tracer.py` | `DAGTracerConfig` + `DAGTracer` (ABC) |
 | `trace_tracer.py` | `MegatronDagTracer` — builds DAG from real trace events and trace_path inputs |
 
 ### `simulon.backend.analytical`
@@ -134,7 +128,7 @@ Encodes inter-node ordering (e.g. AllGather must complete before first kernel).
 
 ## Per-sublayer execution pattern
 
-Megatron sequence parallelism pattern, implemented in `LayerExpander`:
+Megatron sequence parallelism pattern:
 
 ```
 fwd / bwd_ig:
