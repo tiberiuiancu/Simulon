@@ -14,8 +14,21 @@ from simulon.tracking import get_trackers
 from simulon.tracking.params import extract_metrics, extract_params
 
 
+def _make_backend(name: str):
+    if name == "analytical":
+        return AnalyticalBackend()
+    if name == "atlahs-lgs":
+        from simulon.backend.atlahs_lgs import ATLAHSLGSBackend
+        return ATLAHSLGSBackend()
+    if name == "atlahs-htsim":
+        from simulon.backend.atlahs_htsim import ATLAHShtsimBackend
+        return ATLAHShtsimBackend()
+    raise typer.BadParameter(f"Unknown backend: {name!r}. Must be one of: analytical, atlahs-lgs, atlahs-htsim")
+
+
 def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
+    backend: str = typer.Option("analytical", "--backend", help="Simulation backend to use (analytical, atlahs-lgs, atlahs-htsim)"),
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Print iteration summary to stdout"),
     chrome: Optional[Path] = typer.Option(None, "--chrome", help="Write Chrome/Perfetto trace to this path"),
     dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
@@ -54,8 +67,11 @@ def simulate(
         except Exception:
             gpu_spec = None
 
-        backend = AnalyticalBackend()
-        dag, result = backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
+        if chrome is not None and backend != "analytical":
+            raise typer.BadParameter("--chrome is only supported with the analytical backend")
+
+        sim_backend = _make_backend(backend)
+        dag, result = sim_backend.simulate(sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing)
 
         if trackers:
             params = extract_params(sc)
@@ -69,7 +85,8 @@ def simulate(
             try:
                 for tracker in trackers:
                     tracker.log_params(params)
-                    tracker.log_metrics(metrics)
+                    numeric_metrics = {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
+                    tracker.log_metrics(numeric_metrics)
                     tracker.log_artifact(scenario_artifact_path)
             finally:
                 scenario_artifact_path.unlink(missing_ok=True)
@@ -85,7 +102,7 @@ def simulate(
             energy_result = None
             if energy or cost:
                 from simulon.energy import compute_energy
-                energy_result = compute_energy(dag, sc)
+                energy_result = compute_energy(dag, sc, result.total_time_ms)
                 if energy_result is not None:
                     _print_energy_summary(energy_result)
 
@@ -138,6 +155,11 @@ def _print_summary(result, workload=None, gpu_spec=None) -> None:
         workload: Optional workload for throughput metrics.
         gpu_spec: Optional resolved GPUSpec for GPU peak TFLOPs (needed for MFU).
     """
+
+    # ATLAHS backends return a summary string — print it directly.
+    if hasattr(result, "summary"):
+        typer.echo(result.summary)
+        return
 
     total = result.total_time_ms
     n_gpus = len(result.per_gpu_times_ms)
