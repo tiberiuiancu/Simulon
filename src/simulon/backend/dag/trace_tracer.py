@@ -324,6 +324,8 @@ class MegatronDagTracer(DAGTracer):
             dp_stride = pp * ranks_per_stage
             src_stage = (record.remapped_src % dp_stride) // ranks_per_stage
             dst_stage = (record.remapped_dst % dp_stride) // ranks_per_stage
+            if src_stage == dst_stage:
+                continue
             src_ranks = ranks_for_stage(src_stage)
             dst_ranks = ranks_for_stage(dst_stage)
 
