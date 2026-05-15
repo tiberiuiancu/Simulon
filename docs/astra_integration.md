@@ -18,14 +18,10 @@ any target hardware.
 ## Architecture
 
 ```
-ScenarioConfig (DatacenterConfig + MegatronWorkload)
+ScenarioConfig (DatacenterConfig + WorkloadConfig)
     │
     ▼
-MegatronDAGTracer.trace()
-    │
-    ├─ PipelineScheduler   — 1F1B schedule per pipeline stage
-    │
-    ├─ LayerExpander       — per sublayer: AG → kernels → RS (Megatron SP pattern)
+MegatronDagTracer.trace()
     │
     └─ CCLDecomposer.decompose()  (default: DefaultCCLDecomposer → decompose_collective)
            │
@@ -61,16 +57,14 @@ Top-level dispatcher: `decompose_collective(collective_type, group_ranks, data_s
 ### `simulon.backend.dag`
 
 | Module | Responsibility |
-|---|---|
+|---|---|---|
 | `nodes.py` | `ComputeNode`, `CommNode`, `DAGEdge`, `ExecutionDAG` (with `to_dict` / `to_json`) |
-| `pipeline.py` | `PipelineScheduler` — 1F1B warmup / steady-state / cooldown schedule |
-| `layer_expander.py` | Expands one sublayer (attn or mlp) into: `AllGather → kernels → ReduceScatter` for fwd/bwd_ig; `kernels` only for bwd_wg |
-| `tracer.py` | `DAGTracer` (ABC) + `DAGTracerConfig` |
-| `megatron_tracer.py` | `MegatronDAGTracer` — iterates all GPU ranks × pipeline slots × layers × sublayers, fills comm stubs via `CCLDecomposer`, adds PP_Send nodes at stage boundaries |
+| `tracer.py` | `DAGTracerConfig` + `DAGTracer` (ABC) |
+| `trace_tracer.py` | `MegatronDagTracer` — builds DAG from real trace events and trace_path inputs |
 
 ### `simulon.backend.analytical`
 
-`AnalyticalBackend` is a thin wrapper around `MegatronDAGTracer`:
+`AnalyticalBackend` dispatches to `MegatronDagTracer` for Megatron workloads:
 
 ```python
 backend = AnalyticalBackend()
@@ -134,7 +128,7 @@ Encodes inter-node ordering (e.g. AllGather must complete before first kernel).
 
 ## Per-sublayer execution pattern
 
-Megatron sequence parallelism pattern, implemented in `LayerExpander`:
+Megatron sequence parallelism pattern:
 
 ```
 fwd / bwd_ig:

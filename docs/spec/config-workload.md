@@ -2,8 +2,9 @@
 
 This document specifies the format of the workload configuration file (`workload.yaml`).
 The workload config describes the model, parallelism strategy, and workload parameters
-to be simulated. Two frameworks are currently supported: **Megatron-LM** (training)
-and **Inference**.
+to be simulated. The primary framework is **Megatron-LM** (training) with a flat `config`
+dictionary. A legacy `megatron-deprecated` framework is also available for backwards
+compatibility.
 
 ---
 
@@ -12,13 +13,8 @@ and **Inference**.
 1. [Overview](#overview)
 2. [Framework Selection](#framework-selection)
 3. [Model Profiles and Inline Specs](#model-profiles-and-inline-specs)
-4. [Megatron-LM Workload](#megatron-lm-workload)
-   - [`model` Block](#model-block)
-   - [`parallelism` Block](#parallelism-block)
-   - [`training` Block](#training-block)
-5. [Inference Workload](#inference-workload)
-   - [`parallelism` Block (Inference)](#parallelism-block-inference)
-   - [`inference` Block](#inference-block)
+4. [Megatron-LM Workload (flat config)](#megatron-lm-workload-flat-config)
+5. [Deprecated: `megatron-deprecated` Framework](#deprecated-megatron-deprecated-framework)
 6. [Model Profile Reference](#model-profile-reference)
 7. [Full Examples](#full-examples)
 
@@ -27,8 +23,8 @@ and **Inference**.
 ## Overview
 
 Each workload configuration file declares exactly one `framework`. The remaining fields
-are framework-specific. Supported frameworks: `megatron` (LLM training), `inference`
-(LLM inference).
+are framework-specific. Supported frameworks: `megatron` (LLM training, flat config),
+`megatron-deprecated` (legacy nested config), `collective` (standalone collective benchmark).
 
 The workload config is independent of the datacenter config. The `num_gpus` field in
 the workload must not exceed the total GPUs available in the datacenter config, but
@@ -39,15 +35,13 @@ the two files are validated together at simulation time rather than being couple
 ## Framework Selection
 
 ```yaml
-framework: megatron      # megatron | inference  (more planned: deepspeed, vllm, ...)
+framework: megatron  # megatron | megatron-deprecated | collective
 ```
 
 > **Mutual exclusivity:** A workload file uses exactly **one** framework. The `megatron`
-> framework requires `model`, `parallelism`, and `training` blocks. The `inference`
-> framework requires `model`, `parallelism`, and `inference` blocks. Mixing blocks from
-> different frameworks (e.g. a `framework: megatron` file that also contains an
-> `inference:` key) is a validation error — both `MegatronWorkload` and
-> `InferenceWorkload` use `extra="forbid"`.
+> framework passes a flat `config` dictionary to the tracer. The `megatron-deprecated`
+> framework uses nested `model`, `parallelism`, and `training` blocks (legacy). Mixing
+> blocks from different frameworks is a validation error — both use `extra="forbid"`.
 
 ---
 
@@ -87,19 +81,52 @@ model:
 
 ---
 
-## Megatron-LM Workload
+## Megatron-LM Workload (flat config)
 
-A Megatron workload config has three top-level blocks beneath `framework`:
+The `megatron` framework uses a single flat `config` dictionary. All keys are passed
+through to the tracer and the `simulon trace generate` command. This is the recommended
+and actively maintained workload format.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `config` | dict[str, Any] | yes | Flat dictionary of workload parameters. Keys mirror Megatron-LM CLI flags (e.g. `tensor-model-parallel-size`, `pipeline-model-parallel-size`, `micro-batch-size`, `global-batch-size`, `seq-length`, `num-layers`, `hidden-size`, `num-attention-heads`, `ffn-hidden-size`). |
 
 ```yaml
-framework: megatron
+# Recommended: flat config workload
+workload:
+  framework: megatron
+  config:
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 4
+    micro-batch-size: 2
+    global-batch-size: 1024
+    seq-length: 4096
+    num-layers: 40
+    hidden-size: 5120
+    num-attention-heads: 40
+    ffn-hidden-size: 13824
+    num_gpus: 64
+```
+
+---
+
+## Deprecated: `megatron-deprecated` Framework
+
+This legacy nested format is preserved for backwards compatibility only. New workloads
+should use `framework: megatron` with a flat `config` dictionary.
+
+```yaml
+framework: megatron-deprecated
 
 model:       { ... }    # model architecture (profile or inline)
 parallelism: { ... }    # parallelism strategy
 training:    { ... }    # training hyperparameters and implementation options
+megatron_args: { ... }  # optional extra CLI args for `simulon trace generate`
 ```
 
 ---
+
+## Deprecated: `megatron-deprecated` Framework (continued)
 
 ### `model` Block
 
@@ -169,6 +196,7 @@ Defines the Megatron-style parallelism strategy.
 |---|---|---|---|
 | `tp` | int | `1` | Tensor Parallelism degree |
 | `pp` | int | `1` | Pipeline Parallelism degree (number of pipeline stages) |
+| `cp` | int | `1` | Context Parallelism degree. **Values > 1 are not supported.** |
 | `ep` | int | `1` | Expert Parallelism degree (MoE only; must divide `num_experts`) |
 | `dp` | int | derived | Data Parallelism degree. If omitted, derived as `num_gpus / (tp × pp × ep)`. If provided, validated against this formula. |
 | `sp` | bool | `false` | Enable Sequence Parallelism. Distributes LayerNorm and Dropout across the TP group. Requires `tp > 1`. |
@@ -215,6 +243,33 @@ training:
   dtype: bf16
   flash_attention: true
   iterations: 100
+```
+
+---
+
+### `megatron` (flat config) Block
+
+The `megatron` framework uses a single flat `config` dictionary. All keys are passed through to the tracer and the `simulon trace generate` command.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `config` | dict[str, Any] | yes | Flat dictionary of workload parameters. Common keys mirror Megatron-LM CLI flags (e.g. `tensor-model-parallel-size`, `pipeline-model-parallel-size`, `micro-batch-size`, `global-batch-size`, `seq-length`, `num-layers`, `hidden-size`, `num-attention-heads`, `ffn-hidden-size`). |
+
+```yaml
+# Flat-config workload example
+workload:
+  framework: megatron
+  config:
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 4
+    micro-batch-size: 2
+    global-batch-size: 1024
+    seq-length: 4096
+    num-layers: 40
+    hidden-size: 5120
+    num-attention-heads: 40
+    ffn-hidden-size: 13824
+    num_gpus: 64
 ```
 
 ---
@@ -325,10 +380,10 @@ DeepSeek-V2/V3, Qwen, Mixtral, etc.).
 
 ## Full Examples
 
-### Megatron-LM Training Example
+### Megatron-LM Training Example (deprecated nested config)
 
 ```yaml
-framework: megatron
+framework: megatron-deprecated
 
 model:
   from: llama-13b
@@ -354,26 +409,24 @@ training:
   iterations: 500
 ```
 
-### Inference Example
+### Megatron-LM Training Example (flat config, recommended)
 
 ```yaml
-framework: inference
+framework: megatron
 
-model:
-  from: deepseek-v3
-
-parallelism:
-  tp: 8
-  pp: 1
-  ep: 8
-  # dp is derived: 64 / (8 * 1 * 8) = 1
-
-inference:
+config:
+  tensor-model-parallel-size: 4
+  pipeline-model-parallel-size: 4
+  expert-model-parallel-size: 1
+  micro-batch-size: 2
+  global-batch-size: 1024
+  seq-length: 4096
+  num-layers: 40
+  hidden-size: 5120
+  num-attention-heads: 40
+  ffn-hidden-size: 13824
+  vocab-size: 32000
   num_gpus: 64
-  phase: decode
-  batch_size: 32
-  seq_length: 2048
-  dtype: fp8
-  flash_attention: true
-  routing_strategy: RoundRobin
+  dtype: bf16
+  flash-attention: true
 ```
