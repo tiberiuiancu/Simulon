@@ -12,8 +12,6 @@ from simulon.config.dc import DatacenterConfig
 class DAGTracerConfig:
     num_channels: int = 1
     algorithm: str = "ring"   # ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
-    dtype_bytes: int = 2  # bf16
-    cache_dir: Optional[Path] = field(default_factory=lambda: Path.home() / ".cache" / "simulon" / "dag")  # set to None to disable
     compact: bool = False  # fuse consecutive compute-only sublayers into single nodes
 
 
