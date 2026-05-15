@@ -1,0 +1,6 @@
+include README.md
+recursive-include src/simulon *.py
+graft vendor/atlahs
+recursive-exclude vendor/atlahs *.git*
+prune src/simulon/backend/atlahs_binaries
+global-exclude *.so *.pyc __pycache__

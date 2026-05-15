@@ -107,8 +107,30 @@ simulon/
 
 ## Installation
 
-Requires Python 3.11+. Uses [uv](https://github.com/astral-sh/uv). Pure Python — no
-build step required.
+### From PyPI (recommended)
+
+Pre-built wheels are available for macOS (arm64, x86_64) and Linux (x86_64).
+No build tools required.
+
+```bash
+pip install simulon
+```
+
+### From source
+
+Requires Python 3.11+ and system build dependencies:
+
+- **macOS**: `brew install re2c gengetopt`
+- **Ubuntu/Debian**: `sudo apt install re2c gengetopt`
+- **Other Linux**: Install `re2c` and `gengetopt` via your package manager
+
+Then build and install:
+
+```bash
+pip install .
+```
+
+### Development setup (using uv)
 
 ```bash
 uv sync
