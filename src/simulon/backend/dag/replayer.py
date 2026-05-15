@@ -200,7 +200,7 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
     """Critical-path walk over a fully-populated DAG.
 
     Assumes all node.duration_ms fields have been set before calling:
-      - ComputeNode.duration_ms: filled by populate_dag()
+      - ComputeNode.duration_ms: already set by trace_tracer (trace-driven path)
       - CommNode.duration_ms:    filled by populate_network() (or a network simulator)
 
     Pure scheduler — no duration computation happens here. This means any

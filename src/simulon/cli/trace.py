@@ -1,5 +1,4 @@
 import os
-import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -8,88 +7,9 @@ from typing import Optional
 import numpy
 import typer
 import yaml
+from simulon.cli.utils import _ensure_c4_dataset
 
 trace_app = typer.Typer(help="Trace generation commands.")
-
-
-def _ensure_c4_dataset(data_path: str, seq_length: int = 8192) -> None:
-    prefix = Path(data_path)
-    bin_path = prefix.with_suffix(".bin")
-    idx_path = prefix.with_suffix(".idx")
-    if bin_path.exists() and idx_path.exists():
-        with open(idx_path, "rb") as f:
-            header = f.read(9)
-            if header == b"MMIDIDX\x00\x00":
-                version = struct.unpack("<Q", f.read(8))[0]
-                if version == 1:
-                    f.read(1)
-                    seq_count = struct.unpack("<Q", f.read(8))[0]
-                    if seq_count >= 400:
-                        return
-        typer.echo("Existing C4 dataset is outdated, regenerating...")
-        bin_path.unlink(missing_ok=True)
-        idx_path.unlink(missing_ok=True)
-
-    try:
-        from datasets import load_dataset
-        from transformers import AutoTokenizer
-    except ImportError as exc:
-        raise typer.BadParameter(
-            "C4 dataset requires 'transformers' and 'datasets' libraries. "
-            "Install them with: uv pip install transformers datasets"
-        ) from exc
-
-    typer.echo("Downloading C4/en from HuggingFace and tokenizing with Llama-3-8B tokenizer ...")
-    prefix.parent.mkdir(parents=True, exist_ok=True)
-
-    tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B")
-    vocab_size = tokenizer.vocab_size
-
-    ds = load_dataset("allenai/c4", "en", split="train", streaming=True)
-    num_docs = 1000
-    token_ids: list[numpy.ndarray] = []
-    lengths: list[int] = []
-    for i, example in enumerate(ds):
-        if i >= num_docs:
-            break
-        tokens = tokenizer.encode(example["text"], add_special_tokens=False)
-        if len(tokens) < 10:
-            continue
-        arr = numpy.array(tokens, dtype=numpy.int32)
-        token_ids.append(arr)
-        lengths.append(len(arr))
-
-    if len(lengths) < 400:
-        raise typer.BadParameter(
-            f"Only got {len(lengths)} valid C4 documents; "
-            "the dataset stream may have been empty or truncated."
-        )
-
-    with open(bin_path, "wb") as f:
-        for arr in token_ids:
-            f.write(arr.tobytes(order="C"))
-
-    pointers: list[int] = []
-    curr = numpy.int64(0)
-    itemsize = numpy.dtype(numpy.int32).itemsize
-    for length in lengths:
-        pointers.append(curr.item())
-        curr += length * itemsize
-
-    document_indices = list(range(len(lengths) + 1))
-
-    with open(idx_path, "wb") as f:
-        f.write(b"MMIDIDX\x00\x00")
-        f.write(struct.pack("<Q", 1))
-        f.write(struct.pack("<B", 4))
-        f.write(struct.pack("<Q", len(lengths)))
-        f.write(struct.pack("<Q", len(document_indices)))
-        f.write(numpy.array(lengths, dtype=numpy.int32).tobytes(order="C"))
-        f.write(numpy.array(pointers, dtype=numpy.int64).tobytes(order="C"))
-        f.write(numpy.array(document_indices, dtype=numpy.int64).tobytes(order="C"))
-
-    typer.echo(f"Dataset ready: {bin_path}, {idx_path} ({len(lengths)} docs, vocab={vocab_size})")
-
 
 _MEGATRON_ENTRYPOINT = Path(__file__).parents[3] / "vendor" / "Megatron-LM-traced" / "pretrain_gpt.py"
 
@@ -109,10 +29,11 @@ def generate_trace(
     merge_file: Optional[str] = typer.Option(None, "--merge-file", help="Merge file path (required for GPT2BPETokenizer)"),
     dataset: Optional[str] = typer.Option(None, "--dataset", help="Preset dataset (mock) or custom data path"),
     memory_snapshot: Optional[Path] = typer.Option(None, "--memory-snapshot", help="Dump a PyTorch CUDA memory snapshot to the given path (for OOM debugging)"),
+    warmup: int = typer.Option(5, "--warmup", help="Number of warmup iterations to run before tracing (default: 5)"),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.scenario import ScenarioConfig
-    from simulon.config.workload import LLMSpec, MegatronDeprecatedWorkload, MegatronWorkload
+    from simulon.config.workload import MegatronWorkload
     from simulon.config.resolve import resolve_workload, workload_hash, resolve_gpu_spec
 
     with open(scenario) as f:
@@ -129,7 +50,7 @@ def generate_trace(
         if gpu is None:
             raise typer.BadParameter("--gpu is required when input is a workload YAML")
 
-    if not isinstance(workload, (MegatronWorkload, MegatronDeprecatedWorkload)):
+    if not isinstance(workload, MegatronWorkload):
         raise typer.BadParameter("Workload must be a Megatron workload")
 
     # Determine GPU name and compute default trace path if no --output-dir
@@ -143,10 +64,7 @@ def generate_trace(
         else:
             gpu_name = gpu.lower().replace(" ", "-")
 
-        if isinstance(workload, MegatronWorkload):
-            h = workload_hash(workload)
-        else:
-            h = "default"
+        h = workload_hash(workload)
         output_dir = Path("templates/gpu") / gpu_name / "traces" / h
 
     derived_args: dict[str, str | int | bool]
@@ -156,73 +74,31 @@ def generate_trace(
         derived_args[flag] = value
         explicitly_set.add(flag)
 
-    if isinstance(workload, MegatronDeprecatedWorkload):
-        p = workload.parallelism
-        t = workload.training
-
-        derived_args = {
-            "--tensor-model-parallel-size": p.tp,
-            "--pipeline-model-parallel-size": p.pp,
-            "--micro-batch-size": t.micro_batch_size,
-            "--global-batch-size": t.global_batch_size,
-            "--seq-length": t.sequence_length,
-        }
-        explicitly_set.update(derived_args.keys())
-        if p.ep > 1:
-            _set_arg("--expert-model-parallel-size", p.ep)
-
-        model = workload.model
-        if isinstance(model, LLMSpec):
-            if model.num_layers is not None:
-                _set_arg("--num-layers", model.num_layers)
-            if model.hidden_size is not None:
-                _set_arg("--hidden-size", model.hidden_size)
-            if model.num_heads is not None:
-                _set_arg("--num-attention-heads", model.num_heads)
-            if model.ffn_hidden_size is not None:
-                _set_arg("--ffn-hidden-size", model.ffn_hidden_size)
-
-        if workload.megatron_args:
-            for key, value in workload.megatron_args.items():
-                flag = f"--{key}"
-                if isinstance(value, bool):
-                    if value:
-                        _set_arg(flag, True)
-                    elif flag in derived_args:
-                        del derived_args[flag]
-                        explicitly_set.add(flag)
-                else:
-                    _set_arg(flag, value)
-
-        pp = p.pp
-        tp = p.tp
-        world_size = t.num_gpus
-    else:
-        cfg = workload.config
-        derived_args = {}
-        for key in ("tensor-model-parallel-size", "pipeline-model-parallel-size",
-                    "micro-batch-size", "global-batch-size", "seq-length",
-                    "expert-model-parallel-size", "num-layers", "hidden-size",
-                    "num-attention-heads", "ffn-hidden-size"):
-            if key in cfg:
-                _set_arg(f"--{key}", cfg[key])
-        if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
-            _set_arg("--max-position-embeddings", derived_args["--seq-length"])
-        skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
-        for key, value in cfg.items():
-            if key == "distributed-optimizer":
-                flag = "--use-distributed-optimizer"
+    cfg = workload.config
+    derived_args = {}
+    for key in ("tensor-model-parallel-size", "pipeline-model-parallel-size",
+                "micro-batch-size", "global-batch-size", "seq-length",
+                "expert-model-parallel-size", "num-layers", "hidden-size",
+                "num-attention-heads", "ffn-hidden-size"):
+        if key in cfg:
+            _set_arg(f"--{key}", cfg[key])
+    if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
+        _set_arg("--max-position-embeddings", derived_args["--seq-length"])
+    skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
+    for key, value in cfg.items():
+        if key == "distributed-optimizer":
+            flag = "--use-distributed-optimizer"
+        else:
+            flag = f"--{key}"
+        if flag not in derived_args and key not in skip:
+            if isinstance(value, bool):
+                _set_arg(flag, value)
             else:
-                flag = f"--{key}"
-            if flag not in derived_args and key not in skip:
-                if isinstance(value, bool):
-                    _set_arg(flag, value)
-                else:
-                    _set_arg(flag, value)
+                _set_arg(flag, value)
 
-        pp = int(cfg.get("pipeline-model-parallel-size", 1))
-        tp = int(cfg.get("tensor-model-parallel-size", 1))
-        world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
+    pp = int(cfg.get("pipeline-model-parallel-size", 1))
+    tp = int(cfg.get("tensor-model-parallel-size", 1))
+    world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
         "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
@@ -253,7 +129,6 @@ def generate_trace(
         _ensure_c4_dataset(str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len))
 
     _TRACE_DEFAULTS = {
-        "--train-iters": 6,  # 5 warmup + 1 traced iteration
         "--lr": 0.001,
         "--min-lr": 0.0,
         "--eval-interval": 1000000,
@@ -269,6 +144,8 @@ def generate_trace(
     for flag, value in _TRACE_DEFAULTS.items():
         if flag not in explicitly_set:
             derived_args[flag] = value
+    if "--train-iters" not in explicitly_set:
+        derived_args["--train-iters"] = warmup + 1
     if stages is not None:
         stages_to_trace = stages
     elif all_stages:

@@ -316,14 +316,14 @@ class TestAnalyticalBackendCollective:
         _, r_large = backend.simulate(sc_large)
         assert r_large.total_time_ms > r_small.total_time_ms
 
-    def test_simulate_all_collective_types(self):
+    @pytest.mark.parametrize("ct", ["AllReduce", "AllGather", "ReduceScatter", "AllToAll"])
+    def test_simulate_all_collective_types(self, ct):
         """AnalyticalBackend.simulate() works for all four CollectiveType values."""
         backend = AnalyticalBackend()
-        for ct in ["AllReduce", "AllGather", "ReduceScatter", "AllToAll"]:
-            sc = make_collective_scenario(collective_type=ct)
-            dag, result = backend.simulate(sc)
-            assert result.total_time_ms > 0, f"Expected positive time for {ct}"
-            assert dag.compute_nodes == []
+        sc = make_collective_scenario(collective_type=ct)
+        dag, result = backend.simulate(sc)
+        assert result.total_time_ms > 0, f"Expected positive time for {ct}"
+        assert dag.compute_nodes == []
 
     def test_run_trace_returns_execution_dag(self):
         """AnalyticalBackend.run_trace() returns an ExecutionDAG for CollectiveWorkload."""
