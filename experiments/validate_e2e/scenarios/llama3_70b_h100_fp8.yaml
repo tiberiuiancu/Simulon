@@ -49,8 +49,10 @@ workload:
     group-query-attention: true
     kv-channels: 128
     attention-softmax-in-fp32: false
-    fp8: true
     bf16: false
+    fp8-format: e4m3
+    fp8-recipe: blockwise
+    fp8-param-gather: true
     disable-bias-linear: true
     no-bias-dropout-fusion: true
     no-rope-fusion: true
