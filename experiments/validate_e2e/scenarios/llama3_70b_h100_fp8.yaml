@@ -33,8 +33,8 @@ collective:
 workload:
   framework: megatron
   config:
-    tensor-model-parallel-size: 1
-    pipeline-model-parallel-size: 1
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 8
     overlap-grad-reduce: true
     overlap-param-gather: true
     num-layers: 80
