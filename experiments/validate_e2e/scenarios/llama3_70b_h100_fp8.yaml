@@ -1,0 +1,67 @@
+datacenter:
+  datacenter:
+    name: dgx-h100-64gpu
+  cluster:
+    num_nodes: 8
+  node:
+    gpus_per_node: 8
+    gpu:
+      from: h100
+      cost:
+        value: 25000
+        min: 20000
+        max: 32000
+  network:
+    scale_up:
+      switch:
+        port_speed: 7200Gbps
+        latency: 0.000025ms
+    scale_out:
+      nic:
+        speed: 400Gbps
+        latency: 0.005ms
+      topology:
+        type: fat_tree
+        params:
+          k: 8
+
+collective:
+  library: nccl
+  algorithm: ring
+  num_channels: 1
+
+workload:
+  framework: megatron
+  config:
+    tensor-model-parallel-size: 1
+    pipeline-model-parallel-size: 1
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+    num-layers: 80
+    hidden-size: 8192
+    ffn-hidden-size: 28672
+    num-attention-heads: 64
+    num-query-groups: 8
+    vocab-size: 128256
+    swiglu: true
+    position-embedding-type: rope
+    rotary-base: 500000
+    group-query-attention: true
+    kv-channels: 128
+    attention-softmax-in-fp32: false
+    fp8: true
+    bf16: false
+    disable-bias-linear: true
+    no-bias-dropout-fusion: true
+    no-rope-fusion: true
+    gradient-accumulation-fusion: false
+    multi-latent-attention: false
+    hidden-dropout: 0.0
+    attention-dropout: 0.0
+    micro-batch-size: 2
+    global-batch-size: 256
+    seq-length: 8192
+    max-position-embeddings: 8192
+    num-gpus: 64
+    distributed-optimizer: true
+    mock-data: true
