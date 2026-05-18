@@ -35,6 +35,7 @@ workload:
   config:
     tensor-model-parallel-size: 4
     pipeline-model-parallel-size: 8
+    num-layers-per-virtual-pipeline-stage: 2
     overlap-grad-reduce: true
     overlap-param-gather: true
     num-layers: 80
