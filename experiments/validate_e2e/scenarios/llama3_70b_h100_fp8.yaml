@@ -33,7 +33,7 @@ collective:
 workload:
   framework: megatron
   config:
-    use-flash-attn: true
+    attention-backend: flash
     tensor-model-parallel-size: 4
     pipeline-model-parallel-size: 8
     num-layers-per-virtual-pipeline-stage: 2
