@@ -33,6 +33,8 @@ collective:
 workload:
   framework: megatron
   config:
+#    attention-backend: fused
+#    transformer-impl: transformer_engine
     tensor-model-parallel-size: 4
     pipeline-model-parallel-size: 8
     num-layers-per-virtual-pipeline-stage: 2
@@ -50,10 +52,10 @@ workload:
     group-query-attention: true
     kv-channels: 128
     attention-softmax-in-fp32: false
-    bf16: false
-    fp8-format: e4m3
-    fp8-recipe: delayed 
-    fp8-param-gather: true
+    bf16: true
+    #fp8-format: e4m3
+    #fp8-recipe: blockwise
+    #fp8-param-gather: true
     disable-bias-linear: true
     no-bias-dropout-fusion: true
     no-rope-fusion: true
