@@ -1,4 +1,6 @@
 datacenter:
+  datacenter:
+    name: "dgx-64"
   cluster:
     num_nodes: 8
   node:
@@ -26,6 +28,7 @@ collective:
 workload:
   framework: megatron
   config:
+    attention-backend: flash
     tensor-model-parallel-size: 1
     pipeline-model-parallel-size: 4
     expert-model-parallel-size: 8
@@ -69,3 +72,4 @@ workload:
     num-gpus: 64
     distributed-optimizer: true
     mock-data: true
+    split: "1000,0,0"
