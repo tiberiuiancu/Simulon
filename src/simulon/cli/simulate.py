@@ -61,6 +61,10 @@ def simulate(
             params = extract_params(sc)
             metrics = extract_metrics(result)
 
+            if isinstance(sc.workload, MegatronWorkload):
+                derived = _compute_training_metrics(result, sc.workload, gpu_spec)
+                metrics.update({k: v for k, v in derived.items() if v is not None})
+
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".yaml", prefix="scenario_", delete=False
             ) as tmp:
@@ -157,6 +161,66 @@ def _print_summary(result, workload=None, gpu_spec=None) -> None:
     typer.echo(f"  Overlapped comm:{result.overlapped_comm_ms:9.3f} ms        "
                "  (hidden by compute, not in totals above)")
     typer.echo("")
+
+    if workload is not None and total > 0:
+        metrics = _compute_training_metrics(result, workload, gpu_spec)
+        if metrics:
+            typer.echo(
+                f"Throughput:           {metrics['per_gpu_tps']:,.1f} tokens/s "
+                f"({metrics['throughput_tps']:,.1f} tokens/s)"
+            )
+            if metrics.get("per_gpu_tflops") is not None:
+                typer.echo(
+                    f"                      {metrics['per_gpu_tflops']:.2f} TFLOPs/s "
+                    f"({metrics['tflops']:.2f} TFLOPs/s)"
+                )
+            if metrics.get("mfu_pct") is not None:
+                typer.echo(f"  MFU:                {metrics['mfu_pct']:.1f}%")
+            typer.echo("")
+
+
+def _compute_training_metrics(result, workload, gpu_spec=None) -> dict[str, float]:
+    """Compute throughput, TFLOPs, and MFU from a simulation result."""
+    try:
+        total = result.total_time_ms
+        n_gpus = len(result.per_gpu_times_ms)
+        if total <= 0 or n_gpus == 0:
+            return {}
+
+        from simulon.config.workload import MegatronWorkload
+
+        if not isinstance(workload, MegatronWorkload):
+            return {}
+
+        cfg = workload.config
+        tokens_per_iter = cfg.get("global-batch-size", 0) * cfg.get("seq-length", 0)
+
+        iter_time_s = total / 1000.0
+        if iter_time_s <= 0:
+            return {}
+        throughput_tps = tokens_per_iter / iter_time_s
+        per_gpu_tps = throughput_tps / n_gpus
+
+        gflops_per_token = None
+        if result.total_flops is not None and tokens_per_iter > 0:
+            gflops_per_token = result.total_flops / tokens_per_iter / 1e9
+
+        metrics: dict[str, float] = {
+            "throughput_tps": throughput_tps,
+            "per_gpu_tps": per_gpu_tps,
+        }
+        if gflops_per_token is not None:
+            tflops = throughput_tps * gflops_per_token / 1e3
+            per_gpu_tflops = tflops / n_gpus
+            metrics["gflops_per_token"] = gflops_per_token
+            metrics["tflops"] = tflops
+            metrics["per_gpu_tflops"] = per_gpu_tflops
+
+            if gpu_spec is not None and gpu_spec.peak_tflops_bf16 is not None:
+                metrics["mfu_pct"] = (per_gpu_tflops / gpu_spec.peak_tflops_bf16) * 100
+        return metrics
+    except Exception:
+        return {}
 
 
 def _print_collective_summary(workload, result, datacenter) -> None:

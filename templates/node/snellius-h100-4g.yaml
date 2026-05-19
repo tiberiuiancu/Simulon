@@ -2,8 +2,9 @@
 # Hardware: H100 SXM 80GB, NVSwitch 4 (partial node), InfiniBand HDR100
 # Source: experiments/validate_simccl/results/nccl_*.json
 name: snellius-h100-4g
+# Hardware: H100 SXM 96GB, NVSwitch 4 (partial node), InfiniBand HDR100
 gpus_per_node: 4
-gpu: h100
+gpu: h100-96gb
 scale_up:
   switch:
     port_speed: 2554Gbps
