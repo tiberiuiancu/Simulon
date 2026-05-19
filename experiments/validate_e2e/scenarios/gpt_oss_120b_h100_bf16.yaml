@@ -1,16 +1,9 @@
 datacenter:
-  datacenter:
-    name: dgx-h100-64gpu
   cluster:
     num_nodes: 8
   node:
     gpus_per_node: 8
-    gpu:
-      from: h100
-      cost:
-        value: 25000
-        min: 20000
-        max: 32000
+    gpu: h100
   network:
     scale_up:
       switch:
@@ -36,7 +29,6 @@ workload:
     tensor-model-parallel-size: 1
     pipeline-model-parallel-size: 4
     expert-model-parallel-size: 8
-    num-layers-per-virtual-pipeline-stage: 3
     overlap-grad-reduce: true
     overlap-param-gather: true
     num-layers: 36
