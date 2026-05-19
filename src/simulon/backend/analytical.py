@@ -104,7 +104,7 @@ class AnalyticalBackend(Backend):
             tp = int(cfg.get("tensor-model-parallel-size", 1))
             pp = int(cfg.get("pipeline-model-parallel-size", 1))
             ep = int(cfg.get("expert-model-parallel-size", 1))
-            num_gpus = int(cfg.get("num_gpus", tp * pp * ep))
+            num_gpus = int(cfg.get("num_gpus", cfg.get("num-gpus", tp * pp * ep)))
             dp = max(1, num_gpus // (tp * pp * ep))
             logger.info("Building DAG  (GPUs=%d  tp=%d  pp=%d  ep=%d  dp=%d) ...",
                         num_gpus, tp, pp, ep, dp)

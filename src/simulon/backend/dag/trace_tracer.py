@@ -40,7 +40,7 @@ class MegatronDagTracer(DAGTracer):
         pp = int(cfg.get("pipeline-model-parallel-size", 1))
         ep = int(cfg.get("expert-model-parallel-size", 1))
         cp = 1
-        num_gpus = int(cfg.get("num_gpus", tp * pp * ep))
+        num_gpus = int(cfg.get("num_gpus", cfg.get("num-gpus", tp * pp * ep)))
         dp_pipeline = max(1, num_gpus // (tp * pp * cp))
         dp = max(1, num_gpus // (tp * pp * ep))
         num_microbatches = int(
@@ -59,26 +59,27 @@ class MegatronDagTracer(DAGTracer):
         dtype_bytes = 4 if dtype_str == "fp32" else 1 if dtype_str == "fp8" else 2
         activation_bytes = seq_len * micro_bs * hidden_size * dtype_bytes
 
-        def global_rank(dp_rank: int, pp_stage: int, ep_rank: int, tp_rank: int, cp_rank: int = 0) -> int:
+        def global_rank(tp_rank: int, cp_rank: int, ep_rank: int, dp_rank: int, pp_stage: int) -> int:
             return (
-                dp_rank * (pp * ep * cp * tp)
-                + pp_stage * (ep * cp * tp)
-                + ep_rank * (cp * tp)
+                tp_rank
                 + cp_rank * tp
-                + tp_rank
+                + ep_rank * tp * cp
+                + dp_rank * tp * cp * ep
+                + pp_stage * tp * cp * ep * dp
             )
 
         def ranks_for_stage(pp_stage: int) -> list[int]:
             ranks: list[int] = []
             for dp_rank in range(dp):
                 for ep_rank in range(ep):
-                    for tp_rank in range(tp):
-                        for cp_rank in range(cp):
-                            ranks.append(global_rank(dp_rank, pp_stage, ep_rank, tp_rank, cp_rank))
+                    for cp_rank in range(cp):
+                        for tp_rank in range(tp):
+                            ranks.append(global_rank(tp_rank, cp_rank, ep_rank, dp_rank, pp_stage))
             return ranks
 
         def _remap_rank(traced_rank: int, traced_stage: int, target_stage: int) -> int:
-            offset = (target_stage - traced_stage) * (ep * cp * tp)
+            pp_stride = tp * cp * ep * dp
+            offset = (target_stage - traced_stage) * pp_stride
             return traced_rank + offset
 
         traces_dir = (

@@ -104,7 +104,7 @@ def simulate(
                 tp = int(cfg.get("tensor-model-parallel-size", 1))
                 pp_val = int(cfg.get("pipeline-model-parallel-size", 1))
                 ep = int(cfg.get("expert-model-parallel-size", 1))
-                num_gpus = int(cfg.get("num_gpus", tp * pp_val * ep))
+                num_gpus = int(cfg.get("num_gpus", cfg.get("num-gpus", tp * pp_val * ep)))
                 dp = max(1, num_gpus // (tp * pp_val * ep))
             else:
                 tp = pp_val = ep = dp = 1
