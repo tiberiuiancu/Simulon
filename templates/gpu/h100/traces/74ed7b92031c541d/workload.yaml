@@ -1,5 +1,6 @@
 framework: megatron
 config:
+  attention-backend: flash
   tensor-model-parallel-size: 4
   pipeline-model-parallel-size: 4
   num-layers-per-virtual-pipeline-stage: 8
@@ -32,7 +33,4 @@ config:
   max-position-embeddings: 8192
   num-gpus: 16
   distributed-optimizer: true
-  mock-data: false
-  data-path: ./data/c4_en_llama3
-  tokenizer-type: HuggingFaceTokenizer
-  tokenizer-model: meta-llama/Meta-Llama-3-8B
+  mock-data: true

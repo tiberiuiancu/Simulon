@@ -1,10 +1,7 @@
-# Llama-3-8B (dense) training scenario — NEW flat-config format
+# GPT-OSS-20B (MoE) training scenario — NEW flat-config format
 #
-# Parallelism: TP=4, PP=4, DP=1
-# Total GPUs:  4 × 4 × 1 = 16  (4 nodes × 4 GPUs/node)
-#
-# TP=4 keeps tensor-parallel comms within each node over NVLink.
-# PP=4 pipelines across nodes over InfiniBand.
+# Parallelism: TP=1, PP=4, EP=4, DP=1
+# Total GPUs:  1 × 4 × 4 × 1 = 16  (4 nodes × 4 GPUs/node)
 #
 # This uses the trace-driven path (framework: megatron) with a flat "config"
 # dict that mirrors Megatron-LM CLI flags.  Compute durations come from real
@@ -22,7 +19,6 @@ datacenter:
     electricity_cost_per_kwh: 0.10   # Netherlands commercial rate (EUR)
     datacenter_lifetime_years: 5
     idle_fraction: 0.4
-    traces_dir: ./traces
   cluster:
     num_nodes: 4
   node:
@@ -61,28 +57,43 @@ collective:
 workload:
   framework: megatron
   config:
+    attention-backend: flash
+
     # Parallelism
-    tensor-model-parallel-size: 4
+    tensor-model-parallel-size: 1
     pipeline-model-parallel-size: 4
-    num-layers-per-virtual-pipeline-stage: 8
+    expert-model-parallel-size: 4
+    num-layers-per-virtual-pipeline-stage: 3
     overlap-grad-reduce: true
     overlap-param-gather: true
 
     # Model architecture
-    num-layers: 32
-    hidden-size: 4096
-    ffn-hidden-size: 14336
-    num-attention-heads: 32
+    num-layers: 24
+    hidden-size: 2880
+    ffn-hidden-size: 2880
+    num-attention-heads: 64
     num-query-groups: 8
     vocab-size: 128256
     swiglu: true
 
     # Position / attention
     position-embedding-type: rope
-    rotary-base: 500000
+    rotary-base: 150000
     group-query-attention: true
-    kv-channels: 128
+    kv-channels: 64
     attention-softmax-in-fp32: false
+    window-size: "127,0"
+    window-attn-skip-freq: "[1,0]*12"
+
+    # MoE
+    num-experts: 32
+    moe-router-topk: 4
+    moe-token-dispatcher-type: alltoall
+    moe-grouped-gemm: true
+    moe-permute-fusion: true
+    moe-ffn-hidden-size: 2880
+    moe-layer-freq: 1
+    moe-aux-loss-coeff: 0.01
 
     # Precision
     bf16: true
@@ -103,11 +114,9 @@ workload:
     micro-batch-size: 1
     global-batch-size: 16
     seq-length: 8192
-    max-position-embeddings: 8192
+    max-position-embeddings: 131072
     num-gpus: 16
     distributed-optimizer: true
 
-    mock-data: false
-    data-path: ./data/c4_en_llama3
-    tokenizer-type: HuggingFaceTokenizer
-    tokenizer-model: meta-llama/Meta-Llama-3-8B
+    mock-data: true
+
