@@ -98,6 +98,7 @@ def generate_trace(
 
     pp = int(cfg.get("pipeline-model-parallel-size", 1))
     tp = int(cfg.get("tensor-model-parallel-size", 1))
+    ep = int(cfg.get("expert-model-parallel-size", 1))
     world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
 
     _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
@@ -162,7 +163,8 @@ def generate_trace(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for stage in stages_to_trace:
-        ranks_per_stage = world_size // pp if world_size and pp else tp
+        dp = int(cfg.get("data-parallel-size", cfg.get("data_parallel_size", world_size // pp // tp // ep if world_size and pp and tp else 1)))
+        ranks_per_stage = world_size // pp // dp if world_size and pp and dp else tp
         rank = stage * ranks_per_stage
         cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
         for flag, value in derived_args.items():

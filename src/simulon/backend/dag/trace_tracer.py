@@ -321,10 +321,9 @@ class MegatronDagTracer(DAGTracer):
         for record in pending_pp_transfers:
             # The trace records one representative PP transfer per stage pair.
             # Replicate it across all corresponding ranks (TP/EP/CP/DP replicas).
-            ranks_per_stage = ep * cp * tp
-            dp_stride = pp * ranks_per_stage
-            src_stage = (record.remapped_src % dp_stride) // ranks_per_stage
-            dst_stage = (record.remapped_dst % dp_stride) // ranks_per_stage
+            pp_stride = tp * cp * ep * dp
+            src_stage = record.remapped_src // pp_stride
+            dst_stage = record.remapped_dst // pp_stride
             if src_stage == dst_stage:
                 continue
             src_ranks = ranks_for_stage(src_stage)
