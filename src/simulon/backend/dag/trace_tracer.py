@@ -435,7 +435,7 @@ def _add_compute_node(
     cn = ComputeNode(
         node_id=node_id[0],
         gpu_rank=rank,
-        kernel="trace_compute",
+        kernel="compute",
         layer_id=-1,
         microbatch_id=microbatch_id,
         pipeline_stage=_stage_of(rank, config),
