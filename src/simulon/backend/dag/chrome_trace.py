@@ -43,7 +43,9 @@ def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int
     return dp_rank, pp_stage, ep_rank, tp_rank
 
 
-def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -> dict[str, Any]:
+def to_chrome_trace(
+    dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1, *, only_profiled: bool = False
+) -> dict[str, Any]:
     """Build a Chrome Trace dict from a timing-populated ExecutionDAG.
 
     Args:
@@ -51,6 +53,7 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
         tp:   Tensor parallelism degree.
         pp:   Pipeline parallelism degree.
         dp:   Data parallelism degree.
+        only_profiled: If True, only emit events for ranks that had exact trace files.
 
     Returns:
         Dict with "traceEvents" list, ready for json.dump().
@@ -68,6 +71,9 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
     for n in dag.comm_nodes:
         all_gpus.add(n.src_gpu)
         all_gpus.add(n.dst_gpu)
+
+    if only_profiled:
+        all_gpus &= dag.profiled_ranks
 
     # Emit process/thread metadata sorted by (dp, pp, tp) = natural gpu_rank order
     for gpu in sorted(all_gpus):
@@ -191,9 +197,10 @@ def write_chrome_trace(
     dp: int,
     path: str | Path,
     ep: int = 1,
+    only_profiled: bool = False,
 ) -> None:
     """Write a Chrome Trace JSON file from a populated ExecutionDAG."""
     import json
-    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep)
+    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep, only_profiled=only_profiled)
     with open(path, "w") as f:
         json.dump(trace, f)

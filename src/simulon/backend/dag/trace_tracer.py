@@ -833,6 +833,9 @@ class MegatronDagTracer(DAGTracer):
 
         for rank in range(config.world_size):
             trace = _load_or_derive_trace(rank, traces_dir, config, stage_traces)
+            exact_path = traces_dir / f"trace_rank_{rank}.json"
+            if exact_path.exists():
+                dag.profiled_ranks.add(rank)
             if dag.total_flops is None and trace.total_flops is not None:
                 dag.total_flops = trace.total_flops
             _add_trace_to_dag(
