@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, cast
 
 from simulon.backend.dag.nodes import ComputeNode, CommNode, DAGEdge, ExecutionDAG
+from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.trace_parser import TraceFileParser
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
 from simulon.collective import CCLDecomposer
@@ -13,6 +15,7 @@ from simulon.collective.decompose import decompose_collective
 from simulon.config.dc import DatacenterConfig
 from simulon.config.workload import MegatronWorkload
 
+logger = logging.getLogger(__name__)
 
 """Megatron-LM rank formula and parallelism helpers."""
 
@@ -831,20 +834,22 @@ class MegatronDagTracer(DAGTracer):
         node_id = [0]
         flow_id = [0]
 
-        for rank in range(config.world_size):
-            trace = _load_or_derive_trace(rank, traces_dir, config, stage_traces)
-            exact_path = traces_dir / f"trace_rank_{rank}.json"
-            if exact_path.exists():
-                dag.profiled_ranks.add(rank)
-            if dag.total_flops is None and trace.total_flops is not None:
-                dag.total_flops = trace.total_flops
-            _add_trace_to_dag(
-                dag, trace, rank, config, node_id, flow_id,
-                activation_bytes, self.cfg,
-                slot_nodes, slot_entry_node, slot_last_node,
-                slot_first_timestamp, slot_last_timestamp,
-                pending_pp_transfers, last_node_by_rank,
-            )
+        with log_progress("  building DAG", config.world_size, logger) as advance:
+            for rank in range(config.world_size):
+                trace = _load_or_derive_trace(rank, traces_dir, config, stage_traces)
+                exact_path = traces_dir / f"trace_rank_{rank}.json"
+                if exact_path.exists():
+                    dag.profiled_ranks.add(rank)
+                if dag.total_flops is None and trace.total_flops is not None:
+                    dag.total_flops = trace.total_flops
+                _add_trace_to_dag(
+                    dag, trace, rank, config, node_id, flow_id,
+                    activation_bytes, self.cfg,
+                    slot_nodes, slot_entry_node, slot_last_node,
+                    slot_first_timestamp, slot_last_timestamp,
+                    pending_pp_transfers, last_node_by_rank,
+                )
+                advance()
 
         _wire_slot_edges(dag, slot_nodes)
         node_id[0], flow_id[0] = _wire_pp_transfers(
