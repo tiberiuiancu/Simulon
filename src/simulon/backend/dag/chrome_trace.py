@@ -115,6 +115,8 @@ def to_chrome_trace(
     for n in dag.compute_nodes:
         if n.start_ms is None or n.finish_ms is None:
             continue
+        if only_profiled and n.gpu_rank not in dag.profiled_ranks:
+            continue
         args: dict[str, Any] = {
             "kernel":           n.kernel,
             "phase":            n.phase,
@@ -145,6 +147,8 @@ def to_chrome_trace(
 
     for n in dag.comm_nodes:
         if n.start_ms is None or n.finish_ms is None:
+            continue
+        if only_profiled and (n.src_gpu not in dag.profiled_ranks or n.dst_gpu not in dag.profiled_ranks):
             continue
 
         key = (n.src_gpu, n.dst_gpu, n.start_ms, n.bytes)
