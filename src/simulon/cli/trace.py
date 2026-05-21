@@ -156,7 +156,7 @@ def generate_trace(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     dp = int(cfg.get("data-parallel-size", cfg.get("data_parallel_size", world_size // pp // tp // ep if world_size and pp and tp else 1)))
-    ranks_per_stage = world_size // pp // dp if world_size and pp and dp else tp
+    ranks_per_stage = world_size // pp if world_size and pp else tp
 
     if all_ranks:
         ranks_to_trace = list(range(world_size))
