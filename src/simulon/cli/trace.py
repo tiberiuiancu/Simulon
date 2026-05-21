@@ -150,12 +150,7 @@ def generate_trace(
     if stages is not None:
         stages_to_trace = stages
     else:
-        if pp == 1:
-            stages_to_trace = [0]
-        elif pp == 2:
-            stages_to_trace = [0, pp - 1]
-        else:
-            stages_to_trace = [0, pp // 2, pp - 1]
+        stages_to_trace = list(range(pp))
 
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
