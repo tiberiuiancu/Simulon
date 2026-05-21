@@ -20,7 +20,7 @@ def generate_trace(
     output_dir: Optional[Path] = typer.Option(None, "--output-dir", "-o", help="Directory to write trace files (overrides default)"),
     gpu: Optional[str] = typer.Option(None, "--gpu", help="GPU name (required for workload.yaml input)"),
     stages: Optional[list[int]] = typer.Option(None, "--stage", help="Specific PP stages to trace (default: first, middle, last)"),
-    all_stages: bool = typer.Option(False, "--all-stages", help="Trace all pipeline stages"),
+    all_ranks: bool = typer.Option(False, "--all-ranks", help="Trace every GPU rank (default: first rank per PP stage)"),
     mock_data: Optional[bool] = typer.Option(None, "--mock-data/--no-mock-data", help="Use mock synthetic data (default: from config or True)"),
     data_path: Optional[str] = typer.Option(None, "--data-path", help="Path to tokenized dataset directory (required for real data)"),
     tokenizer_type: Optional[str] = typer.Option(None, "--tokenizer-type", help="Tokenizer type for real data (e.g., GPT2BPETokenizer, HuggingFaceTokenizer)"),
@@ -149,8 +149,6 @@ def generate_trace(
         derived_args["--train-iters"] = warmup + 1
     if stages is not None:
         stages_to_trace = stages
-    elif all_stages:
-        stages_to_trace = list(range(pp))
     else:
         if pp == 1:
             stages_to_trace = [0]
@@ -162,10 +160,15 @@ def generate_trace(
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for stage in stages_to_trace:
-        dp = int(cfg.get("data-parallel-size", cfg.get("data_parallel_size", world_size // pp // tp // ep if world_size and pp and tp else 1)))
-        ranks_per_stage = world_size // pp // dp if world_size and pp and dp else tp
-        rank = stage * ranks_per_stage
+    dp = int(cfg.get("data-parallel-size", cfg.get("data_parallel_size", world_size // pp // tp // ep if world_size and pp and tp else 1)))
+    ranks_per_stage = world_size // pp // dp if world_size and pp and dp else tp
+
+    if all_ranks:
+        ranks_to_trace = list(range(world_size))
+    else:
+        ranks_to_trace = [stage * ranks_per_stage for stage in stages_to_trace]
+
+    for rank in ranks_to_trace:
         cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
         for flag, value in derived_args.items():
             if value is True:
@@ -186,7 +189,7 @@ def generate_trace(
                 "--memory-snapshot-path", str(memory_snapshot),
             ])
 
-        typer.echo(f"Tracing PP stage {stage} (rank {rank}) ...")
+        typer.echo(f"Tracing rank {rank} ...")
         env = os.environ.copy()
         if world_size is not None:
             env["WORLD_SIZE"] = str(world_size)
@@ -196,7 +199,7 @@ def generate_trace(
             typer.echo(f"Error: could not run Megatron entry point: {exc}", err=True)
             raise typer.Exit(1)
         except subprocess.CalledProcessError as exc:
-            typer.echo(f"Error: Megatron exited with code {exc.returncode} for PP stage {stage}", err=True)
+            typer.echo(f"Error: Megatron exited with code {exc.returncode} for rank {rank}", err=True)
             raise typer.Exit(1)
 
     if memory_snapshot is not None:
@@ -215,7 +218,7 @@ def generate_trace(
         with open(workload_yaml_path, "w") as f:
             yaml.dump(workload.model_dump(by_alias=False, exclude_none=True), f, default_flow_style=False, sort_keys=False)
 
-    trace_files = sorted(output_dir.glob("trace_pp_stage_*.json"))
+    trace_files = sorted(output_dir.glob("trace_rank_*.json"))
     typer.echo(f"\nTrace generation complete. {len(trace_files)} file(s) in {output_dir}:")
     for tf in trace_files:
         typer.echo(f"  {tf.name}")

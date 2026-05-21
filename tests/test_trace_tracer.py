@@ -6,7 +6,8 @@ from typing import Any
 import pytest
 
 from simulon.backend.dag.nodes import DAGEdge
-from simulon.backend.dag.trace_tracer import MegatronDagTracer
+from simulon.backend.dag.trace_parser import TraceFileParser
+from simulon.backend.dag.trace_tracer import MegatronDagTracer, ParallelConfig, _remap_collectives
 from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.collective import NCCLDecomposer
 from simulon.config.dc import (
@@ -19,8 +20,8 @@ from simulon.config.dc import (
 from simulon.config.workload import MegatronWorkload
 
 
-def _write_trace(data: dict[str, Any], traces_dir: Path, pp_stage: int) -> Path:
-    path = traces_dir / f"trace_pp_stage_{pp_stage}.json"
+def _write_trace(data: dict[str, Any], traces_dir: Path, rank: int) -> Path:
+    path = traces_dir / f"trace_rank_{rank}.json"
     path.write_text(json.dumps(data), encoding="utf-8")
     return path
 
@@ -95,7 +96,7 @@ def test_trace_builds_dag_with_compute_and_comm_nodes():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
-        _write_trace(trace, traces_dir, pp_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -120,7 +121,7 @@ def test_compute_nodes_have_duration_ms():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
-        _write_trace(trace, traces_dir, pp_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -146,7 +147,7 @@ def test_comm_nodes_have_correct_bytes_and_type():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
-        _write_trace(trace, traces_dir, pp_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -192,7 +193,7 @@ def test_dag_edges_wired_sequentially():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
-        _write_trace(trace, traces_dir, pp_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -223,12 +224,12 @@ def test_trace_with_multiple_pp_stages():
         _write_trace(
             _make_trace(events0, rank=0, world_size=2, pipeline_stage=0),
             traces_dir,
-            pp_stage=0,
+            rank=0,
         )
         _write_trace(
-            _make_trace(events1, rank=0, world_size=2, pipeline_stage=1),
+            _make_trace(events1, rank=1, world_size=2, pipeline_stage=1),
             traces_dir,
-            pp_stage=1,
+            rank=1,
         )
         workload = _make_workload(tp=1, pp=2, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
@@ -255,7 +256,7 @@ def test_trace_skips_pp_send_events():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
-        _write_trace(trace, traces_dir, pp_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=1, pp=1, num_gpus=1)
         dc = _make_datacenter(num_gpus=1, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -293,7 +294,7 @@ def test_slot_markers_assign_microbatch_and_phase():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
-        _write_trace(trace, traces_dir, pp_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -316,9 +317,9 @@ def test_missing_middle_trace_reused():
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, pp_stage=0)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=2), traces_dir, pp_stage=2)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=3), traces_dir, pp_stage=3)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, rank=0)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=2), traces_dir, rank=2)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=3), traces_dir, rank=3)
         workload = _make_workload(tp=1, pp=4, num_gpus=4)
         dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -348,8 +349,8 @@ def test_pp_send_has_activation_bytes():
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, pp_stage=0)
-        _write_trace(_make_trace(events1, rank=0, world_size=2, pipeline_stage=1), traces_dir, pp_stage=1)
+        _write_trace(_make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0)
+        _write_trace(_make_trace(events1, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1)
         workload = MegatronWorkload(
             framework="megatron",
             config={
@@ -380,7 +381,7 @@ def test_missing_first_trace_raises():
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, pp_stage=1)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1)
         workload = _make_workload(tp=1, pp=2, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         with pytest.raises(ValueError, match="First PP stage"):
@@ -394,8 +395,103 @@ def test_missing_last_trace_raises():
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, pp_stage=0)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0)
         workload = _make_workload(tp=1, pp=2, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         with pytest.raises(ValueError, match="Last PP stage"):
             _run_tracer(workload, dc)
+
+
+def test_remap_dp_allreduce_to_target_dp_group():
+    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
+    events = [{
+        "type": "collective", "timestamp_ms": 0.0,
+        "metadata": {
+            "collective_type": "AllReduce", "bytes": 2048,
+            "group_ranks": [0, 2],
+        },
+    }]
+    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "trace_rank_0.json"
+        p.write_text(json.dumps(trace_dict))
+        tf = TraceFileParser.parse(str(p))
+    remapped = _remap_collectives(tf, from_rank=0, to_rank=1, config=config)
+    assert len(remapped.events) == 1
+    new_group = remapped.events[0].metadata["group_ranks"]
+    assert set(new_group) == {1, 3}, f"Expected DP group [1,3] for rank 1, got {new_group}"
+
+
+def test_remap_tp_allreduce_to_target_tp_group():
+    config = ParallelConfig(tp=4, cp=1, pp=1, ep=1, dp=1, num_gpus=4)
+    events = [{
+        "type": "collective", "timestamp_ms": 0.0,
+        "metadata": {
+            "collective_type": "AllReduce", "bytes": 2048,
+            "group_ranks": [0, 1, 2, 3],
+        },
+    }]
+    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "trace_rank_0.json"
+        p.write_text(json.dumps(trace_dict))
+        tf = TraceFileParser.parse(str(p))
+    remapped = _remap_collectives(tf, from_rank=0, to_rank=0, config=config)
+    assert remapped.events[0].metadata["group_ranks"] == [0, 1, 2, 3]
+
+
+def test_derived_trace_from_same_stage():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, rank=0)
+        _write_trace(_make_trace(events, rank=3, world_size=4, pipeline_stage=3), traces_dir, rank=3)
+        workload = MegatronWorkload(
+            framework="megatron",
+            config={"tensor-model-parallel-size": 1, "pipeline-model-parallel-size": 4, "num-layers": 2,
+                    "hidden-size": 512, "num-attention-heads": 8, "ffn-hidden-size": 11008,
+                    "seq-length": 128, "micro-batch-size": 1, "global-batch-size": 4, "num_gpus": 4},
+        )
+        dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+        stages = {n.pipeline_stage for n in dag.compute_nodes}
+        assert stages == {0, 1, 2, 3}
+
+
+def test_unknown_collective_kept_unchanged():
+    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
+    events = [{
+        "type": "collective", "timestamp_ms": 0.0,
+        "metadata": {
+            "collective_type": "SomeWeirdCollective", "bytes": 1024,
+            "group_ranks": [0, 1, 2, 3],
+        },
+    }]
+    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "trace_rank_0.json"
+        p.write_text(json.dumps(trace_dict))
+        tf = TraceFileParser.parse(str(p))
+    remapped = _remap_collectives(tf, from_rank=0, to_rank=1, config=config)
+    assert remapped.events[0].metadata["group_ranks"] == [0, 1, 2, 3]
+
+
+def test_pp_send_preserved_in_remap():
+    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
+    events = [{
+        "type": "collective", "timestamp_ms": 0.0,
+        "metadata": {
+            "collective_type": "PP_Send", "bytes": 1024,
+            "group_ranks": [0, 2], "direction": "fwd",
+        },
+    }]
+    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "trace_rank_0.json"
+        p.write_text(json.dumps(trace_dict))
+        tf = TraceFileParser.parse(str(p))
+    remapped = _remap_collectives(tf, from_rank=0, to_rank=1, config=config)
+    assert remapped.events[0].metadata["group_ranks"] == [0, 2]
