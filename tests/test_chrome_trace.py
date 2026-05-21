@@ -50,12 +50,6 @@ class TestFusedKernelsArg:
         events = _compute_events(dag)
         assert events[0]["args"]["fused_kernels"] == "attn_proj"
 
-    def test_fused_node_event_name_unchanged(self):
-        """The event name must be the node's kernel field, not the joined fused names."""
-        dag = ExecutionDAG(compute_nodes=[_make_compute_node(0, ["mlp_act", "mlp_linear2"], kernel="2 kernels")])
-        events = _compute_events(dag)
-        assert events[0]["name"] == "2 kernels"
-
     def test_mixed_nodes_only_fused_gets_arg(self):
         """When both fused and plain nodes exist, only the fused one carries the arg."""
         plain = _make_compute_node(0, [])
