@@ -743,6 +743,41 @@ def _add_compute_node(
     node_id[0] += 1
 
 
+def _add_flow_to_dag(
+    dag: ExecutionDAG,
+    flow,
+    collective_type: str,
+    direction: str,
+    node_id: list,
+    last_node_by_rank: dict[int, int],
+    slot_node_ids: list,
+    rank: int,
+) -> None:
+    comm_node = CommNode(
+        node_id=node_id[0],
+        src_gpu=flow.src,
+        dst_gpu=flow.dst,
+        bytes=flow.flow_size,
+        collective_type=collective_type,
+        layer_id=-1,
+        phase=direction,
+        flow_id=flow.flow_id,
+        parent_flow_ids=flow.parent_flow_ids,
+    )
+    dag.comm_nodes.append(comm_node)
+    if flow.src == rank:
+        slot_node_ids.append(node_id[0])
+        if rank in last_node_by_rank:
+            dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
+        last_node_by_rank[rank] = node_id[0]
+    if flow.dst == rank and flow.dst != flow.src:
+        slot_node_ids.append(node_id[0])
+        if rank in last_node_by_rank:
+            dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
+        last_node_by_rank[rank] = node_id[0]
+    node_id[0] += 1
+
+
 def _add_non_pp_collective(
     dag: ExecutionDAG,
     event,
@@ -771,29 +806,7 @@ def _add_non_pp_collective(
     )
     flow_id[0] = next_flow_id
     for flow in result.flows:
-        comm_node = CommNode(
-            node_id=node_id[0],
-            src_gpu=flow.src,
-            dst_gpu=flow.dst,
-            bytes=flow.flow_size,
-            collective_type=collective_type,
-            layer_id=-1,
-            phase=direction,
-            flow_id=flow.flow_id,
-            parent_flow_ids=flow.parent_flow_ids,
-        )
-        dag.comm_nodes.append(comm_node)
-        if flow.src == rank:
-            slot_node_ids.append(node_id[0])
-            if rank in last_node_by_rank:
-                dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
-            last_node_by_rank[rank] = node_id[0]
-        if flow.dst == rank and flow.dst != flow.src:
-            slot_node_ids.append(node_id[0])
-            if rank in last_node_by_rank:
-                dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
-            last_node_by_rank[rank] = node_id[0]
-        node_id[0] += 1
+        _add_flow_to_dag(dag, flow, collective_type, direction, node_id, last_node_by_rank, slot_node_ids, rank)
 
 
 def _add_pp_transfer(
@@ -825,6 +838,50 @@ def _add_pp_transfer(
         microbatch_id=pp_mb,
         direction=direction,
     ))
+
+
+def _handle_event_gap(
+    dag: ExecutionDAG,
+    event,
+    next_event,
+    rank: int,
+    config: ParallelConfig,
+    active_microbatch_id: list,
+    active_direction: list,
+    node_id: list,
+    flow_id: list,
+    activation_bytes: int,
+    tracer_cfg: DAGTracerConfig,
+    slot_node_ids: list,
+    pending_pp_transfers: list,
+    last_node_by_rank: dict[int, int],
+) -> None:
+    duration_ms = next_event.timestamp_ms - event.timestamp_ms
+    if duration_ms <= 0:
+        return
+    is_pp = False
+    if event.type == "collective":
+        ct = str(event.metadata.get("collective_type", ""))
+        is_pp = ct in ("PP_Send", "PP_Recv")
+    if event.type == "slot_begin" or (event.type == "collective" and not is_pp):
+        _add_compute_node(
+            dag, rank, config, duration_ms,
+            active_microbatch_id[0], active_direction[0],
+            node_id, last_node_by_rank, slot_node_ids
+        )
+    if event.type == "collective":
+        collective_type = str(event.metadata.get("collective_type", ""))
+        if collective_type in ("PP_Send", "PP_Recv"):
+            _add_pp_transfer(
+                event, rank, active_microbatch_id[0],
+                active_direction[0], activation_bytes, pending_pp_transfers
+            )
+        else:
+            _add_non_pp_collective(
+                dag, event, rank, active_microbatch_id[0],
+                active_direction[0], node_id, flow_id,
+                last_node_by_rank, slot_node_ids, tracer_cfg
+            )
 
 
 def _add_trace_to_dag(
@@ -862,39 +919,73 @@ def _add_trace_to_dag(
                 slot_last_node, slot_last_timestamp
             )
         if i + 1 < len(events):
-            next_event = events[i + 1]
-            duration_ms = next_event.timestamp_ms - event.timestamp_ms
-            if duration_ms <= 0:
-                continue
-            is_pp = False
-            if event.type == "collective":
-                ct = str(event.metadata.get("collective_type", ""))
-                is_pp = ct in ("PP_Send", "PP_Recv")
-            if event.type == "slot_begin" or (event.type == "collective" and not is_pp):
-                _add_compute_node(
-                    dag, rank, config, duration_ms,
-                    active_microbatch_id[0], active_direction[0],
-                    node_id, last_node_by_rank, slot_node_ids
-                )
-            if event.type == "collective":
-                collective_type = str(event.metadata.get("collective_type", ""))
-                if collective_type in ("PP_Send", "PP_Recv"):
-                    _add_pp_transfer(
-                        event, rank, active_microbatch_id[0],
-                        active_direction[0], activation_bytes, pending_pp_transfers
-                    )
-                else:
-                    _add_non_pp_collective(
-                        dag, event, rank, active_microbatch_id[0],
-                        active_direction[0], node_id, flow_id,
-                        last_node_by_rank, slot_node_ids, tracer_cfg
-                    )
+            _handle_event_gap(
+                dag, event, events[i + 1], rank, config,
+                active_microbatch_id, active_direction,
+                node_id, flow_id, activation_bytes, tracer_cfg,
+                slot_node_ids, pending_pp_transfers, last_node_by_rank,
+            )
 
 
 def _wire_slot_edges(dag: ExecutionDAG, slot_nodes: dict) -> None:
     for node_ids in slot_nodes.values():
         for i in range(len(node_ids) - 1):
             dag.edges.append(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
+
+
+def _should_skip_pp_pair(src_stage: int, dst_stage: int, direction: str) -> bool:
+    if direction == "fwd" and src_stage > dst_stage:
+        return True
+    if direction == "bwd" and src_stage < dst_stage:
+        return True
+    return False
+
+
+def _create_pp_send(
+    src: int,
+    dst: int,
+    record,
+    src_node: int,
+    dst_node: int,
+    node_id: list,
+    flow_id: list,
+    dag: ExecutionDAG,
+) -> None:
+    pp_send = CommNode(
+        node_id=node_id[0],
+        src_gpu=src,
+        dst_gpu=dst,
+        bytes=record.bytes,
+        collective_type="PP_Send",
+        layer_id=-1,
+        phase=record.direction,
+        flow_id=flow_id[0],
+    )
+    dag.comm_nodes.append(pp_send)
+    dag.edges.append(DAGEdge(src_node_id=src_node, dst_node_id=pp_send.node_id))
+    dag.edges.append(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node))
+    node_id[0] += 1
+    flow_id[0] += 1
+
+
+def _resolve_pp_nodes(
+    src: int,
+    dst: int,
+    record,
+    slot_entry_node: dict,
+    slot_last_node: dict,
+) -> tuple[int | None, int | None]:
+    src_key = (src, record.microbatch_id, record.direction)
+    dst_key = (dst, record.microbatch_id, record.direction)
+    src_node = slot_last_node.get(src_key)
+    dst_node = slot_entry_node.get(dst_key)
+    if dst_node is None and record.direction == "bwd":
+        for bwd_phase in ("bwd_ig", "bwd_wg"):
+            alt_key = (dst, record.microbatch_id, bwd_phase)
+            if alt_key in slot_entry_node:
+                dst_node = slot_entry_node[alt_key]
+                break
+    return src_node, dst_node
 
 
 def _wire_pp_transfers(
@@ -905,7 +996,7 @@ def _wire_pp_transfers(
     slot_last_node: dict,
     node_id: list,
     flow_id: list,
-) -> None:
+) -> tuple[int, int]:
     seen: set[tuple[int, int, int, str]] = set()
     for record in pending:
         pp_stride = config.ranks_per_stage
@@ -923,36 +1014,14 @@ def _wire_pp_transfers(
             if dedup in seen:
                 continue
             seen.add(dedup)
-            src_key = (src, record.microbatch_id, record.direction)
-            dst_key = (dst, record.microbatch_id, record.direction)
-            src_node = slot_last_node.get(src_key)
-            dst_node = slot_entry_node.get(dst_key)
-            if dst_node is None and record.direction == "bwd":
-                for bwd_phase in ("bwd_ig", "bwd_wg"):
-                    alt_key = (dst, record.microbatch_id, bwd_phase)
-                    if alt_key in slot_entry_node:
-                        dst_node = slot_entry_node[alt_key]
-                        break
-            if src_node is not None and dst_node is not None:
-                if record.direction == "fwd" and src_stage > dst_stage:
-                    continue
-                if record.direction == "bwd" and src_stage < dst_stage:
-                    continue
-                pp_send = CommNode(
-                    node_id=node_id[0],
-                    src_gpu=src,
-                    dst_gpu=dst,
-                    bytes=record.bytes,
-                    collective_type="PP_Send",
-                    layer_id=-1,
-                    phase=record.direction,
-                    flow_id=flow_id[0],
-                )
-                dag.comm_nodes.append(pp_send)
-                dag.edges.append(DAGEdge(src_node_id=src_node, dst_node_id=pp_send.node_id))
-                dag.edges.append(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node))
-                node_id[0] += 1
-                flow_id[0] += 1
+            src_node, dst_node = _resolve_pp_nodes(
+                src, dst, record, slot_entry_node, slot_last_node
+            )
+            if src_node is None or dst_node is None:
+                continue
+            if _should_skip_pp_pair(src_stage, dst_stage, record.direction):
+                continue
+            _create_pp_send(src, dst, record, src_node, dst_node, node_id, flow_id, dag)
     return node_id[0], flow_id[0]
 
 def _wire_cross_slot_edges(
