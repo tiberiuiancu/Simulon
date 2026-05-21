@@ -829,8 +829,9 @@ def _add_pp_transfer(
     else:
         traced_src = group_ranks[0] if len(group_ranks) > 0 else -1
         traced_dst = group_ranks[1] if len(group_ranks) > 1 else -1
-    data_size = int(event.metadata.get("bytes", activation_bytes))
-    pp_mb = int(event.metadata.get("microbatch_id", active_microbatch_id))
+    data_size = int(event.metadata.get("bytes") if event.metadata.get("bytes") is not None else activation_bytes)
+    _mb = event.metadata.get("microbatch_id")
+    pp_mb = int(_mb) if _mb is not None else active_microbatch_id
     pending.append(_PendingPPTransfer(
         remapped_src=traced_src,
         remapped_dst=traced_dst,
