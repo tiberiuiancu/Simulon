@@ -16,8 +16,6 @@ from simulon.config.workload import MegatronWorkload
 
 """Megatron-LM rank formula and parallelism helpers."""
 
-_collective_cache: dict[tuple[str, tuple[int, ...], int, float], list[CommNode]] = {}
-
 
 class RankCoords(NamedTuple):
     """Decomposed parallelism coordinates (tp, cp, ep, dp, pp)."""
@@ -489,18 +487,6 @@ def _add_non_pp_collective(
     data_size = int(event.metadata.get("bytes", 0))
     if not group_ranks:
         return
-    cache_key = (collective_type, tuple(sorted(group_ranks)), data_size, event.timestamp_ms)
-    if cache_key in _collective_cache:
-        for comm_node in _collective_cache[cache_key]:
-            if comm_node.src_gpu == rank:
-                if rank in last_node_by_rank:
-                    dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=comm_node.node_id))
-                last_node_by_rank[rank] = comm_node.node_id
-            if comm_node.dst_gpu == rank and comm_node.dst_gpu != comm_node.src_gpu:
-                if rank in last_node_by_rank:
-                    dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=comm_node.node_id))
-                last_node_by_rank[rank] = comm_node.node_id
-        return
     result, next_flow_id = decompose_collective(
         collective_type=collective_type,
         group_ranks=group_ranks,
@@ -510,7 +496,6 @@ def _add_non_pp_collective(
         flow_id_start=flow_id[0],
     )
     flow_id[0] = next_flow_id
-    cached_nodes: list[CommNode] = []
     for flow in result.flows:
         comm_node = CommNode(
             node_id=node_id[0],
@@ -524,7 +509,6 @@ def _add_non_pp_collective(
             parent_flow_ids=flow.parent_flow_ids,
         )
         dag.comm_nodes.append(comm_node)
-        cached_nodes.append(comm_node)
         if flow.src == rank:
             slot_node_ids.append(node_id[0])
             if rank in last_node_by_rank:
@@ -536,7 +520,6 @@ def _add_non_pp_collective(
                 dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
             last_node_by_rank[rank] = node_id[0]
         node_id[0] += 1
-    _collective_cache[cache_key] = cached_nodes
 
 
 def _add_pp_transfer(
@@ -805,7 +788,6 @@ class MegatronDagTracer(DAGTracer):
         self.ccl = ccl
 
     def trace(self, workload: MegatronWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
-        _collective_cache.clear()
         dag = ExecutionDAG()
         config = ParallelConfig.from_workload(workload)
         traces_dir = _resolve_traces_dir(datacenter, workload)
