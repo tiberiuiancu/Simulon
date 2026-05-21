@@ -541,4 +541,4 @@ def test_pp_send_preserved_in_remap():
         p.write_text(json.dumps(trace_dict))
         tf = TraceFileParser.parse(str(p))
     remapped = _remap_collectives(tf, from_rank=0, to_rank=1, config=config)
-    assert remapped.events[0].metadata["group_ranks"] == [0, 2]
+    assert remapped.events[0].metadata["group_ranks"] == [1, 3]

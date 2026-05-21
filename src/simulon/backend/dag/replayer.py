@@ -249,7 +249,25 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
                     successors[flow_to_node[fid]].append(cn.node_id)
             advance()
 
-    # Topological sort (Kahn's algorithm)
+    bad_edges = []
+    for edge in dag.edges:
+        if edge.src_node_id not in all_nodes:
+            bad_edges.append(("src missing", edge.src_node_id, edge.dst_node_id))
+        if edge.dst_node_id not in all_nodes:
+            bad_edges.append(("dst missing", edge.src_node_id, edge.dst_node_id))
+    if bad_edges:
+        raise ValueError(f"DAG has {len(bad_edges)} edges pointing to non-existent nodes: {bad_edges[:10]}")
+
+    bad_flows = []
+    for cn in dag.comm_nodes:
+        for fid in cn.parent_flow_ids:
+            if fid in flow_to_node:
+                parent_nid = flow_to_node[fid]
+                if parent_nid not in all_nodes:
+                    bad_flows.append((cn.node_id, fid, parent_nid))
+    if bad_flows:
+        raise ValueError(f"DAG has {len(bad_flows)} flow deps pointing to non-existent nodes: {bad_flows[:10]}")
+
     temp_in_degree = dict(in_degree)
     queue: deque[int] = deque(nid for nid, deg in temp_in_degree.items() if deg == 0)
     topo_order: list[int] = []
@@ -262,6 +280,10 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
                 if temp_in_degree[succ] == 0:
                     queue.append(succ)
             advance()
+
+    if len(topo_order) != len(all_nodes):
+        missing = set(all_nodes) - set(topo_order)
+        raise ValueError(f"Topo sort incomplete: {len(missing)} nodes not processed: {list(missing)[:10]}")
 
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}

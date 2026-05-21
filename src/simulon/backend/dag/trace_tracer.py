@@ -295,16 +295,27 @@ def _remap_collectives(
             new_events.append(ev)
             continue
         ct = str(ev.metadata.get("collective_type", ""))
-        if ct in ("PP_Send", "PP_Recv"):
-            new_events.append(ev)
-            continue
         group_ranks_raw = ev.metadata.get("group_ranks", [])
         group_ranks = list(group_ranks_raw) if isinstance(group_ranks_raw, (list, tuple)) else []
         ev_name = str(ev.metadata.get("name", ""))
+
+        if ct in ("PP_Send", "PP_Recv"):
+            if len(group_ranks) >= 2:
+                delta = to_rank - from_rank
+                new_group = [group_ranks[0] + delta, group_ranks[1] + delta]
+                if all(0 <= g < config.world_size for g in new_group):
+                    new_ev = type(ev)(
+                        type=ev.type,
+                        timestamp_ms=ev.timestamp_ms,
+                        metadata={**ev.metadata, "group_ranks": new_group},
+                    )
+                    new_events.append(new_ev)
+                    continue
+            new_events.append(ev)
+            continue
+
         new_group = None
-        if "DistributedDataParallel" in ev_name or "Distributed_DataParallel" in ev_name:
-            new_group = _get_dp_group_ranks(to_rank, config)
-        elif _ranks_in_same_dp_group(group_ranks, from_rank, config):
+        if _ranks_in_same_dp_group(group_ranks, from_rank, config):
             new_group = _get_dp_group_ranks(to_rank, config)
         elif _ranks_in_same_ep_group(group_ranks, from_rank, config):
             new_group = _get_ep_group_ranks(to_rank, config)
@@ -312,6 +323,9 @@ def _remap_collectives(
             new_group = _get_tp_group_ranks(to_rank, config)
         elif _ranks_in_same_cp_group(group_ranks, from_rank, config):
             new_group = _get_cp_group_ranks(to_rank, config)
+        elif "DistributedDataParallel" in ev_name or "Distributed_DataParallel" in ev_name:
+            new_group = _get_dp_group_ranks(to_rank, config)
+
         if new_group is not None:
             new_ev = type(ev)(
                 type=ev.type,
