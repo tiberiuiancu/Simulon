@@ -43,6 +43,10 @@ def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int
     return dp_rank, pp_stage, ep_rank, tp_rank
 
 
+def _phase_cname(phase: str) -> str | None:
+    return {"fwd": "green", "bwd": "red", "step": "blue"}.get(phase)
+
+
 def to_chrome_trace(
     dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1, *, only_profiled: bool = False
 ) -> dict[str, Any]:
@@ -129,7 +133,7 @@ def to_chrome_trace(
         if n.fused_kernels:
             args["fused_kernels"] = ", ".join(n.fused_kernels)
         event_name = ("! " + n.kernel) if n.is_extrapolated else n.kernel
-        events.append({
+        entry: dict[str, Any] = {
             "name": event_name,
             "ph": "X",
             "pid": 1000 + n.gpu_rank,
@@ -137,7 +141,11 @@ def to_chrome_trace(
             "ts":  n.start_ms * 1_000,
             "dur": (n.duration_ms or 0.0) * 1_000,
             "args": args,
-        })
+        }
+        cname = _phase_cname(n.phase)
+        if cname:
+            entry["cname"] = cname
+        events.append(entry)
 
     # Comm events — one send event on src, one recv event on dst.
     # The tracer creates one CommNode per GPU participating in a collective, so the
