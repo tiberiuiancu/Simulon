@@ -864,15 +864,15 @@ def _handle_event_gap(
     if event.type == "collective":
         ct = str(event.metadata.get("collective_type", ""))
         is_pp = ct in ("PP_Send", "PP_Recv")
-    if event.type == "slot_begin" or (event.type == "collective" and not is_pp):
+    if event.type == "slot_begin":
         _add_compute_node(
             dag, rank, config, duration_ms,
             active_microbatch_id[0], active_direction[0],
             node_id, last_node_by_rank, slot_node_ids
         )
-    if event.type == "collective":
-        collective_type = str(event.metadata.get("collective_type", ""))
-        if collective_type in ("PP_Send", "PP_Recv"):
+    elif event.type == "collective":
+        ct = str(event.metadata.get("collective_type", ""))
+        if ct in ("PP_Send", "PP_Recv"):
             _add_pp_transfer(
                 event, rank, active_microbatch_id[0],
                 active_direction[0], activation_bytes, pending_pp_transfers
@@ -882,6 +882,11 @@ def _handle_event_gap(
                 dag, event, rank, active_microbatch_id[0],
                 active_direction[0], node_id, flow_id,
                 last_node_by_rank, slot_node_ids, tracer_cfg
+            )
+            _add_compute_node(
+                dag, rank, config, duration_ms,
+                active_microbatch_id[0], active_direction[0],
+                node_id, last_node_by_rank, slot_node_ids
             )
 
 

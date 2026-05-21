@@ -461,6 +461,53 @@ def test_derived_trace_from_same_stage():
         assert stages == {0, 1, 2, 3}
 
 
+def test_collective_node_comes_before_compute_after_it():
+    """
+    For a non-PP collective, the correct DAG order is:
+    compute(gap_before) -> collective -> compute(gap_after)
+    The buggy order was: compute(gap_before) -> compute(gap_after) -> collective
+    """
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"slot": "fwd"}},
+        {
+            "type": "collective",
+            "timestamp_ms": 1.0,
+            "metadata": {
+                "collective_type": "AllReduce",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
+        workload = _make_workload(tp=2, pp=1, num_gpus=2)
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+
+        rank0_compute = sorted(
+            [n for n in dag.compute_nodes if n.gpu_rank == 0],
+            key=lambda n: n.node_id,
+        )
+        assert len(rank0_compute) == 2, f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        c_before = rank0_compute[0]
+        c_after = rank0_compute[1]
+
+        rank0_comm = [n for n in dag.comm_nodes if n.src_gpu == 0 or n.dst_gpu == 0]
+        assert len(rank0_comm) > 0, "Expected at least one comm node on rank 0"
+        collective_node = rank0_comm[0]
+
+        assert _has_path(
+            dag.edges, c_before.node_id, collective_node.node_id
+        ), f"Expected edge from compute before ({c_before.node_id}) to collective ({collective_node.node_id})"
+        assert _has_path(
+            dag.edges, collective_node.node_id, c_after.node_id
+        ), f"Expected edge from collective ({collective_node.node_id}) to compute after ({c_after.node_id})"
+
+
 def test_unknown_collective_kept_unchanged():
     config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
     events = [{
