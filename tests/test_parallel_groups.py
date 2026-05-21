@@ -62,12 +62,22 @@ def test_dp_group_another_positive():
 
 def test_dp_group_vacuously_true_for_empty_list():
     config = _pc(tp=2, pp=2, ep=2, dp=2, num_gpus=16)
-    assert _ranks_in_same_dp_group([], 0, config) is True
+    assert _ranks_in_same_dp_group([], 0, config) is False
 
 
 def test_dp_group_single_element():
     config = _pc(tp=2, pp=2, ep=2, dp=2, num_gpus=16)
-    assert _ranks_in_same_dp_group([0], 0, config) is True
+    assert _ranks_in_same_dp_group([0], 0, config) is False
+
+
+def test_dp_group_full_group():
+    config = _pc(tp=2, pp=2, ep=2, dp=2, num_gpus=16)
+    assert _ranks_in_same_dp_group([0, 4], 0, config) is True
+
+
+def test_dp_group_missing_element():
+    config = _pc(tp=4, pp=1, ep=1, dp=4, num_gpus=16)
+    assert _ranks_in_same_dp_group([0, 4, 8], 0, config) is False
 
 
 def test_ep_group_positive_same_tp_cp_dp_pp_different_ep():

@@ -14,37 +14,13 @@ from simulon.config.dc import DatacenterConfig
 from simulon.config.workload import MegatronWorkload
 
 
-# =============================================================================
-# Rank formula and parallelism helpers
-# =============================================================================
-#
-# Megatron-LM global rank ordering (innermost -> outermost):
-#     TP -> CP -> EP -> DP -> PP
-#
-# A global rank is computed as:
-#     rank = tp
-#          + cp * TP
-#          + ep * TP*CP
-#          + dp * TP*CP*EP
-#          + pp * TP*CP*EP*DP
-#
-# Dimensions that vary faster are to the RIGHT in the linearized address.
-# Example: TP=2, CP=1, EP=1, DP=2, PP=4
-#   - Ranks 0..1  : PP stage 0, DP group 0 (TP=0,1)
-#   - Ranks 2..3  : PP stage 0, DP group 1 (TP=0,1)
-#   - Ranks 4..7  : PP stage 1, DP groups 0,1
-#   - ... and so on.
-#
-# We keep CP hardcoded to 1 for now; the formula still accepts a cp_rank so
-# that the code is forward-compatible.
+"""Megatron-LM rank formula and parallelism helpers."""
+
+_collective_cache: dict[tuple[str, tuple[int, ...], int], list[CommNode]] = {}
 
 
 class RankCoords(NamedTuple):
-    """Decomposed parallelism coordinates for a single global rank.
-
-    The ordering mirrors Megatron-LM's ``parallel_state.py``:
-    ``TP -> CP -> EP -> DP -> PP`` (innermost to outermost).
-    """
+    """Decomposed parallelism coordinates (tp, cp, ep, dp, pp)."""
 
     tp: int
     cp: int
@@ -55,29 +31,7 @@ class RankCoords(NamedTuple):
 
 @dataclass(frozen=True)
 class ParallelConfig:
-    """Immutable parallelism dimensions extracted from a ``MegatronWorkload``.
-
-    Attributes
-    ----------
-    tp : int
-        Tensor-model-parallel size.
-    cp : int
-        Context-parallel size (currently hardcoded to 1).
-    ep : int
-        Expert-model-parallel size.
-    dp : int
-        Data-parallel size.
-    pp : int
-        Pipeline-model-parallel size.
-    num_gpus : int
-        Total number of GPUs (``world_size``).
-
-    Notes
-    -----
-    The product ``tp * cp * ep * dp * pp`` must equal ``num_gpus``.
-    If it does not, the config is considered invalid and ``validate()``
-    (invoked by ``from_workload``) raises ``ValueError``.
-    """
+    """Immutable parallelism dimensions."""
 
     tp: int
     cp: int
@@ -86,9 +40,7 @@ class ParallelConfig:
     pp: int
     num_gpus: int
 
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
+
     def __post_init__(self) -> None:
         if self.tp < 1 or self.cp < 1 or self.ep < 1 or self.dp < 1 or self.pp < 1:
             raise ValueError(
@@ -102,20 +54,9 @@ class ParallelConfig:
                 f"Config: tp={self.tp}, cp={self.cp}, ep={self.ep}, dp={self.dp}, pp={self.pp}"
             )
 
-    # ------------------------------------------------------------------
-    # Factory
-    # ------------------------------------------------------------------
+
     @classmethod
     def from_workload(cls, workload: MegatronWorkload) -> "ParallelConfig":
-        """Build a ``ParallelConfig`` from a ``MegatronWorkload`` config dict.
-
-        The workload's flat ``config`` dictionary is queried for keys like
-        ``tensor-model-parallel-size``, ``pipeline-model-parallel-size``,
-        ``expert-model-parallel-size``, and ``num_gpus``.
-
-        CP (context parallel) is hardcoded to 1 because simulon does not
-        support CP > 1 yet.
-        """
         cfg = workload.config
         tp = int(cfg.get("tensor-model-parallel-size", 1))
         pp = int(cfg.get("pipeline-model-parallel-size", 1))
@@ -125,26 +66,17 @@ class ParallelConfig:
         dp = max(1, num_gpus // (tp * pp * ep))
         return cls(tp=tp, cp=cp, ep=ep, dp=dp, pp=pp, num_gpus=num_gpus)
 
-    # ------------------------------------------------------------------
-    # Convenience properties
-    # ------------------------------------------------------------------
+
     @property
     def world_size(self) -> int:
-        """Alias for ``num_gpus``."""
         return self.num_gpus
 
     @property
     def ranks_per_stage(self) -> int:
-        """Number of global ranks that belong to a single PP stage.
-
-        This is ``TP * CP * EP * DP`` — every dimension *except* PP.
-        """
         return self.tp * self.cp * self.ep * self.dp
 
 
-# ------------------------------------------------------------------------------
 # Rank conversion helpers
-# ------------------------------------------------------------------------------
 
 def _global_rank(
     tp_rank: int,
@@ -154,50 +86,7 @@ def _global_rank(
     pp_stage: int,
     config: ParallelConfig,
 ) -> int:
-    """Compute the global rank from decomposed parallelism coordinates.
-
-    The formula follows Megatron-LM ``parallel_state.py`` ordering:
-    ``TP -> CP -> EP -> DP -> PP`` (innermost to outermost).
-
-    .. math::
-
-        rank = tp
-             + cp \\times TP
-             + ep \\times TP \\times CP
-             + dp \\times TP \\times CP \\times EP
-             + pp \\times TP \\times CP \\times EP \\times DP
-
-    Parameters
-    ----------
-    tp_rank, cp_rank, ep_rank, dp_rank, pp_stage : int
-        Coordinates inside each parallelism dimension.
-    config : ParallelConfig
-        The parallelism configuration defining the sizes of each dimension.
-
-    Returns
-    -------
-    int
-        The global linearized rank (0 .. ``config.world_size - 1``).
-
-    Raises
-    ------
-    ValueError
-        If any coordinate is out of range for the given ``config``.
-
-    Examples
-    --------
-    >>> pc = ParallelConfig(tp=2, cp=1, ep=1, dp=2, pp=4, num_gpus=16)
-    >>> _global_rank(0, 0, 0, 0, 0, pc)
-    0
-    >>> _global_rank(1, 0, 0, 0, 0, pc)
-    1
-    >>> _global_rank(0, 0, 0, 1, 0, pc)   # DP group 1, same PP stage 0
-    2
-    >>> _global_rank(0, 0, 0, 0, 1, pc)   # PP stage 1
-    4
-    >>> _global_rank(0, 0, 0, 0, 3, pc)   # PP stage 3
-    12
-    """
+    """Compute the global rank from decomposed parallelism coordinates."""
     for name, value, size in (
         ("tp_rank", tp_rank, config.tp),
         ("cp_rank", cp_rank, config.cp),
@@ -219,47 +108,7 @@ def _global_rank(
 
 
 def _decompose_rank(rank: int, config: ParallelConfig) -> RankCoords:
-    """Convert a global rank back to decomposed ``(tp, cp, ep, dp, pp)`` coordinates.
-
-    This is the exact inverse of :func:`_global_rank`:
-
-    .. code-block:: python
-
-        assert _global_rank(*_decompose_rank(r, config), config) == r
-        for all valid r in 0 .. config.world_size - 1
-
-    The decomposition uses successive modulo and integer-division by the stride
-    of each dimension, starting from the innermost (TP) and moving outward.
-
-    Parameters
-    ----------
-    rank : int
-        Global linearized rank.
-    config : ParallelConfig
-        The parallelism configuration.
-
-    Returns
-    -------
-    RankCoords
-        Named tuple with fields ``tp, cp, ep, dp, pp``.
-
-    Raises
-    ------
-    ValueError
-        If ``rank`` is outside ``[0, config.world_size)``.
-
-    Examples
-    --------
-    >>> pc = ParallelConfig(tp=2, cp=1, ep=1, dp=2, pp=4, num_gpus=16)
-    >>> _decompose_rank(0, pc)
-    RankCoords(tp=0, cp=0, ep=0, dp=0, pp=0)
-    >>> _decompose_rank(3, pc)
-    RankCoords(tp=1, cp=0, ep=0, dp=1, pp=0)
-    >>> _decompose_rank(7, pc)
-    RankCoords(tp=1, cp=0, ep=0, dp=1, pp=1)
-    >>> _decompose_rank(15, pc)
-    RankCoords(tp=1, cp=0, ep=0, dp=1, pp=3)
-    """
+    """Convert a global rank back to decomposed ``(tp, cp, ep, dp, pp)`` coordinates."""
     if not (0 <= rank < config.world_size):
         raise ValueError(
             f"rank={rank} out of range [0, {config.world_size}) for config {config}"
@@ -273,54 +122,12 @@ def _decompose_rank(rank: int, config: ParallelConfig) -> RankCoords:
 
 
 def _stage_of(rank: int, config: ParallelConfig) -> int:
-    """Return the pipeline-parallel stage index for a global rank.
-
-    This is simply ``rank // ranks_per_stage``.
-
-    Examples
-    --------
-    >>> pc = ParallelConfig(tp=2, cp=1, ep=1, dp=2, pp=4, num_gpus=16)
-    >>> _stage_of(0, pc)
-    0
-    >>> _stage_of(3, pc)
-    0
-    >>> _stage_of(4, pc)
-    1
-    >>> _stage_of(15, pc)
-    3
-    """
+    """Return the pipeline-parallel stage index for a global rank."""
     return rank // config.ranks_per_stage
 
 
 def _ranks_for_stage(pp_stage: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank that belongs to a given PP stage.
-
-    The ranks are generated by iterating over every combination of
-    ``dp``, ``ep``, ``cp``, and ``tp`` (outermost to innermost) and
-    computing the global rank with :func:`_global_rank`.
-
-    Parameters
-    ----------
-    pp_stage : int
-        The pipeline stage index (0 .. ``config.pp - 1``).
-    config : ParallelConfig
-        Parallelism configuration.
-
-    Returns
-    -------
-    list[int]
-        Ordered list of global ranks belonging to ``pp_stage``.
-
-    Examples
-    --------
-    >>> pc = ParallelConfig(tp=2, cp=1, ep=1, dp=2, pp=4, num_gpus=16)
-    >>> _ranks_for_stage(0, pc)
-    [0, 1, 2, 3]
-    >>> _ranks_for_stage(1, pc)
-    [4, 5, 6, 7]
-    >>> _ranks_for_stage(3, pc)
-    [12, 13, 14, 15]
-    """
+    """Return every global rank that belongs to a given PP stage."""
     ranks: list[int] = []
     for dp_rank in range(config.dp):
         for ep_rank in range(config.ep):
@@ -332,142 +139,40 @@ def _ranks_for_stage(pp_stage: int, config: ParallelConfig) -> list[int]:
     return ranks
 
 
-# ------------------------------------------------------------------------------
 # Process-group membership helpers
-# ------------------------------------------------------------------------------
 
 def _ranks_in_same_dp_group(
     group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
 ) -> bool:
-    """Return ``True`` iff every rank in *group_ranks* shares the same DP group as *reference_rank*.
-
-    Two ranks are in the same DP group when **all other dimensions are identical**:
-    ``tp``, ``cp``, ``ep``, and ``pp`` must match; only ``dp`` may differ.
-
-    Parameters
-    ----------
-    group_ranks : Iterable[int]
-        Ranks to validate (e.g. from a trace event's ``group_ranks``).
-    reference_rank : int
-        The rank whose DP group is the reference.
-    config : ParallelConfig
-        Parallelism configuration.
-
-    Returns
-    -------
-    bool
-
-    Examples
-    --------
-    >>> pc = ParallelConfig(tp=2, cp=1, ep=1, dp=2, pp=4, num_gpus=16)
-    >>> _ranks_in_same_dp_group([0, 2], 0, pc)   # same PP stage, same TP, different DP
-    True
-    >>> _ranks_in_same_dp_group([0, 1], 0, pc)   # different TP => different DP group
-    False
-    """
-    ref = _decompose_rank(reference_rank, config)
-    for r in group_ranks:
-        c = _decompose_rank(r, config)
-        if (
-            c.tp != ref.tp
-            or c.cp != ref.cp
-            or c.ep != ref.ep
-            or c.pp != ref.pp
-        ):
-            return False
-    return True
+    """Return ``True`` iff *group_ranks* is exactly the DP group of *reference_rank*."""
+    return set(group_ranks) == set(_get_dp_group_ranks(reference_rank, config))
 
 
 def _ranks_in_same_ep_group(
     group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
 ) -> bool:
-    """Return ``True`` iff every rank in *group_ranks* shares the same EP group as *reference_rank*.
-
-    Same-EP-group condition: ``tp``, ``cp``, ``dp``, and ``pp`` match; only ``ep`` may differ.
-    """
-    ref = _decompose_rank(reference_rank, config)
-    for r in group_ranks:
-        c = _decompose_rank(r, config)
-        if (
-            c.tp != ref.tp
-            or c.cp != ref.cp
-            or c.dp != ref.dp
-            or c.pp != ref.pp
-        ):
-            return False
-    return True
+    """Return ``True`` iff *group_ranks* is exactly the EP group of *reference_rank*."""
+    return set(group_ranks) == set(_get_ep_group_ranks(reference_rank, config))
 
 
 def _ranks_in_same_tp_group(
     group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
 ) -> bool:
-    """Return ``True`` iff every rank in *group_ranks* shares the same TP group as *reference_rank*.
-
-    Same-TP-group condition: ``cp``, ``ep``, ``dp``, and ``pp`` match; only ``tp`` may differ.
-    """
-    ref = _decompose_rank(reference_rank, config)
-    for r in group_ranks:
-        c = _decompose_rank(r, config)
-        if (
-            c.cp != ref.cp
-            or c.ep != ref.ep
-            or c.dp != ref.dp
-            or c.pp != ref.pp
-        ):
-            return False
-    return True
+    """Return ``True`` iff *group_ranks* is exactly the TP group of *reference_rank*."""
+    return set(group_ranks) == set(_get_tp_group_ranks(reference_rank, config))
 
 
 def _ranks_in_same_cp_group(
     group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
 ) -> bool:
-    """Return ``True`` iff every rank in *group_ranks* shares the same CP group as *reference_rank*.
-
-    Same-CP-group condition: ``tp``, ``ep``, ``dp``, and ``pp`` match; only ``cp`` may differ.
-    """
-    ref = _decompose_rank(reference_rank, config)
-    for r in group_ranks:
-        c = _decompose_rank(r, config)
-        if (
-            c.tp != ref.tp
-            or c.ep != ref.ep
-            or c.dp != ref.dp
-            or c.pp != ref.pp
-        ):
-            return False
-    return True
+    """Return ``True`` iff *group_ranks* is exactly the CP group of *reference_rank*."""
+    return set(group_ranks) == set(_get_cp_group_ranks(reference_rank, config))
 
 
-# ------------------------------------------------------------------------------
 # Process-group builders
-# ------------------------------------------------------------------------------
 
 def _get_dp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank in the DP group containing *rank*.
-
-    A DP group contains all ranks where ``tp``, ``cp``, ``ep``, and ``pp`` are
-    fixed to the coordinates of *rank*, while ``dp`` varies across ``0 .. DP-1``.
-
-    Parameters
-    ----------
-    rank : int
-        Any member of the desired DP group.
-    config : ParallelConfig
-        Parallelism configuration.
-
-    Returns
-    -------
-    list[int]
-        Ordered list ``[rank(dp=0), rank(dp=1), ..., rank(dp=DP-1)]``.
-
-    Examples
-    --------
-    >>> pc = ParallelConfig(tp=2, cp=1, ep=1, dp=2, pp=4, num_gpus=16)
-    >>> _get_dp_group_ranks(0, pc)   # TP=0, DP varies
-    [0, 2]
-    >>> _get_dp_group_ranks(1, pc)   # TP=1, DP varies
-    [1, 3]
-    """
+    """Return every global rank in the DP group containing *rank*."""
     coords = _decompose_rank(rank, config)
     return [
         _global_rank(coords.tp, coords.cp, coords.ep, dp, coords.pp, config)
@@ -476,11 +181,7 @@ def _get_dp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
 
 
 def _get_ep_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank in the EP group containing *rank*.
-
-    An EP group contains all ranks where ``tp``, ``cp``, ``dp``, and ``pp`` are
-    fixed to the coordinates of *rank*, while ``ep`` varies across ``0 .. EP-1``.
-    """
+    """Return every global rank in the EP group containing *rank*."""
     coords = _decompose_rank(rank, config)
     return [
         _global_rank(coords.tp, coords.cp, ep, coords.dp, coords.pp, config)
@@ -489,11 +190,7 @@ def _get_ep_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
 
 
 def _get_tp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank in the TP group containing *rank*.
-
-    A TP group contains all ranks where ``cp``, ``ep``, ``dp``, and ``pp`` are
-    fixed to the coordinates of *rank*, while ``tp`` varies across ``0 .. TP-1``.
-    """
+    """Return every global rank in the TP group containing *rank*."""
     coords = _decompose_rank(rank, config)
     return [
         _global_rank(tp, coords.cp, coords.ep, coords.dp, coords.pp, config)
@@ -502,11 +199,7 @@ def _get_tp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
 
 
 def _get_cp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank in the CP group containing *rank*.
-
-    A CP group contains all ranks where ``tp``, ``ep``, ``dp``, and ``pp`` are
-    fixed to the coordinates of *rank*, while ``cp`` varies across ``0 .. CP-1``.
-    """
+    """Return every global rank in the CP group containing *rank*."""
     coords = _decompose_rank(rank, config)
     return [
         _global_rank(coords.tp, cp, coords.ep, coords.dp, coords.pp, config)
@@ -796,6 +489,20 @@ def _add_non_pp_collective(
     data_size = int(event.metadata.get("bytes", 0))
     if not group_ranks:
         return
+    cache_key = (collective_type, tuple(sorted(group_ranks)), data_size)
+    if cache_key in _collective_cache:
+        for comm_node in _collective_cache[cache_key]:
+            if comm_node.src_gpu == rank:
+                slot_node_ids.append(comm_node.node_id)
+                if rank in last_node_by_rank:
+                    dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=comm_node.node_id))
+                last_node_by_rank[rank] = comm_node.node_id
+            if comm_node.dst_gpu == rank and comm_node.dst_gpu != comm_node.src_gpu:
+                slot_node_ids.append(comm_node.node_id)
+                if rank in last_node_by_rank:
+                    dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=comm_node.node_id))
+                last_node_by_rank[rank] = comm_node.node_id
+        return
     result, next_flow_id = decompose_collective(
         collective_type=collective_type,
         group_ranks=group_ranks,
@@ -805,8 +512,33 @@ def _add_non_pp_collective(
         flow_id_start=flow_id[0],
     )
     flow_id[0] = next_flow_id
+    cached_nodes: list[CommNode] = []
     for flow in result.flows:
-        _add_flow_to_dag(dag, flow, collective_type, direction, node_id, last_node_by_rank, slot_node_ids, rank)
+        comm_node = CommNode(
+            node_id=node_id[0],
+            src_gpu=flow.src,
+            dst_gpu=flow.dst,
+            bytes=flow.flow_size,
+            collective_type=collective_type,
+            layer_id=-1,
+            phase=direction,
+            flow_id=flow.flow_id,
+            parent_flow_ids=flow.parent_flow_ids,
+        )
+        dag.comm_nodes.append(comm_node)
+        cached_nodes.append(comm_node)
+        if flow.src == rank:
+            slot_node_ids.append(node_id[0])
+            if rank in last_node_by_rank:
+                dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
+            last_node_by_rank[rank] = node_id[0]
+        if flow.dst == rank and flow.dst != flow.src:
+            slot_node_ids.append(node_id[0])
+            if rank in last_node_by_rank:
+                dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=node_id[0]))
+            last_node_by_rank[rank] = node_id[0]
+        node_id[0] += 1
+    _collective_cache[cache_key] = cached_nodes
 
 
 def _add_pp_transfer(
@@ -1075,6 +807,7 @@ class MegatronDagTracer(DAGTracer):
         self.ccl = ccl
 
     def trace(self, workload: MegatronWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
+        _collective_cache.clear()
         dag = ExecutionDAG()
         config = ParallelConfig.from_workload(workload)
         traces_dir = _resolve_traces_dir(datacenter, workload)
