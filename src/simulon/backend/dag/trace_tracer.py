@@ -418,8 +418,7 @@ def _process_slot_end(
         slot_last_node[key] = slot_node_ids[-1]
         slot_last_timestamp[key] = event.timestamp_ms
     slot_node_ids.clear()
-    active_microbatch_id[0] = -1
-    active_direction[0] = ""
+    slot_node_ids.clear()
 
 
 def _add_compute_node(
@@ -618,6 +617,7 @@ def _handle_event_gap(
                 active_microbatch_id[0], active_direction[0],
                 node_id, last_node_by_rank, slot_node_ids
             )
+
 
 
 def _add_trace_to_dag(
