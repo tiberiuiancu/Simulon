@@ -16,7 +16,7 @@ from simulon.config.workload import MegatronWorkload
 
 """Megatron-LM rank formula and parallelism helpers."""
 
-_collective_cache: dict[tuple[str, tuple[int, ...], int], list[CommNode]] = {}
+_collective_cache: dict[tuple[str, tuple[int, ...], int, float], list[CommNode]] = {}
 
 
 class RankCoords(NamedTuple):
@@ -489,16 +489,14 @@ def _add_non_pp_collective(
     data_size = int(event.metadata.get("bytes", 0))
     if not group_ranks:
         return
-    cache_key = (collective_type, tuple(sorted(group_ranks)), data_size)
+    cache_key = (collective_type, tuple(sorted(group_ranks)), data_size, event.timestamp_ms)
     if cache_key in _collective_cache:
         for comm_node in _collective_cache[cache_key]:
             if comm_node.src_gpu == rank:
-                slot_node_ids.append(comm_node.node_id)
                 if rank in last_node_by_rank:
                     dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=comm_node.node_id))
                 last_node_by_rank[rank] = comm_node.node_id
             if comm_node.dst_gpu == rank and comm_node.dst_gpu != comm_node.src_gpu:
-                slot_node_ids.append(comm_node.node_id)
                 if rank in last_node_by_rank:
                     dag.edges.append(DAGEdge(src_node_id=last_node_by_rank[rank], dst_node_id=comm_node.node_id))
                 last_node_by_rank[rank] = comm_node.node_id
