@@ -864,6 +864,12 @@ def _decompose_collectives_in_dag(
     if not dag.collective_nodes:
         return
 
+    node_id_to_rank: dict[int, int] = {}
+    for n in dag.compute_nodes:
+        node_id_to_rank[n.node_id] = n.gpu_rank
+    for n in dag.comm_nodes:
+        node_id_to_rank[n.node_id] = n.src_gpu
+
     for C in sorted(dag.collective_nodes.values(), key=lambda n: n.node_id):
         result, next_flow_id = decompose_collective(
             collective_type=C.collective_type,
@@ -890,23 +896,40 @@ def _decompose_collectives_in_dag(
                     parent_flow_ids=list(flow.parent_flow_ids),
                 )
             )
+            node_id_to_rank[node_id[0]] = flow.src
             node_id[0] += 1
-        last_p2p_id = node_id[0] - 1
 
-        for i in range(len(result.flows) - 1):
-            dag.add_edge(
-                DAGEdge(
-                    src_node_id=first_p2p_id + i,
-                    dst_node_id=first_p2p_id + i + 1,
-                )
-            )
+        entry_flows: dict[int, list[int]] = {}
+        exit_flows: dict[int, list[int]] = {}
+
+        for idx, flow in enumerate(result.flows):
+            nid = first_p2p_id + idx
+            if not flow.parent_flow_ids:
+                entry_flows.setdefault(flow.src, []).append(nid)
+                entry_flows.setdefault(flow.dst, []).append(nid)
+            if not flow.child_flow_ids:
+                exit_flows.setdefault(flow.src, []).append(nid)
+                exit_flows.setdefault(flow.dst, []).append(nid)
 
         for edge in C.pending_edges or []:
             if edge.dst_node_id == C.node_id:
-                edge.dst_node_id = first_p2p_id
+                src_rank = node_id_to_rank.get(edge.src_node_id)
+                if src_rank is not None and src_rank in entry_flows:
+                    for entry_nid in entry_flows[src_rank]:
+                        dag.add_edge(DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid))
+                else:
+                    for nids in entry_flows.values():
+                        for entry_nid in nids:
+                            dag.add_edge(DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid))
             if edge.src_node_id == C.node_id:
-                edge.src_node_id = last_p2p_id
-            dag.add_edge(edge)
+                dst_rank = node_id_to_rank.get(edge.dst_node_id)
+                if dst_rank is not None and dst_rank in exit_flows:
+                    for exit_nid in exit_flows[dst_rank]:
+                        dag.add_edge(DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id))
+                else:
+                    for nids in exit_flows.values():
+                        for exit_nid in nids:
+                            dag.add_edge(DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id))
 
         flow_id[0] = next_flow_id
 
