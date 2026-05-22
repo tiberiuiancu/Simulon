@@ -826,7 +826,7 @@ def _wire_cross_slot_edges(
     keys_by_rank: dict[int, list] = {}
     for key in slot_first_timestamp:
         keys_by_rank.setdefault(key[0], []).append(key)
-    for rank, keys in keys_by_rank.items():
+    for _, keys in keys_by_rank.items():
         keys.sort(key=lambda k: slot_first_timestamp[k])
         for i in range(len(keys) - 1):
             prev_last = slot_last_node.get(keys[i])
@@ -864,8 +864,6 @@ def _decompose_collectives_in_dag(
     if not dag.collective_nodes:
         return
 
-    n_nodes = len(dag.collective_nodes) + len(dag.compute_nodes) + len(dag.comm_nodes)
-
     for C in sorted(dag.collective_nodes.values(), key=lambda n: n.node_id):
         result, next_flow_id = decompose_collective(
             collective_type=C.collective_type,
@@ -876,6 +874,8 @@ def _decompose_collectives_in_dag(
             flow_id_start=flow_id[0],
         )
         first_p2p_id = node_id[0]
+        if len(result.flows) == 0:
+            continue
         for flow in result.flows:
             dag.add_comm_node(
                 CommNode(
@@ -906,8 +906,7 @@ def _decompose_collectives_in_dag(
                 edge.dst_node_id = first_p2p_id
             if edge.src_node_id == C.node_id:
                 edge.src_node_id = last_p2p_id
-            if last_p2p_id < n_nodes:
-                dag.add_edge(edge)
+            dag.add_edge(edge)
 
         flow_id[0] = next_flow_id
 
