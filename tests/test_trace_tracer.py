@@ -10,6 +10,7 @@ from simulon.backend.dag.trace_parser import TraceFileParser
 from simulon.backend.dag.trace_tracer import MegatronDagTracer, ParallelConfig, _remap_collectives
 from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.collective import NCCLDecomposer
+from simulon.collective.decompose import decompose_collective
 from simulon.config.dc import (
     ClusterSpec,
     DatacenterConfig,
@@ -542,3 +543,86 @@ def test_pp_send_preserved_in_remap():
         tf = TraceFileParser.parse(str(p))
     remapped = _remap_collectives(tf, from_rank=0, to_rank=1, config=config)
     assert remapped.events[0].metadata["group_ranks"] == [1, 3]
+
+
+def test_multi_rank_collective_dedup():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"slot": "fwd"}},
+        {
+            "type": "collective",
+            "timestamp_ms": 1.0,
+            "metadata": {
+                "collective_type": "AllReduce",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0)
+        _write_trace(_make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1)
+        workload = _make_workload(tp=2, pp=1, num_gpus=2)
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+
+        expected_result, _ = decompose_collective(
+            collective_type="AllReduce",
+            group_ranks=[0, 1],
+            data_size=2048,
+            num_channels=1,
+            algorithm="ring",
+            flow_id_start=0,
+        )
+        expected_n = len(expected_result.flows)
+
+        ar_nodes = [n for n in dag.comm_nodes if n.collective_type == "AllReduce"]
+        assert len(ar_nodes) == expected_n, (
+            f"Expected {expected_n} AllReduce P2P nodes, got {len(ar_nodes)}"
+        )
+
+
+def test_collective_decomposition_edge_rewiring():
+    events = [
+        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"slot": "fwd"}},
+        {
+            "type": "collective",
+            "timestamp_ms": 1.0,
+            "metadata": {
+                "collective_type": "AllReduce",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
+        _write_trace(trace, traces_dir, rank=0)
+        _write_trace(_make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1)
+        workload = _make_workload(tp=2, pp=1, num_gpus=2)
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+
+        rank0_compute = sorted(
+            [n for n in dag.compute_nodes if n.gpu_rank == 0],
+            key=lambda n: n.node_id,
+        )
+        assert len(rank0_compute) == 2, f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        c_before = rank0_compute[0]
+        c_after = rank0_compute[1]
+
+        rank0_comm = [n for n in dag.comm_nodes if n.src_gpu == 0 or n.dst_gpu == 0]
+        assert len(rank0_comm) > 0, "Expected at least one CommNode touching rank 0"
+        rank0_comm_sorted = sorted(rank0_comm, key=lambda n: n.node_id)
+        first_p2p = rank0_comm_sorted[0]
+        last_p2p = rank0_comm_sorted[-1]
+
+        assert _has_path(
+            dag.edges, c_before.node_id, first_p2p.node_id
+        ), f"Expected path from compute before ({c_before.node_id}) to first P2P ({first_p2p.node_id})"
+        assert _has_path(
+            dag.edges, last_p2p.node_id, c_after.node_id
+        ), f"Expected path from last P2P ({last_p2p.node_id}) to compute after ({c_after.node_id})"

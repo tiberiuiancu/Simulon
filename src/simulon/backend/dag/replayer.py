@@ -48,7 +48,7 @@ class SimulationResult:
     exposed_comm_ms: float
     exposed_comm_by_type: dict[str, float]  # collective_type -> avg ms
     bubble_ms: float
-    overlapped_comm_ms: float               # informational, not in totals
+    overlapped_comm_ms: float  # informational, not in totals
 
     # --- raw per-GPU ---
     per_gpu_times_ms: dict[int, float] = field(default_factory=dict)
@@ -155,7 +155,11 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
             by_type[ctype].append((start, finish))
         for ctype, ivs in by_type.items():
             type_union = _merge_intervals(ivs)
-            exp = max(0.0, _union_duration(type_union) - _intersection_duration(type_union, compute_ivs))
+            exp = max(
+                0.0,
+                _union_duration(type_union)
+                - _intersection_duration(type_union, compute_ivs),
+            )
             exposed_by_type[ctype] = exp
 
         # Compute total exposed using the union of all recv intervals to avoid
@@ -163,7 +167,8 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
         all_recv_ivs = _merge_intervals([(s, e) for s, e, _ in recv_entries])
         exposed_total = max(
             0.0,
-            _union_duration(all_recv_ivs) - _intersection_duration(all_recv_ivs, compute_ivs),
+            _union_duration(all_recv_ivs)
+            - _intersection_duration(all_recv_ivs, compute_ivs),
         )
 
         overlapped = _intersection_duration(comm_ivs, compute_ivs)
@@ -239,7 +244,9 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
 
     # Build successors for Kahn's algorithm
     successors: dict[int, list[int]] = defaultdict(list)
-    with log_progress("  building successors", len(dag.edges) + len(dag.comm_nodes), logger) as advance:
+    with log_progress(
+        "  building successors", len(dag.edges) + len(dag.comm_nodes), logger
+    ) as advance:
         for edge in dag.edges:
             successors[edge.src_node_id].append(edge.dst_node_id)
             advance()
@@ -256,7 +263,9 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
         if edge.dst_node_id not in all_nodes:
             bad_edges.append(("dst missing", edge.src_node_id, edge.dst_node_id))
     if bad_edges:
-        raise ValueError(f"DAG has {len(bad_edges)} edges pointing to non-existent nodes: {bad_edges[:10]}")
+        raise ValueError(
+            f"DAG has {len(bad_edges)} edges pointing to non-existent nodes: {bad_edges[:10]}"
+        )
 
     bad_flows = []
     for cn in dag.comm_nodes:
@@ -266,7 +275,9 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
                 if parent_nid not in all_nodes:
                     bad_flows.append((cn.node_id, fid, parent_nid))
     if bad_flows:
-        raise ValueError(f"DAG has {len(bad_flows)} flow deps pointing to non-existent nodes: {bad_flows[:10]}")
+        raise ValueError(
+            f"DAG has {len(bad_flows)} flow deps pointing to non-existent nodes: {bad_flows[:10]}"
+        )
 
     temp_in_degree = dict(in_degree)
     queue: deque[int] = deque(nid for nid, deg in temp_in_degree.items() if deg == 0)
@@ -283,7 +294,9 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
 
     if len(topo_order) != len(all_nodes):
         missing = set(all_nodes) - set(topo_order)
-        raise ValueError(f"Topo sort incomplete: {len(missing)} nodes not processed: {list(missing)[:10]}")
+        raise ValueError(
+            f"Topo sort incomplete: {len(missing)} nodes not processed: {list(missing)[:10]}"
+        )
 
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}

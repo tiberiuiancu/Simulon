@@ -16,9 +16,15 @@ class ComputeNode:
     duration_ms: Optional[float] = None
     start_ms: Optional[float] = None
     finish_ms: Optional[float] = None
-    fused_kernels: list[str] = field(default_factory=list)  # non-empty when this node fuses multiple kernels
-    extra_params: dict = field(default_factory=dict)  # kernel-specific lookup params (e.g. num_params for adamw)
-    is_extrapolated: bool = False  # True when duration_ms was obtained via extrapolation, not exact/partial match
+    fused_kernels: list[str] = field(
+        default_factory=list
+    )  # non-empty when this node fuses multiple kernels
+    extra_params: dict = field(
+        default_factory=dict
+    )  # kernel-specific lookup params (e.g. num_params for adamw)
+    is_extrapolated: bool = (
+        False  # True when duration_ms was obtained via extrapolation, not exact/partial match
+    )
 
 
 @dataclass
@@ -38,6 +44,27 @@ class CommNode:
 
 
 @dataclass
+class CollectiveNode:
+    node_id: int
+    collective_type: str
+    group_ranks: list[int]
+    data_size: int
+    name: str
+    timestamp_ms: float
+    layer_id: int
+    phase: str
+    algorithm: str
+    num_channels: int
+    duration_ms: Optional[float] = None
+    start_ms: Optional[float] = None
+    finish_ms: Optional[float] = None
+    pending_edges: Optional[list[DAGEdge]] = field(default_factory=list)
+
+    def add_pending_edge(self, edge: DAGEdge):
+        self.pending_edges.append(edge)
+
+
+@dataclass
 class DAGEdge:
     src_node_id: int
     dst_node_id: int
@@ -47,6 +74,7 @@ class DAGEdge:
 class ExecutionDAG:
     compute_nodes: list[ComputeNode] = field(default_factory=list)
     comm_nodes: list[CommNode] = field(default_factory=list)
+    collective_nodes: dict[int, CollectiveNode] = field(default_factory=dict)
     edges: list[DAGEdge] = field(default_factory=list)
     total_flops: Optional[float] = None
     profiled_ranks: set[int] = field(default_factory=set)
@@ -62,3 +90,20 @@ class ExecutionDAG:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())
+
+    def add_compute_node(self, node: ComputeNode):
+        self.compute_nodes.append(node)
+
+    def add_comm_node(self, node: CommNode):
+        self.comm_nodes.append(node)
+
+    def add_collective_node(self, node: CollectiveNode):
+        self.collective_nodes[node.node_id] = node
+
+    def add_edge(self, edge: DAGEdge):
+        if edge.dst_node_id in self.collective_nodes:
+            self.collective_nodes[edge.dst_node_id].add_pending_edge(edge)
+        elif edge.src_node_id in self.collective_nodes:
+            self.collective_nodes[edge.src_node_id].add_pending_edge(edge)
+        else:
+            self.edges.append(edge)
