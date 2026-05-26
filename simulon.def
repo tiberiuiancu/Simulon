@@ -55,16 +55,16 @@ From: nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
     uv pip install --no-build-isolation transformer_engine[pytorch]==2.15.0
 
     # Install optional CUDA-dependent components via simulon CLI.
-    # Apex is last because it compiles from source and takes the longest.
     uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
     uv run simulon install deepgemm
 
-    # Apex: explicitly declare Hopper (sm_90) arch since GPU detection can fail in containers
-    export TORCH_CUDA_ARCH_LIST="9.0"
-    uv run simulon install apex --skip-cuda-version-check
-
     # Build optional C++ pybind11 extension (MockNccl topology queries)
     uv run python setup.py build_ext --inplace
+
+    # Apex is last because it compiles from source and takes the longest.
+    # Explicitly declare Hopper (sm_90) arch since GPU detection can fail in containers.
+    export TORCH_CUDA_ARCH_LIST="9.0"
+    uv run simulon install apex --skip-cuda-version-check
 
 %environment
     export PYTHONUNBUFFERED=1

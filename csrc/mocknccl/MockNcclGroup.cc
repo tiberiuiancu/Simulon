@@ -1,4 +1,4 @@
-/* 
+/*
 *Copyright (c) 2024, Alibaba Group;
 *Licensed under the Apache License, Version 2.0 (the "License");
 *you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include <queue>
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 #include "MockNcclLog.h"
 using namespace std;
 namespace MockNccl {
@@ -46,7 +47,7 @@ namespace MockNccl {
     int nNodesPerTPGroup = _TP_size / nlocalranks + (_TP_size % nlocalranks > 0 ? 1 : 0);
     std::vector<int>ranks;
     std::vector<int>NVSwitchs;
-    // init TP group 
+    // init TP group
     if(_TP_size>1){
       std::set<int>TPnodes;
       for(int i =0;i<TP_nums;i++){
@@ -158,7 +159,7 @@ namespace MockNccl {
     }
     return;
   }
-  
+
   void MockNcclGroup::generateringchannels(std::map<int, std::vector<int>> localrings, MockNccl::GroupInfo* groupInfo, std::map<int, std::map<int, std::vector<int>>>& ringchannels) {
     std::map<int,std::vector<int>>::iterator ring_it;
     int current;
@@ -177,7 +178,7 @@ namespace MockNccl {
         node_recv = ring_it->second[0] + i * delta;
         node_send = ring_it->second[nlocalRanks-1] + i * delta;
         for(int j = 0; j < nlocalRanks; j++) {
-          current = ring_it->second[j] + i * delta;  
+          current = ring_it->second[j] + i * delta;
           if (j == nlocalRanks-1) {
             next = ring_it->second[0] + (i + 1) * delta;
           } else {
@@ -206,7 +207,7 @@ namespace MockNccl {
     if(GroupIndex.count(std::make_pair(rank,type)) == 0){
       NcclLog->writeLog(NcclLogLevel::ERROR,"There is no relevant group info, resulting in an error in gen_local_ring");
       return {};
-    } 
+    }
     gp_idx = GroupIndex[std::make_pair(rank,type)];
     gp_info = AllGroups[gp_idx];
     ranks = gp_info.Ranks;
@@ -260,7 +261,7 @@ namespace MockNccl {
         node_recv = ring_it->second[0] + i * delta;
         node_send = ring_it->second[nlocalRanks-1] + i * delta;
         for(int j = 0; j < nlocalRanks; j++) {
-          current = ring_it->second[j] + i * delta;  
+          current = ring_it->second[j] + i * delta;
           if (j == nlocalRanks-1) {
             next = ring_it->second[0] + (i + 1) * delta;
           } else {
@@ -308,7 +309,7 @@ namespace MockNccl {
       std::vector<int> prev;
       for(int j = 0;j<gp_info.Ranks.size();j++) {
         if(i == j) continue;
-        else prev.push_back(gp_info.Ranks[j]);  
+        else prev.push_back(gp_info.Ranks[j]);
       }
       for(int j=0;j<gp_info.Ranks.size();j++){
         if(i == j ) continue;
@@ -336,7 +337,7 @@ namespace MockNccl {
     FlowModels result = {};
     std::map<int,FlowModels>rank2flowmodels;
     std::map<int,std::shared_ptr<FlowModels>>rank2pflowmodels;
-    std::map<int, SingleFlow> task_list = {}; 
+    std::map<int, SingleFlow> task_list = {};
     std::map<int, SingleFlow> task_list2 = {};
     SingleFlow tmp_result;
     uint64_t chunksize;
@@ -391,7 +392,7 @@ namespace MockNccl {
           }
           if (rank_it->second[3] == cur_rank &&
               rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-              PXN_ENABLE) { 
+              PXN_ENABLE) {
             prevranks.clear();
             if (rank_it->second[0] != -1)
               prevranks = {rank_it->second[0]};
@@ -452,7 +453,7 @@ namespace MockNccl {
             result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
             task_list[rank_it->first] = tmp_result;
             g_flow_id++;
-          } else { 
+          } else {
             prevranks.clear();
             if(rank_it->second[0]!=-1){
               prevranks = {rank_it->second[0]};
@@ -493,7 +494,7 @@ namespace MockNccl {
             int partner_flow_id = task_list[rank_it->second[0]].flow_id;
             if (rank_it->second[3] == cur_rank &&
                 rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-                PXN_ENABLE) { 
+                PXN_ENABLE) {
               prevranks.clear();
               if (rank_it->second[0] != -1) {
                 prevranks = {rank_it->second[0]};
@@ -557,7 +558,7 @@ namespace MockNccl {
               task_list2[rank_it->first] = tmp_result;
               result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
               g_flow_id++;
-            } else { 
+            } else {
               prevranks.clear();
               if(rank_it->second[0]!=-1){
                 prevranks= {rank_it->second[0]};
@@ -618,7 +619,7 @@ namespace MockNccl {
     if(GroupIndex.count(std::make_pair(rank,type)) == 0){
       NcclLog->writeLog(NcclLogLevel::ERROR,"There is no relevant group info, resulting in an error in generating genallReduceNVLSTreeFlowModels.");
       return nullptr;
-    } 
+    }
     gp_idx = GroupIndex[std::make_pair(rank,type)];
     gp_info = AllGroups[gp_idx];
     nvlstreechannels = AllNVLStreechannels[gp_idx];
@@ -819,7 +820,7 @@ namespace MockNccl {
     gp_info = AllGroups[gp_idx];
     FlowModels result={};
     SingleFlow treeflow;
-    if(gp_info.nNodes == 1){  
+    if(gp_info.nNodes == 1){
       std::vector<int>NVswitchs = gp_info.NVSwitchs;
       std::vector<int>ranks = gp_info.Ranks;
       int chunk_size = data_size / chunk_count;
@@ -866,7 +867,7 @@ namespace MockNccl {
     SingleFlow tmp_result;
     FlowModels result1 = {};
     FlowModels result = {};
-    std::map<int,int> task_list = {}; 
+    std::map<int,int> task_list = {};
     std::map<int,std::map<int,ncclTree>>::iterator tree;
     GroupInfo gp_info;
     int gp_idx;
@@ -917,19 +918,19 @@ namespace MockNccl {
       ncclTree current = q.front();
       q.pop();
       if(current.up != -1) {
-        upinDegree[current.up]--; 
-        std::vector<int> _prev; 
+        upinDegree[current.up]--;
+        std::vector<int> _prev;
         if (current.down.size() == 0)
           _prev = {current.up};
         else
           _prev = current.down;
         tmp_result = SingleFlow(g_flow_id,current.rank,current.up,chunk_size,_prev,nodeprevs[current.rank],{},channle_id,chunk_id,chunk_count,conn_tag);
         for(int parent_flow_id:nodeprevs[current.rank])
-          result[std::make_pair(channle_id,parent_flow_id)].child_flow_id.push_back(g_flow_id);  
+          result[std::make_pair(channle_id,parent_flow_id)].child_flow_id.push_back(g_flow_id);
         result[std::make_pair(channle_id,g_flow_id)] = tmp_result;
         g_flow_id++;
-        nodeprevs[current.up].push_back(tmp_result.flow_id); 
-        nodeprevs.erase(current.rank); 
+        nodeprevs[current.up].push_back(tmp_result.flow_id);
+        nodeprevs.erase(current.rank);
         if(upinDegree[current.up] == 0)
           q.push(nodes[current.up]);
       }
@@ -964,7 +965,7 @@ namespace MockNccl {
             result[std::make_pair(channle_id,parent_flow_id)].child_flow_id.push_back(g_flow_id);
           result[std::make_pair(channle_id,g_flow_id)] = tmp_result;
           g_flow_id++;
-          nodeprevs[down].push_back(tmp_result.flow_id); 
+          nodeprevs[down].push_back(tmp_result.flow_id);
           if(downinDegree[down] == 0)
             q.push(nodes[down]);
         }
@@ -977,7 +978,7 @@ namespace MockNccl {
     FlowModels result = {};
     std::map<int,FlowModels>rank2flowmodels;
     std::map<int,std::shared_ptr<FlowModels>>rank2pflowmodels;
-    std::map<int,SingleFlow> task_list = {}; 
+    std::map<int,SingleFlow> task_list = {};
     std::map<int,SingleFlow> task_list2 = {};
     SingleFlow tmp_result;
     uint64_t chunksize;
@@ -1032,7 +1033,7 @@ namespace MockNccl {
           }
           if (rank_it->second[3] == cur_rank &&
               rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-              PXN_ENABLE) { 
+              PXN_ENABLE) {
             prevranks.clear();
             if(rank_it->second[0]!=-1){
               prevranks={rank_it->second[0]};
@@ -1052,7 +1053,7 @@ namespace MockNccl {
             result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
             g_flow_id++;
             prevranks.clear();
-            prevranks = {rank_it->first};          
+            prevranks = {rank_it->first};
             tmp_result = SingleFlow(
                 g_flow_id,
                 rank_it->second[2],
@@ -1091,7 +1092,7 @@ namespace MockNccl {
             result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
             task_list[rank_it->first] = tmp_result;
             g_flow_id++;
-          } else { 
+          } else {
             prevranks.clear();
             if(rank_it->second[0]!=-1){
               prevranks={rank_it->second[0]};
@@ -1132,7 +1133,7 @@ namespace MockNccl {
             int partner_flow_id = task_list[rank_it->second[0]].flow_id;
             if (rank_it->second[3] == cur_rank &&
                 rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-                PXN_ENABLE) { 
+                PXN_ENABLE) {
               prevranks.clear();
               if (rank_it->second[0] != -1) {
                 prevranks = {rank_it->second[0]};
@@ -1193,7 +1194,7 @@ namespace MockNccl {
               task_list2[rank_it->first] = tmp_result;
               result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
               g_flow_id++;
-            } else { 
+            } else {
             prevranks.clear();
             if(rank_it->second[0]!=-1)
             {
@@ -1238,7 +1239,7 @@ namespace MockNccl {
             int partner_flow_id = task_list[rank_it->second[0]].flow_id;
             if (rank_it->second[3] == cur_rank &&
                 rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-                PXN_ENABLE) { 
+                PXN_ENABLE) {
               prevranks.clear();
               if(rank_it->second[0]!=-1){
                 prevranks = {rank_it->second[0]};
@@ -1301,7 +1302,7 @@ namespace MockNccl {
               task_list2[rank_it->first] = tmp_result;
               result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
               g_flow_id++;
-            } else { 
+            } else {
               prevranks.clear();
               if(rank_it->second[0]!=-1){
                 prevranks = {rank_it->second[0]};
@@ -1347,7 +1348,7 @@ namespace MockNccl {
     FlowModels result = {};
     std::map<int,FlowModels>rank2flowmodels;
     std::map<int,std::shared_ptr<FlowModels>>rank2pflowmodels;
-    std::map<int,SingleFlow> task_list = {}; 
+    std::map<int,SingleFlow> task_list = {};
     std::map<int,SingleFlow> task_list2 = {};
     SingleFlow tmp_result;
     uint64_t chunksize;
@@ -1404,7 +1405,7 @@ namespace MockNccl {
           }
           if (rank_it->second[3] == cur_rank &&
               rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-              PXN_ENABLE) { 
+              PXN_ENABLE) {
             prevranks.clear();
             if(rank_it->second[0]!=-1){
               prevranks = {rank_it->second[0]};
@@ -1465,7 +1466,7 @@ namespace MockNccl {
             result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
             task_list[rank_it->first] = tmp_result;
             g_flow_id++;
-          } else { 
+          } else {
             prevranks.clear();
             if (rank_it->second[0] != -1) {
               prevranks = {rank_it->second[0]};
@@ -1506,7 +1507,7 @@ namespace MockNccl {
             int partner_flow_id = task_list[rank_it->second[0]].flow_id;
             if (rank_it->second[3] == cur_rank &&
                 rank_it->second[2] != cur_rank && gp_info.nNodes > 1 &&
-                PXN_ENABLE) { 
+                PXN_ENABLE) {
               prevranks.clear();
               if(rank_it->second[0]!=-1){
                 prevranks = {rank_it->second[0]};
@@ -1569,7 +1570,7 @@ namespace MockNccl {
               task_list2[rank_it->first] = tmp_result;
               result[std::make_pair(ring_id, g_flow_id)] = tmp_result;
               g_flow_id++;
-            } else { 
+            } else {
               prevranks.clear();
               if(rank_it->second[0]!=-1){
                 prevranks = {rank_it->second[0]};
@@ -1609,7 +1610,7 @@ namespace MockNccl {
     }
     return rank2pflowmodels;
   }
-  
+
   ncclChannelNode* MockNcclGroup::gen_nvls_tree_intra_channels(std::vector<int> intra_topo,std::map<int, vector<ncclChannelNode*>> &nvlstreechannel){
     ncclChannelNode* root = new ncclChannelNode(-1,intra_topo[0],nullptr,{});
     nvlstreechannel[root->rank].push_back(root);
@@ -1687,7 +1688,7 @@ namespace MockNccl {
       }
     }
     std::map<int, std::map<int, std::vector<int>>>
-        allnode2ranks; 
+        allnode2ranks;
     for (ring_it = rings.begin(); ring_it != rings.end(); ring_it++) {
       int nrankspernode = gp_info.nRanks / nNodes;
       for (int i = 0; i < gp_info.nNodes; i++) {
@@ -1800,7 +1801,7 @@ namespace MockNccl {
     if(Alltreechannels.count(gp_idx)){
       return Alltreechannels[gp_idx];
     }
-  
+
     nNodes = gp_info.nNodes;
     nlocalRanks = gp_info.nRanks/nNodes;
     localrings = gen_local_ring(rank,type);
@@ -1809,7 +1810,7 @@ namespace MockNccl {
     for(ring_it = localrings.begin();ring_it != localrings.end();ring_it++) {
       for(int i = 0; i < nNodes; i++) {
         for(int j = 0; j < nlocalRanks; j++) {
-          current = ring_it->second[j] + i * delta; 
+          current = ring_it->second[j] + i * delta;
           rings[ring_it->first].push_back(current);
         }
       }
@@ -1817,7 +1818,7 @@ namespace MockNccl {
     std::vector<DoubleBinaryTreeNode*> roots;
     roots = genInterDouBinTree(gp_info);
     std::map<int, std::map<int, std::vector<int>>>
-        allnode2ranks; 
+        allnode2ranks;
     for (ring_it = rings.begin(); ring_it != rings.end(); ring_it++) {
       int nrankspernode = gp_info.nRanks / nNodes;
       for (int i = 0; i < gp_info.nNodes; i++) {
@@ -1880,7 +1881,7 @@ namespace MockNccl {
     vector<DoubleBinaryTreeNode*> q;
     vector<DoubleBinaryTreeNode*> tmp_q;
     vector<DoubleBinaryTreeNode*> result;
-    int nNodes = gp_info.nNodes; 
+    int nNodes = gp_info.nNodes;
     std::vector<int> nodes;
     for(int i = 0;i < nNodes; i++)
       nodes.push_back(i);
