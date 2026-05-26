@@ -15,6 +15,9 @@ dependencies = [
     "rich>=13.0",
     "numpy>=2.4.4",
     "matplotlib>=3.10.8",
+    "mlflow>=2.0",
+    "pybind11>=2.12",
+    "setuptools",
 ]
 
 [project.scripts]
@@ -24,17 +27,13 @@ simulon = "simulon.cli:app"
 packages = ["src/simulon"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
-profiling = ["torch"]
-tracking = ["mlflow>=2.0"]
-cpp = ["pybind11>=2.12", "setuptools"]
+dev = [
+    "pytest>=8.0",
+    "torch",
+    "datasets",
+    "transformers",
+    "transformer_engine[pytorch]",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "datasets",
-    "transformers",
-]
