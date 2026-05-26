@@ -8,12 +8,10 @@ From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
     export DEBIAN_FRONTEND=noninteractive
     export TZ=UTC
 
-    # Explicitly expose CUDA to all build tools
     export CUDA_HOME=/usr/local/cuda
     export PATH=$CUDA_HOME/bin:$PATH
     export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-    # Install system build dependencies + NCCL runtime + NCCL dev headers
     apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         ca-certificates \
@@ -27,47 +25,30 @@ From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
         wget \
         && rm -rf /var/lib/apt/lists/*
 
-    # Install uv
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
 
-    # Install Python 3.13 via uv
     uv python install 3.13
 
     cd /opt/simulon
 
-    # Remove any host-side artifacts
     rm -rf .venv output build **/__pycache__ **/*.egg-info .pytest_cache
 
-    # Fetch git submodules (vendor/ and experiments/ external code)
     git submodule update --init --recursive
 
-    # Sync Python environment with dev extras.
-    # transformer_engine[pytorch] was removed from pyproject.toml dev extras
-    # because it must be installed with --no-build-isolation (separate step below).
     uv sync --extra dev
 
-    # Ensure all subsequent commands use the uv-managed venv
     export PATH="/opt/simulon/.venv/bin:$PATH"
 
-    # Third-party build scripts invoke `pip` directly; ensure it exists in the venv.
     uv pip install pip
 
-    # Build optional C++ pybind11 extension (MockNccl topology queries).
-    # Place early to catch C++ compilation errors before long-running TE/Apex installs.
     uv run python setup.py build_ext --inplace
 
-    # Install transformer_engine pinned to 2.11.0 (prebuilt wheel).
-    # This version predates the cublasLtGroupedMatrixLayoutInit symbol.
-    # Explicitly specify the cu13 core so it resolves against CUDA 13 in the container.
     uv pip install transformer_engine_cu13==2.11.0 transformer_engine[pytorch]==2.11.0
 
-    # Install optional CUDA-dependent components via simulon CLI.
     uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
     uv run simulon install deepgemm
 
-    # Apex is last because it compiles from source and takes the longest.
-    # Explicitly declare Hopper (sm_90) arch since GPU detection can fail in containers.
     export TORCH_CUDA_ARCH_LIST="9.0"
     uv run simulon install apex --skip-cuda-version-check
 
