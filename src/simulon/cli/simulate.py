@@ -18,6 +18,7 @@ def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Print iteration summary to stdout"),
     chrome: Optional[Path] = typer.Option(None, "--chrome", help="Write Chrome/Perfetto trace to this path"),
+    chrome_compact: bool = typer.Option(False, "--chrome-compact", help="Only include profiled ranks (excludes extrapolated traces)"),
     dag_out: Optional[Path] = typer.Option(None, "--dag", help="Write timing-populated DAG JSON to this path"),
     goal: Optional[Path] = typer.Option(None, "--goal", help="Write GOAL trace to this path for use with ATLAHS/LogGOPSim"),
     compact: bool = typer.Option(False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"),
@@ -108,7 +109,7 @@ def simulate(
                 dp = max(1, num_gpus // (tp * pp_val * ep))
             else:
                 tp = pp_val = ep = dp = 1
-            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep)
+            trace_dict = to_chrome_trace(dag, tp=tp, pp=pp_val, dp=dp, ep=ep, only_profiled=chrome_compact)
             with open(chrome, "w") as f:
                 json.dump(trace_dict, f)
             typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")

@@ -87,7 +87,7 @@ def test_e2e_trace_driven_simulation():
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
 
-        trace_0 = tmp_path / "trace_pp_stage_0.json"
+        trace_0 = tmp_path / "trace_rank_0.json"
         _make_trace_file(
             trace_0,
             rank=0,
@@ -116,7 +116,7 @@ def test_e2e_trace_driven_simulation():
             ],
         )
 
-        trace_1 = tmp_path / "trace_pp_stage_1.json"
+        trace_1 = tmp_path / "trace_rank_2.json"
         _make_trace_file(
             trace_1,
             rank=2,

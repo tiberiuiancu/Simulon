@@ -22,6 +22,26 @@ class TraceFile:
     events: list[TraceEvent]
     total_flops: float | None = None
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "trace_format_version": self.trace_format_version,
+            "rank": self.rank,
+            "world_size": self.world_size,
+            "pipeline_stage": self.pipeline_stage,
+            "events": [
+                {
+                    "type": e.type,
+                    "timestamp_ms": e.timestamp_ms,
+                    "metadata": e.metadata,
+                }
+                for e in self.events
+            ],
+            "total_flops": self.total_flops,
+        }
+
+    def to_json(self, indent: int | None = None) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
+
 
 class TraceEventInput(TypedDict):
     type: str
