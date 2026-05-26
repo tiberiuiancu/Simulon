@@ -27,14 +27,16 @@ from typing import Any
 
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
 
-_TID_COMPUTE   = 1000
-_TID_COLL_SEND = 1001   # AllGather / ReduceScatter / AllReduce send
-_TID_COLL_RECV = 1002   # AllGather / ReduceScatter / AllReduce recv
-_TID_PP_SEND   = 1003   # PP_Send (inter-stage point-to-point, send side)
-_TID_PP_RECV   = 1004   # PP_Send recv side
+_TID_COMPUTE = 1000
+_TID_COLL_SEND = 1001  # AllGather / ReduceScatter / AllReduce send
+_TID_COLL_RECV = 1002  # AllGather / ReduceScatter / AllReduce recv
+_TID_PP_SEND = 1003  # PP_Send (inter-stage point-to-point, send side)
+_TID_PP_RECV = 1004  # PP_Send recv side
 
 
-def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int, int, int]:
+def _decode_rank(
+    gpu_rank: int, tp: int, pp: int, ep: int = 1
+) -> tuple[int, int, int, int]:
     """Return (dp_rank, pp_stage, ep_rank, tp_rank) for a gpu_rank."""
     tp_rank = gpu_rank % tp
     ep_rank = (gpu_rank // tp) % ep
@@ -43,7 +45,15 @@ def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int
     return dp_rank, pp_stage, ep_rank, tp_rank
 
 
-def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -> dict[str, Any]:
+def to_chrome_trace(
+    dag: ExecutionDAG,
+    tp: int,
+    pp: int,
+    dp: int,
+    ep: int = 1,
+    *,
+    only_profiled: bool = False,
+) -> dict[str, Any]:
     """Build a Chrome Trace dict from a timing-populated ExecutionDAG.
 
     Args:
@@ -51,6 +61,7 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
         tp:   Tensor parallelism degree.
         pp:   Pipeline parallelism degree.
         dp:   Data parallelism degree.
+        only_profiled: If True, only emit events for ranks that had exact trace files.
 
     Returns:
         Dict with "traceEvents" list, ready for json.dump().
@@ -69,6 +80,9 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
         all_gpus.add(n.src_gpu)
         all_gpus.add(n.dst_gpu)
 
+    if only_profiled:
+        all_gpus &= dag.profiled_ranks
+
     # Emit process/thread metadata sorted by (dp, pp, tp) = natural gpu_rank order
     for gpu in sorted(all_gpus):
         pid = 1000 + gpu
@@ -76,69 +90,142 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
 
         # Group label: DP replicas together, PP stages within, EP/TP ranks innermost
         proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} EP={ep_rank} TP={tp_rank}"
-        sort_idx = dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
+        sort_idx = (
+            dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
+        )
 
         events += [
-            {"name": "process_name",       "ph": "M", "pid": pid, "tid": 0,
-             "args": {"name": proc_name}},
-            {"name": "process_sort_index", "ph": "M", "pid": pid, "tid": 0,
-             "args": {"sort_index": sort_idx}},
-            {"name": "thread_name",       "ph": "M", "pid": pid, "tid": _TID_COMPUTE,
-             "args": {"name": "Compute"}},
-            {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_COMPUTE,
-             "args": {"sort_index": 0}},
-            {"name": "thread_name",       "ph": "M", "pid": pid, "tid": _TID_COLL_SEND,
-             "args": {"name": "Coll Send (collective)"}},
-            {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_COLL_SEND,
-             "args": {"sort_index": 1}},
-            {"name": "thread_name",       "ph": "M", "pid": pid, "tid": _TID_COLL_RECV,
-             "args": {"name": "Coll Recv (collective)"}},
-            {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_COLL_RECV,
-             "args": {"sort_index": 2}},
-            {"name": "thread_name",       "ph": "M", "pid": pid, "tid": _TID_PP_SEND,
-             "args": {"name": "PP Send"}},
-            {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_PP_SEND,
-             "args": {"sort_index": 3}},
-            {"name": "thread_name",       "ph": "M", "pid": pid, "tid": _TID_PP_RECV,
-             "args": {"name": "PP Recv"}},
-            {"name": "thread_sort_index", "ph": "M", "pid": pid, "tid": _TID_PP_RECV,
-             "args": {"sort_index": 4}},
+            {
+                "name": "process_name",
+                "ph": "M",
+                "pid": pid,
+                "tid": 0,
+                "args": {"name": proc_name},
+            },
+            {
+                "name": "process_sort_index",
+                "ph": "M",
+                "pid": pid,
+                "tid": 0,
+                "args": {"sort_index": sort_idx},
+            },
+            {
+                "name": "thread_name",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_COMPUTE,
+                "args": {"name": "Compute"},
+            },
+            {
+                "name": "thread_sort_index",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_COMPUTE,
+                "args": {"sort_index": 0},
+            },
+            {
+                "name": "thread_name",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_COLL_SEND,
+                "args": {"name": "Coll Send (collective)"},
+            },
+            {
+                "name": "thread_sort_index",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_COLL_SEND,
+                "args": {"sort_index": 1},
+            },
+            {
+                "name": "thread_name",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_COLL_RECV,
+                "args": {"name": "Coll Recv (collective)"},
+            },
+            {
+                "name": "thread_sort_index",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_COLL_RECV,
+                "args": {"sort_index": 2},
+            },
+            {
+                "name": "thread_name",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_PP_SEND,
+                "args": {"name": "PP Send"},
+            },
+            {
+                "name": "thread_sort_index",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_PP_SEND,
+                "args": {"sort_index": 3},
+            },
+            {
+                "name": "thread_name",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_PP_RECV,
+                "args": {"name": "PP Recv"},
+            },
+            {
+                "name": "thread_sort_index",
+                "ph": "M",
+                "pid": pid,
+                "tid": _TID_PP_RECV,
+                "args": {"sort_index": 4},
+            },
         ]
 
     # Compute events
     for n in dag.compute_nodes:
         if n.start_ms is None or n.finish_ms is None:
             continue
+        if only_profiled and n.gpu_rank not in dag.profiled_ranks:
+            continue
         args: dict[str, Any] = {
-            "kernel":           n.kernel,
-            "phase":            n.phase,
-            "layer_id":         n.layer_id,
-            "microbatch_id":    n.microbatch_id,
-            "pipeline_stage":   n.pipeline_stage,
-            "duration_ms":      n.duration_ms,
-            "is_extrapolated":  n.is_extrapolated,
+            "kernel": n.kernel,
+            "phase": n.phase,
+            "layer_id": n.layer_id,
+            "microbatch_id": n.microbatch_id,
+            "pipeline_stage": n.pipeline_stage,
+            "duration_ms": n.duration_ms,
+            "is_extrapolated": n.is_extrapolated,
         }
         if n.fused_kernels:
             args["fused_kernels"] = ", ".join(n.fused_kernels)
-        event_name = ("! " + n.kernel) if n.is_extrapolated else n.kernel
-        events.append({
+        phase_label = n.phase if n.phase else "compute"
+        base_name = f"{phase_label} {n.kernel}"
+        event_name = ("! " + base_name) if n.is_extrapolated else base_name
+        entry: dict[str, Any] = {
             "name": event_name,
             "ph": "X",
             "pid": 1000 + n.gpu_rank,
             "tid": _TID_COMPUTE,
-            "ts":  n.start_ms * 1_000,
+            "ts": n.start_ms * 1_000,
             "dur": (n.duration_ms or 0.0) * 1_000,
             "args": args,
-        })
+        }
+        events.append(entry)
 
     # Comm events — one send event on src, one recv event on dst.
     # The tracer creates one CommNode per GPU participating in a collective, so the
     # same physical P2P transfer (src, dst, start_ms, bytes) may appear multiple times.
     # Deduplicate by physical identity before emitting.
-    seen_transfers: set[tuple[int, int, float, int]] = set()  # (src, dst, start_ms, bytes)
+    seen_transfers: set[tuple[int, int, float, int]] = (
+        set()
+    )  # (src, dst, start_ms, bytes)
 
     for n in dag.comm_nodes:
         if n.start_ms is None or n.finish_ms is None:
+            continue
+        if only_profiled and (
+            n.src_gpu not in dag.profiled_ranks and n.dst_gpu not in dag.profiled_ranks
+        ):
             continue
 
         key = (n.src_gpu, n.dst_gpu, n.start_ms, n.bytes)
@@ -146,40 +233,46 @@ def to_chrome_trace(dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1) -
             continue
         seen_transfers.add(key)
 
-        ts_us  = n.start_ms * 1_000
+        ts_us = n.start_ms * 1_000
         dur_us = (n.duration_ms or 0.0) * 1_000
         args = {
             "collective_type": n.collective_type,
-            "phase":           n.phase,
-            "layer_id":        n.layer_id,
-            "bytes":           n.bytes,
-            "duration_ms":     n.duration_ms,
-            "src_gpu":         n.src_gpu,
-            "dst_gpu":         n.dst_gpu,
-            "flow_id":         n.flow_id,
+            "phase": n.phase,
+            "layer_id": n.layer_id,
+            "bytes": n.bytes,
+            "duration_ms": n.duration_ms,
+            "src_gpu": n.src_gpu,
+            "dst_gpu": n.dst_gpu,
+            "flow_id": n.flow_id,
         }
         is_pp = n.collective_type == "PP_Send"
-        tid_send = _TID_PP_SEND   if is_pp else _TID_COLL_SEND
-        tid_recv = _TID_PP_RECV   if is_pp else _TID_COLL_RECV
+        tid_send = _TID_PP_SEND if is_pp else _TID_COLL_SEND
+        tid_recv = _TID_PP_RECV if is_pp else _TID_COLL_RECV
 
-        events.append({
-            "name": f"{n.collective_type} \u2192 GPU{n.dst_gpu}",
-            "ph": "X",
-            "pid": 1000 + n.src_gpu,
-            "tid": tid_send,
-            "ts":  ts_us,
-            "dur": dur_us,
-            "args": args,
-        })
-        events.append({
-            "name": f"{n.collective_type} \u2190 GPU{n.src_gpu}",
-            "ph": "X",
-            "pid": 1000 + n.dst_gpu,
-            "tid": tid_recv,
-            "ts":  ts_us,
-            "dur": dur_us,
-            "args": args,
-        })
+        if not only_profiled or n.src_gpu in dag.profiled_ranks:
+            events.append(
+                {
+                    "name": f"{n.collective_type} \u2192 GPU{n.dst_gpu}",
+                    "ph": "X",
+                    "pid": 1000 + n.src_gpu,
+                    "tid": tid_send,
+                    "ts": ts_us,
+                    "dur": dur_us,
+                    "args": args,
+                }
+            )
+        if not only_profiled or n.dst_gpu in dag.profiled_ranks:
+            events.append(
+                {
+                    "name": f"{n.collective_type} \u2190 GPU{n.src_gpu}",
+                    "ph": "X",
+                    "pid": 1000 + n.dst_gpu,
+                    "tid": tid_recv,
+                    "ts": ts_us,
+                    "dur": dur_us,
+                    "args": args,
+                }
+            )
 
     return {"traceEvents": events}
 
@@ -191,9 +284,13 @@ def write_chrome_trace(
     dp: int,
     path: str | Path,
     ep: int = 1,
+    only_profiled: bool = False,
 ) -> None:
     """Write a Chrome Trace JSON file from a populated ExecutionDAG."""
     import json
-    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep)
+
+    trace = to_chrome_trace(
+        dag, tp=tp, pp=pp, dp=dp, ep=ep, only_profiled=only_profiled
+    )
     with open(path, "w") as f:
         json.dump(trace, f)
