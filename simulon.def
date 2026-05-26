@@ -32,6 +32,8 @@ From: nvcr.io/nvidia/pytorch:26.04-py3
     python3 -m pip install -e ".[dev]" \
         && python3 setup.py build_ext --inplace
 
+    make -C vendor/Megatron-LM-traced/megatron/core/datasets
+
     simulon install deepgemm
 
 %environment
