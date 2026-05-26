@@ -6,7 +6,9 @@ from simulon.backend.dag.chrome_trace import _TID_COMPUTE, to_chrome_trace
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
 
 
-def _make_compute_node(node_id: int, fused_kernels: list[str], kernel: str = "mlp_linear1") -> ComputeNode:
+def _make_compute_node(
+    node_id: int, fused_kernels: list[str], kernel: str = "mlp_linear1"
+) -> ComputeNode:
     """Return a minimal, timing-populated ComputeNode."""
     return ComputeNode(
         node_id=node_id,
@@ -69,20 +71,41 @@ class TestOnlyProfiledFiltering:
     def test_only_profiled_filters_compute_comm_and_metadata(self):
         """When only_profiled=True, only ranks in dag.profiled_ranks emit events."""
         compute_profiled = ComputeNode(
-            node_id=0, gpu_rank=0, kernel="mlp_linear1", layer_id=0,
-            microbatch_id=0, pipeline_stage=0, phase="fwd",
-            duration_ms=1.0, start_ms=0.0, finish_ms=1.0,
+            node_id=0,
+            gpu_rank=0,
+            kernel="mlp_linear1",
+            layer_id=0,
+            microbatch_id=0,
+            pipeline_stage=0,
+            phase="fwd",
+            duration_ms=1.0,
+            start_ms=0.0,
+            finish_ms=1.0,
         )
         compute_unprofiled = ComputeNode(
-            node_id=1, gpu_rank=1, kernel="mlp_linear2", layer_id=0,
-            microbatch_id=0, pipeline_stage=0, phase="fwd",
-            duration_ms=1.0, start_ms=2.0, finish_ms=3.0,
+            node_id=1,
+            gpu_rank=1,
+            kernel="mlp_linear2",
+            layer_id=0,
+            microbatch_id=0,
+            pipeline_stage=0,
+            phase="fwd",
+            duration_ms=1.0,
+            start_ms=2.0,
+            finish_ms=3.0,
         )
         comm = CommNode(
-            node_id=2, src_gpu=0, dst_gpu=1, bytes=1024,
-            collective_type="AllGather", layer_id=0, phase="fwd",
+            node_id=2,
+            src_gpu=0,
+            dst_gpu=1,
+            bytes=1024,
+            collective_type="AllGather",
+            layer_id=0,
+            phase="fwd",
             flow_id=0,
-            duration_ms=0.5, start_ms=0.0, finish_ms=0.5,
+            duration_ms=0.5,
+            start_ms=0.0,
+            finish_ms=0.5,
         )
         dag = ExecutionDAG(
             compute_nodes=[compute_profiled, compute_unprofiled],

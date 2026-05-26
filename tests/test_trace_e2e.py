@@ -4,8 +4,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from simulon.backend.analytical import AnalyticalBackend
 from simulon.backend.dag.replayer import replay
 from simulon.config.dc import (
@@ -13,8 +11,8 @@ from simulon.config.dc import (
     DatacenterConfig,
     DatacenterMeta,
     GPUSpec,
-    NICSpec,
     NetworkSpec,
+    NICSpec,
     NodeSpec,
     ScaleOutSpec,
     ScaleUpSpec,
@@ -27,12 +25,7 @@ from simulon.config.workload import MegatronWorkload
 
 
 def _make_trace_file(
-    path: Path,
-    *,
-    rank: int,
-    world_size: int,
-    pipeline_stage: int,
-    events: list[dict],
+    path: Path, *, rank: int, world_size: int, pipeline_stage: int, events: list[dict]
 ) -> None:
     trace = {
         "trace_format_version": "1.0",
@@ -48,14 +41,9 @@ def _make_datacenter(traces_dir: str | None = None) -> DatacenterConfig:
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test_cluster", traces_dir=traces_dir),
         cluster=ClusterSpec(num_nodes=2),
-        node=NodeSpec(
-            gpus_per_node=2,
-            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
-        ),
+        node=NodeSpec(gpus_per_node=2, gpu=GPUSpec(name="H100", memory_capacity_gb=80.0)),
         network=NetworkSpec(
-            scale_up=ScaleUpSpec(
-                switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms"),
-            ),
+            scale_up=ScaleUpSpec(switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms")),
             scale_out=ScaleOutSpec(
                 nic=NICSpec(speed="400Gbps", latency="0.005ms"),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
@@ -108,11 +96,7 @@ def test_e2e_trace_driven_simulation():
                         "bytes": 1_048_576,
                     },
                 },
-                {
-                    "type": "slot_end",
-                    "timestamp_ms": 15.0,
-                    "metadata": {},
-                },
+                {"type": "slot_end", "timestamp_ms": 15.0, "metadata": {}},
             ],
         )
 
@@ -137,11 +121,7 @@ def test_e2e_trace_driven_simulation():
                         "bytes": 1_048_576,
                     },
                 },
-                {
-                    "type": "slot_end",
-                    "timestamp_ms": 15.0,
-                    "metadata": {},
-                },
+                {"type": "slot_end", "timestamp_ms": 15.0, "metadata": {}},
             ],
         )
 

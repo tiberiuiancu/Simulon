@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from simulon.config.dc import (
     ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
     NodeSpec,
     ScaleOutSpec,
-    ScaleUpSpec,
     SwitchSpec,
 )
 from simulon.config.nccl_profile import NcclProfile
@@ -108,9 +108,7 @@ class TestLoadNodeTemplate:
         spec = load_node_template("test-node")
         assert spec.gpus_per_node == 4
 
-    def test_raises_when_templates_dir_missing(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_raises_when_templates_dir_missing(self, tmp_path: Path, monkeypatch) -> None:
         """load_node_template raises FileNotFoundError when templates/node/ dir is absent."""
         monkeypatch.chdir(tmp_path)
         with pytest.raises(FileNotFoundError):
@@ -134,9 +132,7 @@ class TestResolveNodeSpec:
     def test_from_with_shallow_override(self, node_templates_dir: Path) -> None:
         """resolve_node_spec applies top-level field overrides from the inline spec."""
         (node_templates_dir / "test-node.yaml").write_text(_MINIMAL_NODE_YAML)
-        dc = _make_dc(
-            NodeSpec.model_validate({"from": "test-node", "gpus_per_node": 8})
-        )
+        dc = _make_dc(NodeSpec.model_validate({"from": "test-node", "gpus_per_node": 8}))
         spec = resolve_node_spec(dc)
         assert spec.gpus_per_node == 8  # override applied
         assert spec.gpu == "h100"  # from base template
@@ -145,10 +141,7 @@ class TestResolveNodeSpec:
         """resolve_node_spec deep-merges nested scale_up.switch overrides without clobbering sibling fields."""
         (node_templates_dir / "test-node.yaml").write_text(_MINIMAL_NODE_YAML)
         # Override only latency; port_speed from base template must survive.
-        override_data = {
-            "from": "test-node",
-            "scale_up": {"switch": {"latency": "0.0001ms"}},
-        }
+        override_data = {"from": "test-node", "scale_up": {"switch": {"latency": "0.0001ms"}}}
         dc = _make_dc(NodeSpec.model_validate(override_data))
         spec = resolve_node_spec(dc)
         assert spec.scale_up is not None
@@ -157,15 +150,10 @@ class TestResolveNodeSpec:
         assert switch.latency == "0.0001ms"
         assert switch.port_speed == "2554Gbps"  # sibling field preserved from base
 
-    def test_deep_merge_does_not_clobber_siblings(
-        self, node_templates_dir: Path
-    ) -> None:
+    def test_deep_merge_does_not_clobber_siblings(self, node_templates_dir: Path) -> None:
         """Partial nested override of scale_up.switch does not wipe port_speed from the base."""
         (node_templates_dir / "test-node.yaml").write_text(_MINIMAL_NODE_YAML)
-        override_data = {
-            "from": "test-node",
-            "scale_up": {"switch": {"port_speed": "7200Gbps"}},
-        }
+        override_data = {"from": "test-node", "scale_up": {"switch": {"port_speed": "7200Gbps"}}}
         dc = _make_dc(NodeSpec.model_validate(override_data))
         spec = resolve_node_spec(dc)
         switch = spec.scale_up.switch
@@ -220,9 +208,7 @@ class TestResolveNcclProfile:
         assert profile is not None
         assert profile.AllReduce.ring[0].bus_bw_GBps == pytest.approx(199.0)
 
-    def test_returns_none_when_no_profile(
-        self, node_templates_dir: Path, tmp_path: Path
-    ) -> None:
+    def test_returns_none_when_no_profile(self, node_templates_dir: Path, tmp_path: Path) -> None:
         """resolve_nccl_profile returns None when neither embedded nor companion profile exists."""
         # Node template with a gpu string but no nccl profile.
         (node_templates_dir / "bare-node.yaml").write_text(_MINIMAL_NODE_YAML)
@@ -290,5 +276,3 @@ class TestResolveScaleOut:
             result = resolve_scale_out(dc)
         assert result is so_top
         assert len(w) == 0  # no deprecation warning when top-level is used
-
-

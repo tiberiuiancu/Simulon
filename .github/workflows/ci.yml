@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - validate_e2e
+      - dev
+  pull_request:
+    branches:
+      - main
+      - validate_e2e
+      - dev
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: '0.5.x'
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Lint with ruff
+        run: uv run --with ruff ruff check simulon tests setup.py
+
+      - name: Check formatting
+        run: uv run --with ruff ruff format --check simulon tests setup.py
