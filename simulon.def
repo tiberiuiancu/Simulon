@@ -56,9 +56,9 @@ From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
     # Place early to catch C++ compilation errors before long-running TE/Apex installs.
     uv run python setup.py build_ext --inplace
 
-    # Install transformer_engine from source against the exact CUDA in this container.
+    # Install transformer_engine from source pinned at the v2.15 tag.
     export NVTE_FRAMEWORK=pytorch
-    uv pip install --no-build-isolation git+https://github.com/NVIDIA/TransformerEngine.git@stable
+    uv pip install --no-build-isolation 'git+https://github.com/NVIDIA/TransformerEngine.git@v2.15'
 
     # Install optional CUDA-dependent components via simulon CLI.
     uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
