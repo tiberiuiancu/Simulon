@@ -1,0 +1,62 @@
+Bootstrap: docker
+From: nvidia/cuda:12.9.2-devel-ubuntu24.04
+
+%files
+    . /opt/simulon
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=UTC
+
+    # Install system build dependencies
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        libssl-dev \
+        ninja-build \
+        wget \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+
+    # Install Python 3.13 via uv
+    uv python install 3.13
+
+    cd /opt/simulon
+
+    # Remove any host-side artifacts
+    rm -rf .venv output build **/__pycache__ **/*.egg-info .pytest_cache
+
+    # Fetch git submodules (vendor/ and experiments/ external code)
+    git submodule update --init --recursive
+
+    # Sync Python environment with dev extras.
+    # transformer_engine[pytorch] was removed from pyproject.toml dev extras
+    # because it must be installed with --no-build-isolation (separate step below).
+    uv sync --extra dev
+
+    # Ensure all subsequent commands use the uv-managed venv
+    export PATH="/opt/simulon/.venv/bin:$PATH"
+
+    # Install transformer_engine against local PyTorch / CUDA headers
+    uv pip install --no-build-isolation transformer_engine[pytorch]
+
+    # Install optional CUDA-dependent components via simulon CLI
+    uv run simulon install apex --skip-cuda-version-check
+    uv run simulon install flash-attn-hopper --version 2.7.3 --prebuilt
+    uv run simulon install deepgemm
+
+    # Build optional C++ pybind11 extension (MockNccl topology queries)
+    uv run python setup.py build_ext --inplace
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export PATH="/opt/simulon/.venv/bin:$PATH"
+    export PYTHONPATH="/opt/simulon:$PYTHONPATH"
+
+%runscript
+    exec "$@"
