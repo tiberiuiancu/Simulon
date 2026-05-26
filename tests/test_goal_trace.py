@@ -7,10 +7,10 @@ import pytest
 from simulon.backend.dag.goal_trace import dag_to_goal, write_goal_trace
 from simulon.backend.dag.nodes import CommNode, ComputeNode, DAGEdge, ExecutionDAG
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _compute(node_id: int, gpu_rank: int, duration_ms: float | None = 1.0) -> ComputeNode:
     """Minimal populated ComputeNode."""
@@ -27,11 +27,7 @@ def _compute(node_id: int, gpu_rank: int, duration_ms: float | None = 1.0) -> Co
 
 
 def _comm(
-    node_id: int,
-    src_gpu: int,
-    dst_gpu: int,
-    bytes_: int = 1024,
-    duration_ms: float | None = 0.5,
+    node_id: int, src_gpu: int, dst_gpu: int, bytes_: int = 1024, duration_ms: float | None = 0.5
 ) -> CommNode:
     """Minimal CommNode; duration_ms set to verify it does NOT appear in output."""
     return CommNode(
@@ -50,6 +46,7 @@ def _comm(
 # ---------------------------------------------------------------------------
 # Scenario 1: single-rank, single compute node
 # ---------------------------------------------------------------------------
+
 
 class TestSingleRankSingleCompute:
     def test_num_ranks_is_one(self):
@@ -76,15 +73,13 @@ class TestSingleRankSingleCompute:
 # Scenario 2: same-rank compute → compute dependency
 # ---------------------------------------------------------------------------
 
+
 class TestComputeToComputeDependency:
     def test_requires_line_present(self):
         """c1 requires c0 must appear when ComputeNode 0 → ComputeNode 1 on same rank."""
         n0 = _compute(0, gpu_rank=0, duration_ms=1.0)
         n1 = _compute(1, gpu_rank=0, duration_ms=1.0)
-        dag = ExecutionDAG(
-            compute_nodes=[n0, n1],
-            edges=[DAGEdge(src_node_id=0, dst_node_id=1)],
-        )
+        dag = ExecutionDAG(compute_nodes=[n0, n1], edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
         out = dag_to_goal(dag)
         assert "c1 requires c0" in out
 
@@ -92,10 +87,7 @@ class TestComputeToComputeDependency:
         """Only the declared dependency should appear — no extra requires lines."""
         n0 = _compute(0, gpu_rank=0, duration_ms=1.0)
         n1 = _compute(1, gpu_rank=0, duration_ms=1.0)
-        dag = ExecutionDAG(
-            compute_nodes=[n0, n1],
-            edges=[DAGEdge(src_node_id=0, dst_node_id=1)],
-        )
+        dag = ExecutionDAG(compute_nodes=[n0, n1], edges=[DAGEdge(src_node_id=0, dst_node_id=1)])
         out = dag_to_goal(dag)
         assert out.count("requires") == 1
 
@@ -103,6 +95,7 @@ class TestComputeToComputeDependency:
 # ---------------------------------------------------------------------------
 # Scenario 3: two-rank P2P (send/recv pair)
 # ---------------------------------------------------------------------------
+
 
 class TestTwoRankP2P:
     def setup_method(self):
@@ -138,15 +131,14 @@ class TestTwoRankP2P:
 # Scenario 4: AllGather pattern — comm → compute dependency (recv side)
 # ---------------------------------------------------------------------------
 
+
 class TestCommToComputeDependency:
     def test_compute_requires_recv(self):
         """c{compute_id} requires r{comm_id} must appear in dst_gpu's rank block."""
         comm = _comm(node_id=10, src_gpu=0, dst_gpu=1, bytes_=512)
         calc = _compute(node_id=11, gpu_rank=1, duration_ms=1.0)
         dag = ExecutionDAG(
-            compute_nodes=[calc],
-            comm_nodes=[comm],
-            edges=[DAGEdge(src_node_id=10, dst_node_id=11)],
+            compute_nodes=[calc], comm_nodes=[comm], edges=[DAGEdge(src_node_id=10, dst_node_id=11)]
         )
         out = dag_to_goal(dag)
         # comm recv completes at dst_gpu=1; calc is also on gpu_rank=1 → intra-rank dep
@@ -157,15 +149,14 @@ class TestCommToComputeDependency:
 # Scenario 5: ReduceScatter pattern — compute → comm dependency (send side)
 # ---------------------------------------------------------------------------
 
+
 class TestComputeToCommDependency:
     def test_send_requires_compute(self):
         """s{comm_id} requires c{compute_id} must appear in src_gpu's rank block."""
         calc = _compute(node_id=20, gpu_rank=0, duration_ms=1.0)
         comm = _comm(node_id=21, src_gpu=0, dst_gpu=1, bytes_=512)
         dag = ExecutionDAG(
-            compute_nodes=[calc],
-            comm_nodes=[comm],
-            edges=[DAGEdge(src_node_id=20, dst_node_id=21)],
+            compute_nodes=[calc], comm_nodes=[comm], edges=[DAGEdge(src_node_id=20, dst_node_id=21)]
         )
         out = dag_to_goal(dag)
         # calc on gpu_rank=0; comm send side at src_gpu=0 → intra-rank dep
@@ -176,14 +167,14 @@ class TestComputeToCommDependency:
 # Scenario 6: ring step — comm → comm dependency
 # ---------------------------------------------------------------------------
 
+
 class TestCommToCommDependency:
     def test_send_requires_recv_in_shared_rank(self):
         """s{Y.node_id} requires r{X.node_id} in rank 1 when X.dst_gpu == Y.src_gpu == 1."""
         comm_x = _comm(node_id=30, src_gpu=0, dst_gpu=1, bytes_=256)
         comm_y = _comm(node_id=31, src_gpu=1, dst_gpu=2, bytes_=256)
         dag = ExecutionDAG(
-            comm_nodes=[comm_x, comm_y],
-            edges=[DAGEdge(src_node_id=30, dst_node_id=31)],
+            comm_nodes=[comm_x, comm_y], edges=[DAGEdge(src_node_id=30, dst_node_id=31)]
         )
         out = dag_to_goal(dag)
         # src (X) → r30 at dst_gpu=1; dst (Y) → s31 at src_gpu=1 → intra-rank dep
@@ -201,6 +192,7 @@ class TestCommToCommDependency:
 # ---------------------------------------------------------------------------
 # Scenario 7: cross-rank edge is silently skipped (PP_Send fan-out)
 # ---------------------------------------------------------------------------
+
 
 class TestCrossRankEdgeSkipped:
     def test_no_requires_for_cross_rank_edge(self):
@@ -233,6 +225,7 @@ class TestCrossRankEdgeSkipped:
 # Error conditions
 # ---------------------------------------------------------------------------
 
+
 class TestErrorConditions:
     def test_unpopulated_compute_raises(self):
         """ValueError must be raised if any ComputeNode.duration_ms is None."""
@@ -243,20 +236,14 @@ class TestErrorConditions:
     def test_unknown_src_node_id_raises(self):
         """ValueError must be raised when a DAGEdge references a non-existent src_node_id."""
         calc = _compute(0, gpu_rank=0, duration_ms=1.0)
-        dag = ExecutionDAG(
-            compute_nodes=[calc],
-            edges=[DAGEdge(src_node_id=999, dst_node_id=0)],
-        )
+        dag = ExecutionDAG(compute_nodes=[calc], edges=[DAGEdge(src_node_id=999, dst_node_id=0)])
         with pytest.raises(ValueError, match="src_node_id"):
             dag_to_goal(dag)
 
     def test_unknown_dst_node_id_raises(self):
         """ValueError must be raised when a DAGEdge references a non-existent dst_node_id."""
         calc = _compute(0, gpu_rank=0, duration_ms=1.0)
-        dag = ExecutionDAG(
-            compute_nodes=[calc],
-            edges=[DAGEdge(src_node_id=0, dst_node_id=999)],
-        )
+        dag = ExecutionDAG(compute_nodes=[calc], edges=[DAGEdge(src_node_id=0, dst_node_id=999)])
         with pytest.raises(ValueError, match="dst_node_id"):
             dag_to_goal(dag)
 
@@ -281,6 +268,7 @@ class TestErrorConditions:
 # Scenario 12: ms → ns conversion precision
 # ---------------------------------------------------------------------------
 
+
 class TestMsToNsConversion:
     def test_half_ms_produces_500000_ns(self):
         """duration_ms=0.5 must produce calc 500000 (0.5 ms = 500 000 ns)."""
@@ -298,6 +286,7 @@ class TestMsToNsConversion:
 # ---------------------------------------------------------------------------
 # write_goal_trace integration
 # ---------------------------------------------------------------------------
+
 
 class TestWriteGoalTrace:
     def test_writes_file_with_correct_content(self, tmp_path):

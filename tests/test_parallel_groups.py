@@ -2,16 +2,16 @@ import pytest
 
 from simulon.backend.dag.trace_tracer import (
     ParallelConfig,
-    _global_rank,
     _decompose_rank,
-    _ranks_in_same_dp_group,
-    _ranks_in_same_ep_group,
-    _ranks_in_same_tp_group,
-    _ranks_in_same_cp_group,
+    _get_cp_group_ranks,
     _get_dp_group_ranks,
     _get_ep_group_ranks,
     _get_tp_group_ranks,
-    _get_cp_group_ranks,
+    _global_rank,
+    _ranks_in_same_cp_group,
+    _ranks_in_same_dp_group,
+    _ranks_in_same_ep_group,
+    _ranks_in_same_tp_group,
 )
 
 
