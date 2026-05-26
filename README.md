@@ -35,7 +35,7 @@ by injecting profiling data.
 
 ```
 simulon/
-├── src/simulon/
+├── simulon/
 │   ├── config/
 │   │   ├── common.py        # DType, Cost
 │   │   ├── dc.py            # DatacenterConfig, GPUSpec, KernelRun, ...
@@ -177,4 +177,3 @@ Add `-v` to print per-GPU timing breakdown:
 ```bash
 simulon simulate examples/llama3_8b_training.yaml -v
 ```
-

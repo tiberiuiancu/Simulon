@@ -2,16 +2,14 @@
 
 import pytest
 
-from simulon.collective.common import P2PFlow
+from simulon.collective.decompose import CollectiveResult, decompose_collective
+from simulon.collective.nvls import nvls_all_reduce
 from simulon.collective.ring import (
     ring_all_gather,
     ring_all_reduce,
     ring_all_to_all,
     ring_reduce_scatter,
 )
-from simulon.collective.nvls import nvls_all_reduce
-from simulon.collective.decompose import decompose_collective, CollectiveResult
-
 
 # ---------------------------------------------------------------------------
 # Ring ReduceScatter
@@ -237,9 +235,7 @@ def test_nvls_all_reduce_reduce_no_parents():
 
 
 def test_decompose_ring_all_reduce():
-    result, nfid = decompose_collective(
-        "AllReduce", [0, 1, 2, 3], data_size=1024, algorithm="ring"
-    )
+    result, nfid = decompose_collective("AllReduce", [0, 1, 2, 3], data_size=1024, algorithm="ring")
     assert isinstance(result, CollectiveResult)
     assert len(result.flows) == 24
 
@@ -252,16 +248,12 @@ def test_decompose_ring_reduce_scatter():
 
 
 def test_decompose_ring_all_gather():
-    result, nfid = decompose_collective(
-        "AllGather", [0, 1, 2, 3], data_size=1024, algorithm="ring"
-    )
+    result, nfid = decompose_collective("AllGather", [0, 1, 2, 3], data_size=1024, algorithm="ring")
     assert len(result.flows) == 12
 
 
 def test_decompose_ring_all_to_all():
-    result, nfid = decompose_collective(
-        "AllToAll", [0, 1, 2, 3], data_size=1024, algorithm="ring"
-    )
+    result, nfid = decompose_collective("AllToAll", [0, 1, 2, 3], data_size=1024, algorithm="ring")
     assert len(result.flows) == 12
 
 

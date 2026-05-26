@@ -10,21 +10,20 @@ Covers:
   single-node, inter_bw set for multi-node, algorithm auto-selection
 - load_nccl_profile: known GPU returns NcclProfile, unknown returns None
 """
+
 from __future__ import annotations
 
-import os
 import pytest
 
-from simulon.collective.common import P2PFlow
-from simulon.collective.tree import tree_all_reduce
-from simulon.collective.nvls import nvls_all_reduce, nvls_tree_all_reduce
-from simulon.config.nccl_profile import NcclDataPoint, NcclAlgoMeasurements, NcclProfile
 from simulon.collective.calbusbw import cal_busbw
-
+from simulon.collective.nvls import nvls_all_reduce, nvls_tree_all_reduce
+from simulon.collective.tree import tree_all_reduce
+from simulon.config.nccl_profile import NcclAlgoMeasurements, NcclDataPoint, NcclProfile
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_profile(
     allreduce_ring_bw: float = 200.0,
@@ -86,15 +85,15 @@ class TestTreeAllReduce:
     def test_flow_id_start_is_respected(self):
         """flow_id_start offsets all generated flow IDs."""
         start = 42
-        flows, nfid = tree_all_reduce([0, 1, 2, 3], data_size=4096, num_channels=1,
-                                       flow_id_start=start)
+        flows, nfid = tree_all_reduce(
+            [0, 1, 2, 3], data_size=4096, num_channels=1, flow_id_start=start
+        )
         assert flows[0].flow_id == start
         assert nfid == start + len(flows)
 
     def test_flow_ids_are_contiguous_and_unique(self):
         """Flow IDs form a contiguous sequence with no duplicates."""
-        flows, nfid = tree_all_reduce([0, 1, 2, 3], data_size=4096, num_channels=1,
-                                       flow_id_start=0)
+        flows, nfid = tree_all_reduce([0, 1, 2, 3], data_size=4096, num_channels=1, flow_id_start=0)
         fids = [f.flow_id for f in flows]
         assert len(fids) == len(set(fids))
         assert min(fids) == 0
@@ -175,7 +174,8 @@ class TestTreeAllReduce:
 
     def test_decompose_collective_routes_to_tree(self):
         """decompose_collective with algorithm='tree' and AllReduce calls tree_all_reduce."""
-        from simulon.collective.decompose import decompose_collective, CollectiveResult
+        from simulon.collective.decompose import CollectiveResult, decompose_collective
+
         result, nfid = decompose_collective(
             "AllReduce", [0, 1, 2, 3], data_size=4096, algorithm="tree", num_channels=1
         )
@@ -261,7 +261,8 @@ class TestNvlsTreeAllReduce:
 
     def test_decompose_collective_routes_to_nvls_tree(self):
         """decompose_collective with algorithm='nvls_tree' and AllReduce works."""
-        from simulon.collective.decompose import decompose_collective, CollectiveResult
+        from simulon.collective.decompose import CollectiveResult, decompose_collective
+
         group = list(range(16))
         result, nfid = decompose_collective(
             "AllReduce", group, data_size=16 * 1024, algorithm="nvls_tree", num_channels=1
@@ -508,19 +509,14 @@ class TestCalBusbw:
         size = 1 << 30  # our single profile point
         large_size = size * 1000  # far beyond the table
         profile = _make_profile(allreduce_ring_bw=200.0)
-        _, intra_bw_large, _ = cal_busbw(
-            "AllReduce", large_size, 1, 8, 1.0, 50.0, profile, "ring"
-        )
+        _, intra_bw_large, _ = cal_busbw("AllReduce", large_size, 1, 8, 1.0, 50.0, profile, "ring")
         assert intra_bw_large == pytest.approx(200.0)
 
     def test_smaller_message_clamps_to_min_profile_bw(self):
         """Message size below the first profile point clamps to the first measured bw."""
-        size = 1 << 30  # our single profile point
         small_size = 1  # far below
         profile = _make_profile(allreduce_ring_bw=166.0)
-        _, intra_bw_small, _ = cal_busbw(
-            "AllReduce", small_size, 1, 8, 1.0, 50.0, profile, "ring"
-        )
+        _, intra_bw_small, _ = cal_busbw("AllReduce", small_size, 1, 8, 1.0, 50.0, profile, "ring")
         assert intra_bw_small == pytest.approx(166.0)
 
 
@@ -535,6 +531,7 @@ class TestLoadNcclProfile:
     def test_h100_returns_nccl_profile(self):
         """load_nccl_profile('h100') returns an NcclProfile when h100.nccl.yaml exists."""
         from simulon.config.resolve import load_nccl_profile
+
         profile = load_nccl_profile("h100")
         assert profile is not None
         assert isinstance(profile, NcclProfile)
@@ -542,6 +539,7 @@ class TestLoadNcclProfile:
     def test_h100_profile_has_allreduce_ring_points(self):
         """h100.nccl.yaml has ring AllReduce measurements."""
         from simulon.config.resolve import load_nccl_profile
+
         profile = load_nccl_profile("h100")
         assert profile is not None
         assert len(profile.AllReduce.ring) > 0
@@ -549,6 +547,7 @@ class TestLoadNcclProfile:
     def test_h100_profile_gpus_per_node(self):
         """h100.nccl.yaml specifies gpus_per_node=8."""
         from simulon.config.resolve import load_nccl_profile
+
         profile = load_nccl_profile("h100")
         assert profile is not None
         assert profile.gpus_per_node == 8
@@ -556,12 +555,14 @@ class TestLoadNcclProfile:
     def test_nonexistent_gpu_returns_none(self):
         """load_nccl_profile returns None for an unknown GPU name."""
         from simulon.config.resolve import load_nccl_profile
+
         profile = load_nccl_profile("nonexistent_gpu_xyz")
         assert profile is None
 
     def test_case_insensitive_lookup(self):
         """load_nccl_profile('H100') (uppercase) resolves the same as 'h100'."""
         from simulon.config.resolve import load_nccl_profile
+
         profile_lower = load_nccl_profile("h100")
         profile_upper = load_nccl_profile("H100")
         # Both should either return a profile or None; they must agree

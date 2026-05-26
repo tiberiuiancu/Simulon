@@ -4,8 +4,9 @@ Usage:
     uv sync --extra cpp
     python setup.py build_ext --inplace   # builds simulon/_mocknccl.so
 """
-from setuptools import setup, Extension
+
 import pybind11
+from setuptools import Extension, setup
 
 ext = Extension(
     "simulon._mocknccl",

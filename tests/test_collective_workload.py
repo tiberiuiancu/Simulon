@@ -19,8 +19,8 @@ from simulon.config.dc import (
     DatacenterConfig,
     DatacenterMeta,
     GPUSpec,
-    NICSpec,
     NetworkSpec,
+    NICSpec,
     NodeSpec,
     ScaleOutSpec,
     ScaleUpSpec,
@@ -31,7 +31,6 @@ from simulon.config.dc import (
 from simulon.config.scenario import NcclConfig, ScenarioConfig
 from simulon.config.workload import CollectiveType, CollectiveWorkload
 from simulon.tracking.params import extract_params
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -44,13 +43,10 @@ def make_datacenter(num_nodes: int = 2, gpus_per_node: int = 2) -> DatacenterCon
         datacenter=DatacenterMeta(name="test"),
         cluster=ClusterSpec(num_nodes=num_nodes),
         node=NodeSpec(
-            gpus_per_node=gpus_per_node,
-            gpu=GPUSpec(from_="h100", memory_capacity_gb=80.0),
+            gpus_per_node=gpus_per_node, gpu=GPUSpec(from_="h100", memory_capacity_gb=80.0)
         ),
         network=NetworkSpec(
-            scale_up=ScaleUpSpec(
-                switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms"),
-            ),
+            scale_up=ScaleUpSpec(switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms")),
             scale_out=ScaleOutSpec(
                 nic=NICSpec(speed="400Gbps", latency="0.005ms"),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
@@ -60,8 +56,7 @@ def make_datacenter(num_nodes: int = 2, gpus_per_node: int = 2) -> DatacenterCon
 
 
 def make_collective_workload(
-    collective_type: str = "AllReduce",
-    message_size_bytes: int = 1024 * 1024,
+    collective_type: str = "AllReduce", message_size_bytes: int = 1024 * 1024
 ) -> CollectiveWorkload:
     return CollectiveWorkload(
         framework="collective",
@@ -77,6 +72,7 @@ def make_collective_scenario(
     gpus_per_node: int = 2,
 ) -> ScenarioConfig:
     from simulon.config.scenario import NcclConfig
+
     collective = NcclConfig(
         algorithm="auto",  # calbusbw drives BW from the nccl profile
         num_channels=1,
@@ -109,27 +105,19 @@ class TestCollectiveWorkloadConfig:
         """All four CollectiveType enum values are accepted."""
         for ct in ["AllReduce", "AllGather", "ReduceScatter", "AllToAll"]:
             wl = CollectiveWorkload(
-                framework="collective",
-                collective_type=CollectiveType(ct),
-                message_size_bytes=512,
+                framework="collective", collective_type=CollectiveType(ct), message_size_bytes=512
             )
             assert wl.collective_type.value == ct
 
     def test_missing_collective_type_raises(self):
         """CollectiveWorkload rejects a payload missing collective_type."""
         with pytest.raises(ValidationError):
-            CollectiveWorkload(
-                framework="collective",
-                message_size_bytes=1024,
-            )
+            CollectiveWorkload(framework="collective", message_size_bytes=1024)
 
     def test_missing_message_size_raises(self):
         """CollectiveWorkload rejects a payload missing message_size_bytes."""
         with pytest.raises(ValidationError):
-            CollectiveWorkload(
-                framework="collective",
-                collective_type=CollectiveType.AllGather,
-            )
+            CollectiveWorkload(framework="collective", collective_type=CollectiveType.AllGather)
 
     def test_extra_field_rejected(self):
         """CollectiveWorkload rejects unknown extra fields (extra='forbid')."""
@@ -152,8 +140,7 @@ class TestCollectiveWorkloadConfig:
 
         sc = make_collective_scenario(collective_type="ReduceScatter", message_size_bytes=8192)
         dumped = yaml.dump(
-            sc.model_dump(mode="json", by_alias=True, exclude_none=True),
-            default_flow_style=False,
+            sc.model_dump(mode="json", by_alias=True, exclude_none=True), default_flow_style=False
         )
         restored = ScenarioConfig.model_validate(yaml.safe_load(dumped))
         assert isinstance(restored.workload, CollectiveWorkload)

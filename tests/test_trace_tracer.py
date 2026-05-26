@@ -11,13 +11,7 @@ from simulon.backend.dag.trace_tracer import MegatronDagTracer, ParallelConfig, 
 from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.collective import NCCLDecomposer
 from simulon.collective.decompose import decompose_collective
-from simulon.config.dc import (
-    ClusterSpec,
-    DatacenterConfig,
-    DatacenterMeta,
-    GPUSpec,
-    NodeSpec,
-)
+from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
 from simulon.config.workload import MegatronWorkload
 
 
@@ -28,10 +22,7 @@ def _write_trace(data: dict[str, Any], traces_dir: Path, rank: int) -> Path:
 
 
 def _make_trace(
-    events: list[dict[str, Any]],
-    rank: int = 0,
-    world_size: int = 2,
-    pipeline_stage: int = 0,
+    events: list[dict[str, Any]], rank: int = 0, world_size: int = 2, pipeline_stage: int = 0
 ) -> dict[str, Any]:
     return {
         "trace_format_version": "1.0",
@@ -46,18 +37,11 @@ def _make_datacenter(num_gpus: int = 2, traces_dir: str | None = None) -> Datace
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test", traces_dir=traces_dir),
         cluster=ClusterSpec(num_nodes=1),
-        node=NodeSpec(
-            gpus_per_node=num_gpus,
-            gpu=GPUSpec(name="H100", memory_capacity_gb=80.0),
-        ),
+        node=NodeSpec(gpus_per_node=num_gpus, gpu=GPUSpec(name="H100", memory_capacity_gb=80.0)),
     )
 
 
-def _make_workload(
-    tp: int = 1,
-    pp: int = 1,
-    num_gpus: int = 2,
-) -> MegatronWorkload:
+def _make_workload(tp: int = 1, pp: int = 1, num_gpus: int = 2) -> MegatronWorkload:
     return MegatronWorkload(
         framework="megatron",
         config={
@@ -86,11 +70,7 @@ def test_trace_builds_dag_with_compute_and_comm_nodes():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
     ]
@@ -111,11 +91,7 @@ def test_compute_nodes_have_duration_ms():
         {
             "type": "collective",
             "timestamp_ms": 2.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 5.0, "metadata": {"slot": "fwd"}},
     ]
@@ -137,11 +113,7 @@ def test_comm_nodes_have_correct_bytes_and_type():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
     ]
@@ -181,11 +153,7 @@ def test_dag_edges_wired_sequentially():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
         {"type": "slot_begin", "timestamp_ms": 3.0, "metadata": {"slot": "bwd"}},
@@ -200,15 +168,12 @@ def test_dag_edges_wired_sequentially():
         dag = _run_tracer(workload, dc)
         for rank in {n.gpu_rank for n in dag.compute_nodes}:
             rank_cnodes = sorted(
-                [n for n in dag.compute_nodes if n.gpu_rank == rank],
-                key=lambda n: n.node_id,
+                [n for n in dag.compute_nodes if n.gpu_rank == rank], key=lambda n: n.node_id
             )
             for i in range(len(rank_cnodes) - 1):
-                assert _has_path(
-                    dag.edges,
-                    rank_cnodes[i].node_id,
-                    rank_cnodes[i + 1].node_id,
-                ), f"No path between compute nodes on rank {rank}"
+                assert _has_path(dag.edges, rank_cnodes[i].node_id, rank_cnodes[i + 1].node_id), (
+                    f"No path between compute nodes on rank {rank}"
+                )
 
 
 def test_trace_with_multiple_pp_stages():
@@ -223,14 +188,10 @@ def test_trace_with_multiple_pp_stages():
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
         _write_trace(
-            _make_trace(events0, rank=0, world_size=2, pipeline_stage=0),
-            traces_dir,
-            rank=0,
+            _make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
         )
         _write_trace(
-            _make_trace(events1, rank=1, world_size=2, pipeline_stage=1),
-            traces_dir,
-            rank=1,
+            _make_trace(events1, rank=1, world_size=2, pipeline_stage=1), traces_dir, rank=1
         )
         workload = _make_workload(tp=1, pp=2, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
@@ -246,11 +207,7 @@ def test_trace_skips_pp_send_events():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "PP_Send",
-                "bytes": 1024,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "PP_Send", "bytes": 1024, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
     ]
@@ -270,11 +227,7 @@ def test_slot_markers_assign_microbatch_and_phase():
         {
             "type": "collective",
             "timestamp_ms": 0.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {
             "type": "slot_begin",
@@ -284,11 +237,7 @@ def test_slot_markers_assign_microbatch_and_phase():
         {
             "type": "collective",
             "timestamp_ms": 2.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 3.0, "metadata": {}},
     ]
@@ -301,8 +250,7 @@ def test_slot_markers_assign_microbatch_and_phase():
         dag = _run_tracer(workload, dc)
         for rank in {n.gpu_rank for n in dag.compute_nodes}:
             rank_cnodes = sorted(
-                [n for n in dag.compute_nodes if n.gpu_rank == rank],
-                key=lambda n: n.node_id,
+                [n for n in dag.compute_nodes if n.gpu_rank == rank], key=lambda n: n.node_id
             )
             assert rank_cnodes[0].microbatch_id == -1
             assert rank_cnodes[0].phase == ""
@@ -313,14 +261,24 @@ def test_slot_markers_assign_microbatch_and_phase():
 
 def test_missing_middle_trace_reused():
     events = [
-        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, rank=0)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=2), traces_dir, rank=2)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=3), traces_dir, rank=3)
+        _write_trace(
+            _make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events, rank=0, world_size=4, pipeline_stage=2), traces_dir, rank=2
+        )
+        _write_trace(
+            _make_trace(events, rank=0, world_size=4, pipeline_stage=3), traces_dir, rank=3
+        )
         workload = _make_workload(tp=1, pp=4, num_gpus=4)
         dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -330,7 +288,11 @@ def test_missing_middle_trace_reused():
 
 def test_pp_send_has_activation_bytes():
     events0 = [
-        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
         {
             "type": "collective",
             "timestamp_ms": 0.5,
@@ -345,13 +307,21 @@ def test_pp_send_has_activation_bytes():
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     events1 = [
-        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0)
-        _write_trace(_make_trace(events1, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1)
+        _write_trace(
+            _make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events1, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1
+        )
         workload = MegatronWorkload(
             framework="megatron",
             config={
@@ -377,12 +347,18 @@ def test_pp_send_has_activation_bytes():
 
 def test_missing_first_trace_raises():
     events = [
-        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1)
+        _write_trace(
+            _make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1
+        )
         workload = _make_workload(tp=1, pp=2, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         with pytest.raises(ValueError, match="First PP stage"):
@@ -391,12 +367,18 @@ def test_missing_first_trace_raises():
 
 def test_missing_last_trace_raises():
     events = [
-        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0)
+        _write_trace(
+            _make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
+        )
         workload = _make_workload(tp=1, pp=2, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         with pytest.raises(ValueError, match="Last PP stage"):
@@ -405,14 +387,20 @@ def test_missing_last_trace_raises():
 
 def test_remap_dp_allreduce_to_target_dp_group():
     config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
-    events = [{
-        "type": "collective", "timestamp_ms": 0.0,
-        "metadata": {
-            "collective_type": "AllReduce", "bytes": 2048,
-            "group_ranks": [0, 2],
-        },
-    }]
-    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    events = [
+        {
+            "type": "collective",
+            "timestamp_ms": 0.0,
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 2]},
+        }
+    ]
+    trace_dict = {
+        "trace_format_version": "1.0",
+        "rank": 0,
+        "world_size": 4,
+        "pipeline_stage": 0,
+        "events": events,
+    }
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "trace_rank_0.json"
         p.write_text(json.dumps(trace_dict))
@@ -425,14 +413,24 @@ def test_remap_dp_allreduce_to_target_dp_group():
 
 def test_remap_tp_allreduce_to_target_tp_group():
     config = ParallelConfig(tp=4, cp=1, pp=1, ep=1, dp=1, num_gpus=4)
-    events = [{
-        "type": "collective", "timestamp_ms": 0.0,
-        "metadata": {
-            "collective_type": "AllReduce", "bytes": 2048,
-            "group_ranks": [0, 1, 2, 3],
-        },
-    }]
-    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    events = [
+        {
+            "type": "collective",
+            "timestamp_ms": 0.0,
+            "metadata": {
+                "collective_type": "AllReduce",
+                "bytes": 2048,
+                "group_ranks": [0, 1, 2, 3],
+            },
+        }
+    ]
+    trace_dict = {
+        "trace_format_version": "1.0",
+        "rank": 0,
+        "world_size": 4,
+        "pipeline_stage": 0,
+        "events": events,
+    }
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "trace_rank_0.json"
         p.write_text(json.dumps(trace_dict))
@@ -443,18 +441,35 @@ def test_remap_tp_allreduce_to_target_tp_group():
 
 def test_derived_trace_from_same_stage():
     events = [
-        {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"microbatch_id": 0, "phase": "fwd"}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
         {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, rank=0)
-        _write_trace(_make_trace(events, rank=3, world_size=4, pipeline_stage=3), traces_dir, rank=3)
+        _write_trace(
+            _make_trace(events, rank=0, world_size=4, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events, rank=3, world_size=4, pipeline_stage=3), traces_dir, rank=3
+        )
         workload = MegatronWorkload(
             framework="megatron",
-            config={"tensor-model-parallel-size": 1, "pipeline-model-parallel-size": 4, "num-layers": 2,
-                    "hidden-size": 512, "num-attention-heads": 8, "ffn-hidden-size": 11008,
-                    "seq-length": 128, "micro-batch-size": 1, "global-batch-size": 4, "num_gpus": 4},
+            config={
+                "tensor-model-parallel-size": 1,
+                "pipeline-model-parallel-size": 4,
+                "num-layers": 2,
+                "hidden-size": 512,
+                "num-attention-heads": 8,
+                "ffn-hidden-size": 11008,
+                "seq-length": 128,
+                "micro-batch-size": 1,
+                "global-batch-size": 4,
+                "num_gpus": 4,
+            },
         )
         dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -473,11 +488,7 @@ def test_collective_node_comes_before_compute_after_it():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
     ]
@@ -490,10 +501,11 @@ def test_collective_node_comes_before_compute_after_it():
         dag = _run_tracer(workload, dc)
 
         rank0_compute = sorted(
-            [n for n in dag.compute_nodes if n.gpu_rank == 0],
-            key=lambda n: n.node_id,
+            [n for n in dag.compute_nodes if n.gpu_rank == 0], key=lambda n: n.node_id
         )
-        assert len(rank0_compute) == 2, f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        assert len(rank0_compute) == 2, (
+            f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        )
         c_before = rank0_compute[0]
         c_after = rank0_compute[1]
 
@@ -501,24 +513,34 @@ def test_collective_node_comes_before_compute_after_it():
         assert len(rank0_comm) > 0, "Expected at least one comm node on rank 0"
         collective_node = rank0_comm[0]
 
-        assert _has_path(
-            dag.edges, c_before.node_id, collective_node.node_id
-        ), f"Expected edge from compute before ({c_before.node_id}) to collective ({collective_node.node_id})"
-        assert _has_path(
-            dag.edges, collective_node.node_id, c_after.node_id
-        ), f"Expected edge from collective ({collective_node.node_id}) to compute after ({c_after.node_id})"
+        assert _has_path(dag.edges, c_before.node_id, collective_node.node_id), (
+            f"Expected edge from compute before ({c_before.node_id}) to collective ({collective_node.node_id})"
+        )
+        assert _has_path(dag.edges, collective_node.node_id, c_after.node_id), (
+            f"Expected edge from collective ({collective_node.node_id}) to compute after ({c_after.node_id})"
+        )
 
 
 def test_unknown_collective_kept_unchanged():
     config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
-    events = [{
-        "type": "collective", "timestamp_ms": 0.0,
-        "metadata": {
-            "collective_type": "SomeWeirdCollective", "bytes": 1024,
-            "group_ranks": [0, 1, 2, 3],
-        },
-    }]
-    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    events = [
+        {
+            "type": "collective",
+            "timestamp_ms": 0.0,
+            "metadata": {
+                "collective_type": "SomeWeirdCollective",
+                "bytes": 1024,
+                "group_ranks": [0, 1, 2, 3],
+            },
+        }
+    ]
+    trace_dict = {
+        "trace_format_version": "1.0",
+        "rank": 0,
+        "world_size": 4,
+        "pipeline_stage": 0,
+        "events": events,
+    }
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "trace_rank_0.json"
         p.write_text(json.dumps(trace_dict))
@@ -529,14 +551,25 @@ def test_unknown_collective_kept_unchanged():
 
 def test_pp_send_preserved_in_remap():
     config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
-    events = [{
-        "type": "collective", "timestamp_ms": 0.0,
-        "metadata": {
-            "collective_type": "PP_Send", "bytes": 1024,
-            "group_ranks": [0, 2], "direction": "fwd",
-        },
-    }]
-    trace_dict = {"trace_format_version": "1.0", "rank": 0, "world_size": 4, "pipeline_stage": 0, "events": events}
+    events = [
+        {
+            "type": "collective",
+            "timestamp_ms": 0.0,
+            "metadata": {
+                "collective_type": "PP_Send",
+                "bytes": 1024,
+                "group_ranks": [0, 2],
+                "direction": "fwd",
+            },
+        }
+    ]
+    trace_dict = {
+        "trace_format_version": "1.0",
+        "rank": 0,
+        "world_size": 4,
+        "pipeline_stage": 0,
+        "events": events,
+    }
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "trace_rank_0.json"
         p.write_text(json.dumps(trace_dict))
@@ -551,18 +584,18 @@ def test_multi_rank_collective_dedup():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
     ]
     with tempfile.TemporaryDirectory() as tmp_dir:
         traces_dir = Path(tmp_dir)
-        _write_trace(_make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0)
-        _write_trace(_make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1)
+        _write_trace(
+            _make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1
+        )
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
@@ -589,11 +622,7 @@ def test_collective_decomposition_edge_rewiring():
         {
             "type": "collective",
             "timestamp_ms": 1.0,
-            "metadata": {
-                "collective_type": "AllReduce",
-                "bytes": 2048,
-                "group_ranks": [0, 1],
-            },
+            "metadata": {"collective_type": "AllReduce", "bytes": 2048, "group_ranks": [0, 1]},
         },
         {"type": "slot_end", "timestamp_ms": 2.0, "metadata": {"slot": "fwd"}},
     ]
@@ -601,16 +630,19 @@ def test_collective_decomposition_edge_rewiring():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        _write_trace(_make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1)
+        _write_trace(
+            _make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1
+        )
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
         dag = _run_tracer(workload, dc)
 
         rank0_compute = sorted(
-            [n for n in dag.compute_nodes if n.gpu_rank == 0],
-            key=lambda n: n.node_id,
+            [n for n in dag.compute_nodes if n.gpu_rank == 0], key=lambda n: n.node_id
         )
-        assert len(rank0_compute) == 2, f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        assert len(rank0_compute) == 2, (
+            f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        )
         c_before = rank0_compute[0]
         c_after = rank0_compute[1]
 
@@ -620,9 +652,9 @@ def test_collective_decomposition_edge_rewiring():
         first_p2p = rank0_comm_sorted[0]
         last_p2p = rank0_comm_sorted[-1]
 
-        assert _has_path(
-            dag.edges, c_before.node_id, first_p2p.node_id
-        ), f"Expected path from compute before ({c_before.node_id}) to first P2P ({first_p2p.node_id})"
-        assert _has_path(
-            dag.edges, last_p2p.node_id, c_after.node_id
-        ), f"Expected path from last P2P ({last_p2p.node_id}) to compute after ({c_after.node_id})"
+        assert _has_path(dag.edges, c_before.node_id, first_p2p.node_id), (
+            f"Expected path from compute before ({c_before.node_id}) to first P2P ({first_p2p.node_id})"
+        )
+        assert _has_path(dag.edges, last_p2p.node_id, c_after.node_id), (
+            f"Expected path from last P2P ({last_p2p.node_id}) to compute after ({c_after.node_id})"
+        )
