@@ -80,8 +80,8 @@ def apex(
         "-c",
         'NVCC_APPEND_FLAGS="--threads $(nproc)" '
         "APEX_PARALLEL_BUILD=$(nproc) "
-        "APEX_CPP_EXT=1 APEX_CUDA_EXT=1 APEX_FAST_LAYER_NORM=1 "
-        f'"{sys.executable}" setup.py install --cpp_ext --cuda_ext',
+        "APEX_CUDA_EXT=1 APEX_FusedLayerNorm=1 "
+        f'"{sys.executable}" -m pip install -v --disable-pip-version-check --no-build-isolation --no-cache-dir .',
     ]
     typer.echo(f"Installing apex from {apex_src} ...")
     subprocess.run(install_cmd, cwd=str(apex_src), check=True)
