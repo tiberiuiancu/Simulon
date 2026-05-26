@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
+From: nvcr.io/nvidia/pytorch:26.04-py3
 
 %files
     . /opt/simulon
@@ -12,23 +12,19 @@ From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
     export PATH=$CUDA_HOME/bin:$PATH
     export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-    apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        cmake \
-        curl \
-        git \
-        libnccl2 \
-        libnccl-dev \
-        libssl-dev \
-        ninja-build \
-        wget \
-        && rm -rf /var/lib/apt/lists/*
+    apt-get update \&\& apt-get install -y --no-install-recommends \\
+        build-essential \\
+        ca-certificates \\
+        cmake \\
+        curl \\
+        git \\
+        libssl-dev \\
+        ninja-build \\
+        wget \\
+        \&\& rm -rf /var/lib/apt/lists/*
 
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
-
-    uv python install 3.13
 
     cd /opt/simulon
 
@@ -36,15 +32,15 @@ From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
 
     git submodule update --init --recursive
 
-    uv sync --extra dev
-
+    rm -f /etc/pip/constraint.txt
+    uv venv --python python3.12 --system-site-packages
     export PATH="/opt/simulon/.venv/bin:$PATH"
+
+    uv sync --extra dev
 
     uv pip install pip
 
     uv run python setup.py build_ext --inplace
-
-    uv pip install transformer_engine_cu13==2.11.0 transformer_engine[pytorch]==2.11.0
 
     uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
     uv run simulon install deepgemm
