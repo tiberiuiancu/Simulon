@@ -9,22 +9,19 @@ From: nvcr.io/nvidia/pytorch:26.04-py3
     export TZ=UTC
 
     export CUDA_HOME=/usr/local/cuda
-    export PATH=$CUDA_HOME/bin:$PATH
-    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-    apt-get update \&\& apt-get install -y --no-install-recommends \\
-        build-essential \\
-        ca-certificates \\
-        cmake \\
-        curl \\
-        git \\
-        libssl-dev \\
-        ninja-build \\
-        wget \\
-        \&\& rm -rf /var/lib/apt/lists/*
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        curl \
+        git \
+        libssl-dev \
+        ninja-build \
+        wget \
+        && rm -rf /var/lib/apt/lists/*
 
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+    rm -f /etc/pip/constraint.txt
 
     cd /opt/simulon
 
@@ -32,26 +29,33 @@ From: nvcr.io/nvidia/pytorch:26.04-py3
 
     git submodule update --init --recursive
 
-    rm -f /etc/pip/constraint.txt
-    uv venv --python python3.12 --system-site-packages
-    export PATH="/opt/simulon/.venv/bin:$PATH"
+    python3 -m pip install \
+        pydantic>=2.0 \
+        pyyaml>=6.0 \
+        typer>=0.12 \
+        rich>=13.0 \
+        numpy>=2.4.4 \
+        matplotlib>=3.10.8 \
+        mlflow>=2.0 \
+        pybind11>=2.12 \
+        setuptools \
+        pytest>=8.0 \
+        ruff>=0.11 \
+        pre-commit>=4.0 \
+        datasets \
+        transformers \
+        && python3 setup.py build_ext --inplace
 
-    uv sync --extra dev
-
-    uv pip install pip
-
-    uv run python setup.py build_ext --inplace
-
-    uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
-    uv run simulon install deepgemm
+    simulon install flash-attn-hopper --version 2.8.3 --prebuilt
+    simulon install deepgemm
 
     export TORCH_CUDA_ARCH_LIST="9.0"
-    uv run simulon install apex --skip-cuda-version-check
+    simulon install apex --skip-cuda-version-check
 
 %environment
     export PYTHONUNBUFFERED=1
     export CUDA_HOME=/usr/local/cuda
-    export PATH="/opt/simulon/.venv/bin:$CUDA_HOME/bin:$PATH"
+    export PATH="/usr/local/bin:$CUDA_HOME/bin:$PATH"
     export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
     export PYTHONPATH="/opt/simulon:$PYTHONPATH"
 
