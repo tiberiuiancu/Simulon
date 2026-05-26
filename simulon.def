@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
+From: nvidia/cuda:13.2.1-cudnn-devel-ubuntu24.04
 
 %files
     . /opt/simulon
@@ -13,12 +13,19 @@ From: nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
     export PATH=$CUDA_HOME/bin:$PATH
     export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-    # Install system build dependencies
-    apt-get update && apt-get install -y --no-install-recommends \
+    # CUDA 13.1+ images no longer bundle NCCL; add the NVIDIA ML repo to get it.
+    wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+    dpkg -i cuda-keyring_1.1-1_all.deb
+    apt-get update
+
+    # Install system build dependencies + NCCL runtime + NCCL dev headers
+    apt-get install -y --no-install-recommends \
         build-essential \
         ca-certificates \
         curl \
         git \
+        libnccl2 \
+        libnccl-dev \
         libssl-dev \
         ninja-build \
         wget \
