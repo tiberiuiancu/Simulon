@@ -8,6 +8,11 @@ From: nvidia/cuda:12.9.2-devel-ubuntu24.04
     export DEBIAN_FRONTEND=noninteractive
     export TZ=UTC
 
+    # Explicitly expose CUDA to all build tools (required for TE/Apex compilation)
+    export CUDA_HOME=/usr/local/cuda
+    export PATH=$CUDA_HOME/bin:$PATH
+    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
     # Install system build dependencies
     apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -42,8 +47,9 @@ From: nvidia/cuda:12.9.2-devel-ubuntu24.04
     # Ensure all subsequent commands use the uv-managed venv
     export PATH="/opt/simulon/.venv/bin:$PATH"
 
-    # Install transformer_engine against local PyTorch / CUDA headers
-    uv pip install --no-build-isolation transformer_engine[pytorch]
+    # Pin transformer_engine to 2.5.0 to avoid pulling cu13 variant / v2.15.0
+    export NVTE_FRAMEWORK=pytorch
+    uv pip install --no-build-isolation transformer_engine[pytorch]==2.5.0
 
     # Install optional CUDA-dependent components via simulon CLI
     uv run simulon install apex --skip-cuda-version-check
@@ -55,7 +61,9 @@ From: nvidia/cuda:12.9.2-devel-ubuntu24.04
 
 %environment
     export PYTHONUNBUFFERED=1
-    export PATH="/opt/simulon/.venv/bin:$PATH"
+    export CUDA_HOME=/usr/local/cuda
+    export PATH="/opt/simulon/.venv/bin:$CUDA_HOME/bin:$PATH"
+    export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
     export PYTHONPATH="/opt/simulon:$PYTHONPATH"
 
 %runscript
