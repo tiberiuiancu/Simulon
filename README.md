@@ -107,94 +107,85 @@ simulon/
 
 ## Installation
 
-Requires Python 3.11+. Uses [uv](https://github.com/astral-sh/uv). Pure Python — no
-build step required.
+Requires Python 3.11+. Uses [uv](https://github.com/astral-sh/uv).
+
+### Standard (core simulation only)
 
 ```bash
 uv sync
+```
+
+This installs the pure-Python simulator. The C++ extension (`simulon._mocknccl`) is optional and only needed for advanced topology queries.
+
+### With C++ extension
+
+```bash
+uv sync
+python setup.py build_ext --inplace
+```
+
+### Development (CUDA required)
+
+For running the instrumented Megatron-LM fork and the test suite, install the extra dependencies:
+
+```bash
+uv sync --extra dev
+```
+
+The `dev` extra pulls in PyTorch, pytest, the Hugging Face stack (`datasets`, `transformers`), and `transformer_engine[pytorch]`. A CUDA-capable environment is required.
+
+> **Note:** `transformer_engine[pytorch]` may require `--no-build-isolation` because it compiles against your local PyTorch headers. If `uv sync --extra dev` fails on this package, install it manually:
+> ```bash
+> uv pip install --no-build-isolation transformer_engine[pytorch]
+> ```
+
+### Additional GPU-dependent components (optional)
+
+These cannot be declared in `pyproject.toml` because they must be built against your local CUDA / PyTorch toolchain. Install them manually when needed:
+
+```bash
+# NVIDIA Apex (layer-norm fusion, gradient scaling, etc.)
+simulon install apex
+
+# Flash Attention 3 (Hopper-optimized)
+simulon install flash-attn-hopper
+
+# DeepGEMM (DeepSeek MoE kernels — optional)
+simulon install deepgemm
 ```
 
 ---
 
 ## Quick start
 
-### 1. Write a scenario YAML
-
-```yaml
-# scenario.yaml
-datacenter:
-  datacenter:
-    name: my-cluster
-  cluster:
-    num_nodes: 1
-  node:
-    gpus_per_node: 4
-    gpu:
-      name: H100
-      memory_capacity_gb: 80.0
-  network:
-    scale_up:
-      switch:
-        port_speed: 2880Gbps
-        latency: 0.000025ms
-    scale_out:
-      nic:
-        speed: 400Gbps
-        latency: 0.005ms
-
-collective:
-  library: nccl
-  algorithm: ring
-  num_channels: 1
-
-workload:
-  framework: megatron
-  config:
-    num-layers: 32
-    hidden-size: 4096
-    num-attention-heads: 32
-    ffn-hidden-size: 11008
-    vocab-size: 32000
-    tensor-model-parallel-size: 2
-    pipeline-model-parallel-size: 2
-    micro-batch-size: 1
-    global-batch-size: 4
-    seq-length: 2048
-    num_gpus: 4
-    dtype: bf16
-```
-
-### 2. Generate a trace and simulate
+The repository ships with pre-generated GPU execution traces. You can run a complete simulation using a bundled example:
 
 ```bash
-# 2a. Run the instrumented Megatron-LM fork to produce execution traces
-simulon trace generate scenario.yaml -o traces/
-
-# 2b. Simulate using the generated traces
-simulon simulate scenario.yaml -o trace.json
+# Simulate Llama-3 8B (16 GPUs, TP=4, PP=4)
+simulon simulate examples/llama3_8b_training.yaml -o trace.json
 ```
 
 Output:
 ```
 Trace written to trace.json
-  GPUs: 4  |  Total: 612.4 ms
+  GPUs: 16  |  Total: 612.4 ms
   Load in https://ui.perfetto.dev or chrome://tracing
 ```
 
-Add `-v` to also print per-GPU timing breakdown:
+Add `-v` to print per-GPU timing breakdown:
 
 ```bash
-simulon simulate scenario.yaml -v
+simulon simulate examples/llama3_8b_training.yaml -v
 ```
 
-### 3. Use the Python API directly
+### Python API
 
 ```python
 from simulon.backend.analytical import AnalyticalBackend
 from simulon.config.scenario import ScenarioConfig
-import yaml, json
+import yaml
 
-with open("scenario.yaml") as f:
+with open("examples/llama3_8b_training.yaml") as f:
     sc = ScenarioConfig.model_validate(yaml.safe_load(f))
 
 backend = AnalyticalBackend()
