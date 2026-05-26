@@ -35,9 +35,6 @@ From: nvcr.io/nvidia/pytorch:26.04-py3
     simulon install flash-attn-hopper --version 2.8.3 --prebuilt
     simulon install deepgemm
 
-    export TORCH_CUDA_ARCH_LIST="9.0"
-    simulon install apex --skip-cuda-version-check
-
 %environment
     export PYTHONUNBUFFERED=1
     export CUDA_HOME=/usr/local/cuda
