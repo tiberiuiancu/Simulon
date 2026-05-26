@@ -11,7 +11,7 @@ from simulon.cli.utils import _ensure_c4_dataset
 trace_app = typer.Typer(help="Trace generation commands.")
 
 _MEGATRON_ENTRYPOINT = (
-    Path(__file__).parents[3] / "vendor" / "Megatron-LM-traced" / "pretrain_gpt.py"
+    Path(__file__).parents[2] / "vendor" / "Megatron-LM-traced" / "pretrain_gpt.py"
 )
 
 
