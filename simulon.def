@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04
+From: nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
 
 %files
     . /opt/simulon
@@ -8,7 +8,7 @@ From: nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04
     export DEBIAN_FRONTEND=noninteractive
     export TZ=UTC
 
-    # Explicitly expose CUDA to all build tools (required for TE/Apex compilation)
+    # Explicitly expose CUDA to all build tools
     export CUDA_HOME=/usr/local/cuda
     export PATH=$CUDA_HOME/bin:$PATH
     export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
@@ -50,14 +50,15 @@ From: nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04
     # Third-party build scripts invoke `pip` directly; ensure it exists in the venv.
     uv pip install pip
 
-    # Pin transformer_engine to 2.5.0 to avoid pulling cu13 variant / v2.15.0
+    # Install transformer_engine (allow latest 2.15 which resolves CUDA 13 variant)
     export NVTE_FRAMEWORK=pytorch
-    uv pip install --no-build-isolation transformer_engine[pytorch]==2.5.0
+    uv pip install --no-build-isolation transformer_engine[pytorch]==2.15.0
 
-    # Install optional CUDA-dependent components via simulon CLI
-    uv run simulon install apex --skip-cuda-version-check
-    uv run simulon install flash-attn-hopper --version 2.7.3 --prebuilt
+    # Install optional CUDA-dependent components via simulon CLI.
+    # Apex is last because it compiles from source and takes the longest.
+    uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
     uv run simulon install deepgemm
+    uv run simulon install apex --skip-cuda-version-check
 
     # Build optional C++ pybind11 extension (MockNccl topology queries)
     uv run python setup.py build_ext --inplace
