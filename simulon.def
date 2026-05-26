@@ -47,10 +47,6 @@ From: nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04
     # Ensure all subsequent commands use the uv-managed venv
     export PATH="/opt/simulon/.venv/bin:$PATH"
 
-    # Apex and other third-party build scripts invoke `pip` directly.
-    # Ensure `pip` is present in the venv so those calls succeed.
-    uv pip install pip
-
     # Pin transformer_engine to 2.5.0 to avoid pulling cu13 variant / v2.15.0
     export NVTE_FRAMEWORK=pytorch
     uv pip install --no-build-isolation transformer_engine[pytorch]==2.5.0
