@@ -54,9 +54,12 @@ From: nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
     # Place early to catch C++ compilation errors before long-running TE/Apex installs.
     uv run python setup.py build_ext --inplace
 
-    # Install transformer_engine (allow latest 2.15 which resolves CUDA 13 variant)
+    # Install transformer_engine
+    # TE wheels on PyPI can be built against a newer CUDA 13 patch than the
+    # container image. Forcing a source build with --no-binary ensures the C++
+    # extension compiles against the exact libcublasLt shipped here.
     export NVTE_FRAMEWORK=pytorch
-    uv pip install --no-build-isolation transformer_engine[pytorch]==2.15.0
+    uv pip install --no-build-isolation --no-binary transformer_engine transformer_engine[pytorch]==2.15.0
 
     # Install optional CUDA-dependent components via simulon CLI.
     uv run simulon install flash-attn-hopper --version 2.8.3 --prebuilt
