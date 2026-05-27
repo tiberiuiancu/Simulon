@@ -47,8 +47,13 @@ workload:
     expert-model-parallel-size: 64
     expert-tensor-parallel-size: 1
     sequence-parallel: true
+    context-parallel-size: 1
     overlap-grad-reduce: true
     overlap-param-gather: true
+
+    # Pipeline split accounting
+    account-for-embedding-in-pipeline-split: false
+    account-for-loss-in-pipeline-split: false
 
     # Model architecture (DeepSeek V3 671B)
     num-layers: 61
@@ -57,7 +62,11 @@ workload:
     num-attention-heads: 128
     num-query-groups: 128
     vocab-size: 129280
+    make-vocab-size-divisible-by: 3232
     swiglu: true
+    normalization: RMSNorm
+    norm-epsilon: 1.0e-6
+    untie-embeddings-and-output-weights: true
 
     # Position / attention (MLA)
     position-embedding-type: rope
@@ -67,16 +76,39 @@ workload:
     multi-latent-attention: true
     kv-channels: 128
     attention-softmax-in-fp32: false
+    qk-layernorm: true
+
+    # MLA specific
+    q-lora-rank: 1536
+    kv-lora-rank: 512
+    qk-head-dim: 128
+    qk-pos-emb-head-dim: 64
+    v-head-dim: 128
+    mscale: 1.0
+    mscale-all-dim: 1.0
 
     # MoE
     num-experts: 256
     moe-router-topk: 8
+    moe-router-pre-softmax: true
+    moe-router-score-function: sigmoid
+    moe-router-enable-expert-bias: true
+    moe-router-bias-update-rate: 1.0e-3
+    moe-router-dtype: fp32
+    moe-router-group-topk: 4
+    moe-router-num-groups: 8
+    moe-router-topk-scaling-factor: 2.5
     moe-token-dispatcher-type: alltoall
     moe-grouped-gemm: true
     moe-permute-fusion: true
     moe-ffn-hidden-size: 2048
+    moe-shared-expert-intermediate-size: 2048
+    moe-shared-expert-overlap: true
     moe-layer-freq: 1
     moe-aux-loss-coeff: 0.0001
+    moe-router-force-load-balancing: false
+    moe-router-padding-for-fp8: false
+    overlap-moe-expert-parallel-comm: false
 
     # MTP (Multi-Token Prediction)
     mtp-num-layers: 1
@@ -85,13 +117,17 @@ workload:
     # Precision (FP8)
     bf16: true
     fp16: false
+    params-dtype: bfloat16
+    pipeline-dtype: bfloat16
     fp8-format: hybrid
     fp8-recipe: tensorwise
+    accumulate-allreduce-grads-in-fp32: false
 
     # Transformer Engine
     transformer-impl: transformer_engine
     attention-backend: flash
     cross-entropy-loss-fusion: true
+    cross-entropy-fusion-impl: te
 
     # Fusion / kernels
     disable-bias-linear: true
@@ -107,13 +143,39 @@ workload:
     # Model init
     init-method-std: 0.006
 
+    # CUDA graphs
+    cuda-graph-impl: none
+
+    # Memory / recompute
+    recompute-granularity: null
+    recompute-method: null
+    recompute-num-layers: null
+    fine-grained-activation-offloading: false
+
+    # Manual GC
+    manual-gc: true
+    manual-gc-interval: 5
+
+    # Optimizer (precision-aware)
+    use-precision-aware-optimizer: true
+    main-params-dtype: fp32
+    main-grads-dtype: bf16
+    exp-avg-dtype: bf16
+    exp-avg-sq-dtype: bf16
+
+    # Data parallel / distributed optimizer
+    distributed-optimizer: true
+    data-parallel-sharding-strategy: no_shard
+
+    # Tokenizer
+    tokenizer-type: NullTokenizer
+
     # Training shape
     micro-batch-size: 1
     global-batch-size: 4096
     seq-length: 4096
     max-position-embeddings: 4096
     num-gpus: 1024
-    distributed-optimizer: true
 
     mock-data: true
     split: "1000,0,0"
