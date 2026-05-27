@@ -103,6 +103,7 @@ _TRAINING_FLAG_PATTERNS: set[str] = {
     "flight-recorder",
     "distributed-timeout",
     "distributed-backend",
+    "moe-router-padding",
 }
 
 # ---------------------------------------------------------------------------
