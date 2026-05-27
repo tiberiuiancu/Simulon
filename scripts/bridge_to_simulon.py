@@ -262,6 +262,15 @@ def _build_simulon_config(cfg: Any) -> dict[str, Any]:
                 del result[key]
                 break
 
+    mp = getattr(cfg, "mixed_precision", None)
+    if mp is not None:
+        for attr_name, flag_name in (("fp8", "fp8-format"), ("fp8_recipe", "fp8-recipe")):
+            raw = getattr(mp, attr_name, None)
+            if raw is not None:
+                override_name = _KNOWN_REVERSE_OVERRIDES.get(attr_name, flag_name)
+                if override_name not in result:
+                    result[override_name] = raw
+
     # Force overrides
     result["mock-data"] = True
     result["split"] = "1000,0,0"
