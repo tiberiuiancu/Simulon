@@ -43,6 +43,8 @@ _KNOWN_REVERSE_OVERRIDES: dict[str, str] = {
     "fp8_param": "fp8-param-gather",
     "fp4_param": "fp4-param-gather",
     "grad_reduce_in_fp32": "grad-reduce-in-bf16",
+    "fp8": "fp8-format",
+    "fp4": "fp4-format",
     "use_precision_aware_optimizer": "use-precision-aware-optimizer",
     "layernorm_zero_centered_gamma": "layernorm-zero-centered-gamma",
     "random_seed": "seed",
