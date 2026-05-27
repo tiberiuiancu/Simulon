@@ -254,6 +254,7 @@ def _build_simulon_config(cfg: Any) -> dict[str, Any]:
     # Force overrides
     result["mock-data"] = True
     result["split"] = "1000,0,0"
+    result["moe-token-dispatcher-type"] = "alltoall"
 
     return result
 
