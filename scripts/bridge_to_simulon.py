@@ -194,6 +194,11 @@ def _subconfig_to_flags(sub_instance: Any) -> dict[str, Any]:
         if _should_skip_field(field, val, defaults_map):
             continue
 
+        # None means "use CLI default" (e.g. attention_backend=None → auto).
+        # Never emit a flag with explicit None.
+        if val is None:
+            continue
+
         val = _convert_value(val)
         if isinstance(val, list | tuple):
             val = _list_to_cli_string(val)
