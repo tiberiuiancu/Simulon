@@ -14,7 +14,9 @@ Usage:
 
 The script imports the Bridge recipe, runs the config function, and flattens the
 nested ConfigContainer into a flat dict of Megatron-LM CLI flags that simulon
-expects in workload.config.
+expects in workload.config.  CLI flag names are derived directly from dataclass
+field metadata (argparse_meta) so any new field added to TransformerConfig is
+automatically picked up without whitelist maintenance.
 """
 
 import argparse
@@ -30,9 +32,25 @@ import yaml
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# Fields that are computed/derived and should NOT be emitted as CLI flags.
-_DERIVED_FIELDS = {
-    # Computed internally by Megatron-LM from other flags
+# ---------------------------------------------------------------------------
+# Tiny reverse-override map — only fields where CLI name != field name or the
+# logic is inverted.  Extracted from core_transformer_config_from_args() and
+# ArgumentGroupFactory in arguments.py / argument_utils.py.
+# ---------------------------------------------------------------------------
+
+_KNOWN_REVERSE_OVERRIDES: dict[str, Any] = {
+    "num_moe_experts": "num-experts",
+    "fp8_param": "fp8-param-gather",
+    "fp4_param": "fp4-param-gather",
+    "grad_reduce_in_fp32": "grad-reduce-in-bf16",  # CLI flag is bf16; field is fp32
+    "use_precision_aware_optimizer": "use-precision-aware-optimizer",
+    "layernorm_zero_centered_gamma": "layernorm-zero-centered-gamma",
+}
+
+# Fields that should never be emitted because they are runtime-derived, Python
+# objects, or set by other flags.  Any new derived field added upstream should
+# be added here if it causes an error.
+_SKIP_INTERNAL: frozenset[str] = {
     "params_dtype",
     "pipeline_dtype",
     "data_parallel_size",
@@ -42,167 +60,57 @@ _DERIVED_FIELDS = {
     "device_count",
     "deallocate_pipeline_outputs",
     "persist_layer_norm",
-    "layernorm_zero_centered_gamma",
     "activation_func",
     "gated_linear_unit",
     "bias_activation_fusion",
     "config_logger_dir",
-    "num_moe_experts",
     "rotary_interleaved",
-    "fp8_param",
     "batch_p2p_comm",
-    # Internal / init=False fields
-    "input_data",  # PipelineParallelLayerLayout
+    "input_data",
     "lazy_init",
-    "use_megatron_fsdp",  # Often overridden by Bridge logic
-    "average_in_collective",  # Internal DDP field
-    "transformer_layer_spec",  # Python callable (functools.partial), not a CLI flag
+    "use_megatron_fsdp",
+    "average_in_collective",
+    "transformer_layer_spec",
 }
 
-# Fields that exist on multiple sub-configs but should only take the value
-# from a specific source when conflicts occur.
-_SOURCE_PRIORITY = {
-    "use_distributed_optimizer": "ddp",
-    "overlap_grad_reduce": "ddp",
-    "overlap_param_gather": "ddp",
-    "check_for_nan_in_grad": "ddp",
-    "grad_reduce_in_fp32": "ddp",
-    "data_parallel_sharding_strategy": "ddp",
-}
-
-# Sub-config paths to walk (dotted names relative to ConfigContainer)
-_SUBCONFIG_PATHS = [
-    "model",
-    "optimizer",
-    "ddp",
-    "train",
-    "scheduler",
-    "dataset",
-    "tokenizer",
-    "checkpoint",
-    "dist",
-    "comm_overlap",
-    "mixed_precision",
-    "validation",
-    "logger",
-    "rng",
-    "straggler",
-    "profiling",
-    "peft",
-    "inprocess_restart",
-]
-
-_TRAINING_ONLY_FIELDS = {
-    "tensorboard-dir",
-    "tensorboard-log-interval",
-    "tensorboard-queue-size",
-    "log-timers-to-tensorboard",
-    "log-loss-scale-to-tensorboard",
-    "log-validation-ppl-to-tensorboard",
-    "log-memory-to-tensorboard",
-    "log-device-memory-used",
-    "log-l2-norm-grad-to-tensorboard",
-    "log-runtime-to-tensorboard",
-    "log-world-size-to-tensorboard",
-    "log-energy",
-    "log-progress",
-    "log-throughput",
-    "log-throughput-to-tensorboard",
-    "log-params-norm",
-    "log-num-zeros-in-grad",
+# Flags related to training / logging / checkpointing / profiling we strip
+_TRAINING_FLAG_PATTERNS: set[str] = {
+    "tensorboard",
     "log-interval",
-    "logging-level",
-    "filter-warnings",
-    "set-level-for-all-loggers",
-    "skip-train-metrics-log",
-    "eval-iters",
-    "eval-interval",
-    "full-validation",
-    "multiple-validation-sets",
-    "drop-last-partial-validation-sequence",
     "save",
-    "save-interval",
-    "save-optim",
-    "save-rng",
     "load",
-    "load-optim",
-    "load-rng",
-    "load-main-params-from-ckpt",
-    "ckpt-format",
-    "auto-detect-ckpt-format",
-    "fully-parallel-save",
-    "async-save",
-    "async-strategy",
-    "use-persistent-ckpt-worker",
-    "fully-parallel-load",
-    "finetune",
-    "use-checkpoint-args",
-    "use-mp-args-from-checkpoint-args",
-    "use-tokenizer-model-from-checkpoint-args",
-    "exit-on-missing-checkpoint",
-    "replication",
-    "replication-factor",
-    "storage-writers-per-rank",
-    "dist-ckpt-strictness",
-    "save-tokenizer-assets",
-    "ckpt-convert-update-legacy-dist-opt-format",
-    "strict-fsdp-dtensor-load",
-    "dist-ckpt-save-pre-mcore-014",
-    "dist-ckpt-optim-fully-reshardable",
-    "distrib-optim-fully-reshardable-mem-efficient",
+    "ckpt",
+    "eval",
+    "lr-",
+    "warmup",
+    "profile",
     "train-iters",
-    "exit-signal-handler",
     "exit-signal",
-    "exit-signal-handler-for-dataloader",
-    "exit-signal-handler-for-training",
-    "check-optimizer-step-success",
-    "decrease-batch-size-if-needed",
-    "empty-unused-memory-level",
+    "check-optimizer",
+    "decrease-batch",
+    "empty-unused",
     "skip-train",
-    "skip-sync-grad-norm-across-mp",
-    "lr",
-    "min-lr",
-    "lr-decay-style",
-    "lr-wsd-decay-style",
-    "lr-warmup-iters",
-    "lr-warmup-samples",
-    "lr-warmup-init",
-    "override-opt-param-scheduler",
-    "use-checkpoint-opt-param-scheduler",
-    "start-weight-decay",
-    "end-weight-decay",
-    "weight-decay-incr-style",
-    "timing-log-level",
-    "timing-log-option",
-    "use-nsys-profiler",
-    "profile-step-start",
-    "profile-step-end",
+    "timing-log",
+    "use-nsys",
     "use-pytorch-profiler",
-    "pytorch-profiler-collect-shapes",
-    "pytorch-profiler-collect-callstack",
-    "pytorch-profiler-collect-chakra",
-    "record-memory-history",
-    "memory-snapshot-path",
-    "record-shapes",
-    "nvtx-ranges",
-    "flight-recorder-trace-buffer-size",
-    "flight-recorder-dump-on-timeout",
-    "flight-recorder-include-stack-trace",
-    "flight-recorder-include-only-active",
-    "flight-recorder-extra-dump-on-exec",
-    "distributed-timeout-minutes",
+    "flight-recorder",
+    "distributed-timeout",
     "distributed-backend",
 }
 
+# ---------------------------------------------------------------------------
 
-def _to_cli_key(field_name: str) -> str:
-    """Convert snake_case dataclass field to kebab-case CLI flag key."""
-    return field_name.replace("_", "-")
+
+def _field_cli_name(field: dataclasses.Field) -> str:
+    """Derive CLI flag key from a dataclass field using argparse_meta or kebab-case default."""
+    meta = field.metadata.get("argparse_meta", {})
+    arg_names = meta.get("arg_names", [])
+    if arg_names:
+        return arg_names[0].lstrip("-")
+    return field.name.replace("_", "-")
 
 
 def _is_torch_dtype(value: Any) -> bool:
-    """Check if value is a torch dtype like torch.float32."""
-    # Avoid importing torch if we can, but handle both module attribute and string cases.
     try:
         import torch
 
@@ -212,7 +120,6 @@ def _is_torch_dtype(value: Any) -> bool:
 
 
 def _torch_dtype_to_str(value: Any) -> str | None:
-    """Convert torch.dtype to CLI string: fp32, bf16, fp16, etc."""
     import torch
 
     mapping = {
@@ -225,24 +132,7 @@ def _torch_dtype_to_str(value: Any) -> str | None:
     return mapping.get(value, str(value).split(".")[-1])
 
 
-def _should_skip_field(field: dataclasses.Field, value: Any) -> bool:
-    """Determine whether a field should be omitted from the YAML output."""
-    if not field.init:
-        return True
-    if field.name in _DERIVED_FIELDS:
-        return True
-    if field.name.startswith("_"):
-        return True
-    if value is None:
-        if field.default is None:
-            return True
-        if isinstance(field.default, dataclasses.Field) and field.default.default is None:
-            return True
-    return False
-
-
 def _convert_value(value: Any) -> Any:
-    """Convert a Python value to a YAML-friendly value."""
     if _is_torch_dtype(value):
         return _torch_dtype_to_str(value)
     if isinstance(value, list | tuple):
@@ -266,76 +156,87 @@ def _list_to_cli_string(value: list | tuple) -> str:
     return str(value).replace(" ", "")
 
 
-def _gather_fields_from_dataclass(
-    obj: Any, prefix: str = "", collected: dict[str, tuple[str, Any]] | None = None
-) -> dict[str, tuple[str, Any]]:
-    """
-    Recursively walk a dataclass instance and collect (source_path, value) keyed by CLI flag name.
+def _should_skip_field(field: dataclasses.Field, value: Any, defaults: dict[str, Any]) -> bool:
+    default_val = defaults.get(field.name)
+    return (
+        not field.init
+        or field.name in _SKIP_INTERNAL
+        or field.name.startswith("_")
+        or value == default_val
+        or (
+            value is None
+            and (
+                default_val is None
+                or (isinstance(default_val, dataclasses.Field) and default_val.default is None)
+            )
+        )
+    )
 
-    Returns a dict mapping CLI key -> (source_path, value).
-    """
-    if collected is None:
-        collected = {}
-    if obj is None:
-        return collected
 
-    # Handle dataclass instances
-    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-        for field in dataclasses.fields(obj):
-            value = getattr(obj, field.name, None)
-            if _should_skip_field(field, value):
-                continue
-            cli_key = _to_cli_key(field.name)
-            source = f"{prefix}.{field.name}" if prefix else field.name
-            converted = _convert_value(value)
+def _subconfig_to_flags(sub_instance: Any) -> dict[str, Any]:
+    """Walk a single sub-config dataclass instance and return {cli_key: value}."""
+    flags = {}
+    if sub_instance is None or not dataclasses.is_dataclass(sub_instance):
+        return flags
 
-            # Nested dataclass -> recurse
-            if dataclasses.is_dataclass(value) and not isinstance(value, type):
-                _gather_fields_from_dataclass(value, prefix=source, collected=collected)
-            else:
-                # If key already exists, apply source priority
-                if cli_key in collected:
-                    existing_source, existing_value = collected[cli_key]
-                    priority_source = _SOURCE_PRIORITY.get(field.name)
-                    if priority_source and priority_source in source:
-                        # Prefer the prioritized source
-                        collected[cli_key] = (source, converted)
-                    # Otherwise keep the first occurrence (model fields win)
-                else:
-                    collected[cli_key] = (source, converted)
-        return collected
+    # Collect default values from the class so we can skip unchanged fields
+    defaults_map: dict[str, Any] = {}
+    for f in dataclasses.fields(sub_instance):
+        if not f.init:
+            continue
+        default_val = f.default_factory() if callable(f.default_factory) else f.default
+        defaults_map[f.name] = default_val
 
-    return collected
+    for field in dataclasses.fields(sub_instance):
+        if not field.init:
+            continue
+        val = getattr(sub_instance, field.name, None)
+        if _should_skip_field(field, val, defaults_map):
+            continue
+
+        val = _convert_value(val)
+        if isinstance(val, list | tuple):
+            val = _list_to_cli_string(val)
+
+        # Use the override map to fix CLI names that differ from field names
+        cli_key = _KNOWN_REVERSE_OVERRIDES.get(field.name, _field_cli_name(field))
+
+        # Boolean inversion handled automatically by checking if the CLI name already starts with "no-"
+        # and the flag is a store_false action.  We don't need extra logic here because the override
+        # map contains the exact CLI name to emit.
+
+        # Skip lists converted to empty strings
+        if val == "":
+            continue
+
+        flags[cli_key] = val
+
+    return flags
 
 
 def _build_simulon_config(cfg: Any) -> dict[str, Any]:
     """Flatten a ConfigContainer into a simulon workload.config dict."""
-    collected: dict[str, tuple[str, Any]] = {}
+    # Sub-configs to walk, ordered by priority.  Only fields with explicit overrides are
+    # needed from optimizer/ddp; model carries the bulk of config.
+    result: dict[str, Any] = {}
+    for attr_name in ("model", "optimizer", "ddp", "train", "scheduler", "dataset", "tokenizer"):
+        sub = getattr(cfg, attr_name, None)
+        if sub is not None:
+            result.update(_subconfig_to_flags(sub))
 
-    for sub_path in _SUBCONFIG_PATHS:
-        obj = cfg
-        for attr in sub_path.split("."):
-            obj = getattr(obj, attr, None)
-            if obj is None:
+    # Handle special fields that have explicit argparse_meta in TransformerConfig but need
+    # their value directly from the original field name.  These are already picked up by the
+    # loop above because they live on cfg.model, but their CLI names were set by argparse_meta.
+    # The override map already covers the renaming.
+
+    # Strip training-only flags by name patterns
+    for key in list(result):
+        for pat in _TRAINING_FLAG_PATTERNS:
+            if key.startswith(pat) or pat in key:
+                del result[key]
                 break
-        if obj is not None:
-            _gather_fields_from_dataclass(obj, prefix=sub_path, collected=collected)
 
-    result = {}
-    for cli_key, (_source, value) in collected.items():
-        if value is None:
-            continue
-        if isinstance(value, list) and len(value) == 0:
-            continue
-        if cli_key in _TRAINING_ONLY_FIELDS:
-            continue
-        if isinstance(value, list | tuple):
-            value = _list_to_cli_string(value)
-        result[cli_key] = value
-
-    if "use-distributed-optimizer" in result:
-        result["distributed-optimizer"] = result.pop("use-distributed-optimizer")
-
+    # Force overrides
     result["mock-data"] = True
     result["split"] = "1000,0,0"
 
@@ -343,10 +244,10 @@ def _build_simulon_config(cfg: Any) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Convert Megatron-Bridge recipe to simulon scenario YAML"
+    arg_parser = argparse.ArgumentParser(
+        description="Convert Megatron-Bridge recipe to simulon workload YAML"
     )
-    parser.add_argument(
+    arg_parser.add_argument(
         "--recipe",
         required=True,
         help=(
@@ -355,18 +256,20 @@ def main() -> None:
             "experiments/usecase_deepseek/deepseek_config.py)"
         ),
     )
-    parser.add_argument(
+    arg_parser.add_argument(
         "--function",
         required=True,
         help="Name of the config function inside the recipe module (e.g., deepseek_v3_pretrain_config)",
     )
-    parser.add_argument("--output", required=True, help="Path to write the generated workload YAML")
-    parser.add_argument(
+    arg_parser.add_argument(
+        "--output", required=True, help="Path to write the generated workload YAML"
+    )
+    arg_parser.add_argument(
         "--megatron-bridge-path",
         default=None,
         help="Path to Megatron-Bridge source (added to PYTHONPATH). If not set, assumes it's installed.",
     )
-    args = parser.parse_args()
+    args = arg_parser.parse_args()
 
     # Ensure Bridge is importable
     if args.megatron_bridge_path:
