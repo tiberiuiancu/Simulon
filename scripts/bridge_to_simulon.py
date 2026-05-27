@@ -86,6 +86,108 @@ _SUBCONFIG_PATHS = [
     "inprocess_restart",
 ]
 
+_TRAINING_ONLY_FIELDS = {
+    "tensorboard-dir",
+    "tensorboard-log-interval",
+    "tensorboard-queue-size",
+    "log-timers-to-tensorboard",
+    "log-loss-scale-to-tensorboard",
+    "log-validation-ppl-to-tensorboard",
+    "log-memory-to-tensorboard",
+    "log-device-memory-used",
+    "log-l2-norm-grad-to-tensorboard",
+    "log-runtime-to-tensorboard",
+    "log-world-size-to-tensorboard",
+    "log-energy",
+    "log-progress",
+    "log-throughput",
+    "log-throughput-to-tensorboard",
+    "log-params-norm",
+    "log-num-zeros-in-grad",
+    "log-interval",
+    "logging-level",
+    "filter-warnings",
+    "set-level-for-all-loggers",
+    "skip-train-metrics-log",
+    "eval-iters",
+    "eval-interval",
+    "full-validation",
+    "multiple-validation-sets",
+    "drop-last-partial-validation-sequence",
+    "save",
+    "save-interval",
+    "save-optim",
+    "save-rng",
+    "load",
+    "load-optim",
+    "load-rng",
+    "load-main-params-from-ckpt",
+    "ckpt-format",
+    "auto-detect-ckpt-format",
+    "fully-parallel-save",
+    "async-save",
+    "async-strategy",
+    "use-persistent-ckpt-worker",
+    "fully-parallel-load",
+    "finetune",
+    "use-checkpoint-args",
+    "use-mp-args-from-checkpoint-args",
+    "use-tokenizer-model-from-checkpoint-args",
+    "exit-on-missing-checkpoint",
+    "replication",
+    "replication-factor",
+    "storage-writers-per-rank",
+    "dist-ckpt-strictness",
+    "save-tokenizer-assets",
+    "ckpt-convert-update-legacy-dist-opt-format",
+    "strict-fsdp-dtensor-load",
+    "dist-ckpt-save-pre-mcore-014",
+    "dist-ckpt-optim-fully-reshardable",
+    "distrib-optim-fully-reshardable-mem-efficient",
+    "train-iters",
+    "exit-signal-handler",
+    "exit-signal",
+    "exit-signal-handler-for-dataloader",
+    "exit-signal-handler-for-training",
+    "check-optimizer-step-success",
+    "decrease-batch-size-if-needed",
+    "empty-unused-memory-level",
+    "skip-train",
+    "skip-sync-grad-norm-across-mp",
+    "lr",
+    "min-lr",
+    "lr-decay-style",
+    "lr-wsd-decay-style",
+    "lr-warmup-iters",
+    "lr-warmup-samples",
+    "lr-warmup-init",
+    "override-opt-param-scheduler",
+    "use-checkpoint-opt-param-scheduler",
+    "start-weight-decay",
+    "end-weight-decay",
+    "weight-decay-incr-style",
+    "timing-log-level",
+    "timing-log-option",
+    "use-nsys-profiler",
+    "profile-step-start",
+    "profile-step-end",
+    "use-pytorch-profiler",
+    "pytorch-profiler-collect-shapes",
+    "pytorch-profiler-collect-callstack",
+    "pytorch-profiler-collect-chakra",
+    "record-memory-history",
+    "memory-snapshot-path",
+    "record-shapes",
+    "nvtx-ranges",
+    "flight-recorder-trace-buffer-size",
+    "flight-recorder-dump-on-timeout",
+    "flight-recorder-include-stack-trace",
+    "flight-recorder-include-only-active",
+    "flight-recorder-extra-dump-on-exec",
+    "distributed-timeout-minutes",
+    "distributed-backend",
+}
+
 
 def _to_cli_key(field_name: str) -> str:
     """Convert snake_case dataclass field to kebab-case CLI flag key."""
@@ -144,6 +246,20 @@ def _convert_value(value: Any) -> Any:
     return value
 
 
+def _list_to_cli_string(value: list | tuple) -> str:
+    if not value:
+        return ""
+    if isinstance(value[0], list | tuple):
+        layer_chars = {"embedding": "E", "decoder": "t", "mtp": "m", "loss": "L"}
+        stages = []
+        for stage in value:
+            stages.append("".join(layer_chars.get(item, str(item)[0]) for item in stage))
+        return "|".join(stages)
+    if all(isinstance(x, int) for x in value):
+        return str(value).replace(" ", "")
+    return str(value).replace(" ", "")
+
+
 def _gather_fields_from_dataclass(
     obj: Any, prefix: str = "", collected: dict[str, tuple[str, Any]] | None = None
 ) -> dict[str, tuple[str, Any]]:
@@ -199,21 +315,23 @@ def _build_simulon_config(cfg: Any) -> dict[str, Any]:
         if obj is not None:
             _gather_fields_from_dataclass(obj, prefix=sub_path, collected=collected)
 
-    # Build final flat dict
     result = {}
     for cli_key, (_source, value) in collected.items():
-        # Skip None values
         if value is None:
             continue
-        # Skip empty lists that are just defaults
         if isinstance(value, list) and len(value) == 0:
             continue
+        if cli_key in _TRAINING_ONLY_FIELDS:
+            continue
+        if isinstance(value, list | tuple):
+            value = _list_to_cli_string(value)
         result[cli_key] = value
 
-    # Post-processing: handle special simulon mappings
-    # simulon trace.py maps "distributed-optimizer" -> "--use-distributed-optimizer"
     if "use-distributed-optimizer" in result:
         result["distributed-optimizer"] = result.pop("use-distributed-optimizer")
+
+    result["mock-data"] = True
+    result["split"] = "1000,0,0"
 
     return result
 
