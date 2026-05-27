@@ -51,6 +51,7 @@ _DERIVED_FIELDS = {
     "lazy_init",
     "use_megatron_fsdp",  # Often overridden by Bridge logic
     "average_in_collective",  # Internal DDP field
+    "transformer_layer_spec",  # Python callable (functools.partial), not a CLI flag
 }
 
 # Fields that exist on multiple sub-configs but should only take the value
