@@ -79,6 +79,9 @@ def generate_trace(
         sc = ScenarioConfig.model_validate(raw)
         is_scenario = True
         workload = sc.workload
+        # If workload was given as a file path, resolve it to a MegatronWorkload.
+        if isinstance(workload, Path):
+            workload = resolve_workload(workload)
     except Exception:
         workload = resolve_workload(scenario)
         is_scenario = False
