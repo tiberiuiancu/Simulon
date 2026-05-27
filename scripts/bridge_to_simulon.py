@@ -33,23 +33,27 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Tiny reverse-override map — only fields where CLI name != field name or the
-# logic is inverted.  Extracted from core_transformer_config_from_args() and
-# ArgumentGroupFactory in arguments.py / argument_utils.py.
+
+
 # ---------------------------------------------------------------------------
 
-_KNOWN_REVERSE_OVERRIDES: dict[str, Any] = {
+
+_KNOWN_REVERSE_OVERRIDES: dict[str, str] = {
     "num_moe_experts": "num-experts",
     "fp8_param": "fp8-param-gather",
     "fp4_param": "fp4-param-gather",
-    "grad_reduce_in_fp32": "grad-reduce-in-bf16",  # CLI flag is bf16; field is fp32
+    "grad_reduce_in_fp32": "grad-reduce-in-bf16",
     "use_precision_aware_optimizer": "use-precision-aware-optimizer",
     "layernorm_zero_centered_gamma": "layernorm-zero-centered-gamma",
+    "random_seed": "seed",
+    "sequence_length": "seq-length",
+    # Inverted booleans (store_false in argparse — default True, emit --no-* when False)
+    "masked_softmax_fusion": "no-|masked-softmax-fusion",
+    "gradient_accumulation_fusion": "no-|gradient-accumulation-fusion",
+    "bias_dropout_fusion": "no-|bias-dropout-fusion",
 }
 
-# Fields that should never be emitted because they are runtime-derived, Python
-# objects, or set by other flags.  Any new derived field added upstream should
-# be added here if it causes an error.
+
 _SKIP_INTERNAL: frozenset[str] = {
     "params_dtype",
     "pipeline_dtype",
@@ -71,6 +75,7 @@ _SKIP_INTERNAL: frozenset[str] = {
     "use_megatron_fsdp",
     "average_in_collective",
     "transformer_layer_spec",
+    "hf_model_id",
 }
 
 # Flags related to training / logging / checkpointing / profiling we strip
@@ -194,8 +199,6 @@ def _subconfig_to_flags(sub_instance: Any) -> dict[str, Any]:
         if _should_skip_field(field, val, defaults_map):
             continue
 
-        # None means "use CLI default" (e.g. attention_backend=None → auto).
-        # Never emit a flag with explicit None.
         if val is None:
             continue
 
@@ -203,12 +206,17 @@ def _subconfig_to_flags(sub_instance: Any) -> dict[str, Any]:
         if isinstance(val, list | tuple):
             val = _list_to_cli_string(val)
 
-        # Use the override map to fix CLI names that differ from field names
-        cli_key = _KNOWN_REVERSE_OVERRIDES.get(field.name, _field_cli_name(field))
+        override = _KNOWN_REVERSE_OVERRIDES.get(field.name)
+        if override:
+            if override.startswith("no-|"):
+                body = override.replace("no-|", "")
+                if not val:
+                    flags[f"no-{body}"] = True
+            else:
+                flags[override] = val
+            continue
 
-        # Boolean inversion handled automatically by checking if the CLI name already starts with "no-"
-        # and the flag is a store_false action.  We don't need extra logic here because the override
-        # map contains the exact CLI name to emit.
+        cli_key = _field_cli_name(field)
 
         # Skip lists converted to empty strings
         if val == "":
