@@ -76,6 +76,7 @@ _SKIP_INTERNAL: frozenset[str] = {
     "average_in_collective",
     "transformer_layer_spec",
     "hf_model_id",
+    "check_for_nan_in_grad",
 }
 
 # Flags related to training / logging / checkpointing / profiling we strip
