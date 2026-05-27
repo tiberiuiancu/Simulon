@@ -175,8 +175,8 @@ def deepseek_v3_pretrain_config() -> ConfigContainer:
     )
     # FP8 settings (commented - enable if using FP8)
     cfg.mixed_precision.fp8_recipe = "tensorwise"
-    cfg.mixed_precision.fp8 = None
-    cfg.mixed_precision.fp8_param_gather = False
+    cfg.mixed_precision.fp8 = "hybrid"
+    cfg.mixed_precision.fp8_param_gather = True
     # cfg.mixed_precision.reuse_grad_buf_for_mxfp8_param_ag = False
     cfg.model.moe_router_padding_for_fp8 = True  # Pad router for FP8 alignment
 
