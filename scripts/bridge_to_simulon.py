@@ -89,6 +89,7 @@ _TRAINING_FLAG_PATTERNS: set[str] = {
     "eval",
     "lr-",
     "warmup",
+    "weight-decay",
     "profile",
     "train-iters",
     "exit-signal",
