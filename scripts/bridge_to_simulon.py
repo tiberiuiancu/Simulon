@@ -234,7 +234,16 @@ def _build_simulon_config(cfg: Any) -> dict[str, Any]:
     # Sub-configs to walk, ordered by priority.  Only fields with explicit overrides are
     # needed from optimizer/ddp; model carries the bulk of config.
     result: dict[str, Any] = {}
-    for attr_name in ("model", "optimizer", "ddp", "train", "scheduler", "dataset", "tokenizer"):
+    for attr_name in (
+        "model",
+        "mixed_precision",
+        "optimizer",
+        "ddp",
+        "train",
+        "scheduler",
+        "dataset",
+        "tokenizer",
+    ):
         sub = getattr(cfg, attr_name, None)
         if sub is not None:
             result.update(_subconfig_to_flags(sub))
