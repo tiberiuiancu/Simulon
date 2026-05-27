@@ -7,6 +7,11 @@ Usage:
         --function deepseek_v3_pretrain_config \
         --output deepseek_v3.yaml
 
+    python scripts/bridge_to_simulon.py \
+        --recipe experiments/usecase_deepseek/deepseek_config.py \
+        --function deepseek_v3_pretrain_config \
+        --output deepseek_v3.yaml
+
 The script imports the Bridge recipe, runs the config function, and flattens the
 nested ConfigContainer into a flat dict of Megatron-LM CLI flags that simulon
 expects in workload.config.
@@ -344,7 +349,11 @@ def main() -> None:
     parser.add_argument(
         "--recipe",
         required=True,
-        help="Dotted module path to the Bridge recipe (e.g., megatron.bridge.recipes.deepseek.deepseek_v3)",
+        help=(
+            "Dotted module path or file path to the Bridge recipe "
+            "(e.g., megatron.bridge.recipes.deepseek.deepseek_v3 or "
+            "experiments/usecase_deepseek/deepseek_config.py)"
+        ),
     )
     parser.add_argument(
         "--function",
@@ -364,11 +373,30 @@ def main() -> None:
         sys.path.insert(0, args.megatron_bridge_path)
 
     # Import recipe module
-    try:
-        recipe_mod = importlib.import_module(args.recipe)
-    except ImportError as e:
-        logger.error("Cannot import recipe module '%s': %s", args.recipe, e)
-        sys.exit(1)
+    recipe_arg = args.recipe
+    recipe_path = Path(recipe_arg)
+    is_file_path = "/" in recipe_arg or "\\" in recipe_arg or recipe_path.suffix == ".py"
+
+    if is_file_path:
+        if recipe_path.suffix != ".py":
+            recipe_path = recipe_path.with_suffix(".py")
+        if not recipe_path.exists():
+            logger.error("Recipe file not found: %s", recipe_path)
+            sys.exit(1)
+        abs_path = recipe_path.resolve()
+        module_name = abs_path.stem
+        sys.path.insert(0, str(abs_path.parent))
+        try:
+            recipe_mod = importlib.import_module(module_name)
+        except ImportError as e:
+            logger.error("Cannot import recipe module '%s': %s", module_name, e)
+            sys.exit(1)
+    else:
+        try:
+            recipe_mod = importlib.import_module(recipe_arg)
+        except ImportError as e:
+            logger.error("Cannot import recipe module '%s': %s", recipe_arg, e)
+            sys.exit(1)
 
     # Get config function
     if not hasattr(recipe_mod, args.function):
