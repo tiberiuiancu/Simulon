@@ -20,7 +20,7 @@ config:
   hidden-dropout: 0.0
   attention-dropout: 0.0
   norm-epsilon: 1.0e-06
-  disable-bias-linear: false
+  disable-bias-linear: true
   num-experts: 256
   normalization: RMSNorm
   qk-layernorm: true
@@ -51,6 +51,9 @@ config:
   position-embedding-type: rope
   seq-length: 4096
   vocab-size: 32000
+  grad-reduce-in-bf16: false
+  fp8-format: hybrid
+  fp8-param-gather: true
   lr: 0.0003
   min-lr: 3.0e-05
   use-precision-aware-optimizer: true
