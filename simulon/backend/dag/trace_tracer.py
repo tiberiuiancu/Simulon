@@ -689,9 +689,11 @@ def _add_trace_to_dag(
 
 
 def _wire_slot_edges(dag: ExecutionDAG, slot_nodes: dict) -> None:
-    for node_ids in slot_nodes.values():
-        for i in range(len(node_ids) - 1):
-            dag.add_edge(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
+    with log_progress("  wiring slot edges", len(slot_nodes), logger) as advance:
+        for node_ids in slot_nodes.values():
+            for i in range(len(node_ids) - 1):
+                dag.add_edge(DAGEdge(src_node_id=node_ids[i], dst_node_id=node_ids[i + 1]))
+            advance()
 
 
 def _should_skip_pp_pair(src_stage: int, dst_stage: int, direction: str) -> bool:
@@ -753,32 +755,36 @@ def _wire_pp_transfers(
     flow_id: list,
 ) -> tuple[int, int]:
     seen: set[tuple[int, int, int, str]] = set()
-    for record in pending:
-        pp_stride = config.ranks_per_stage
-        src_stage = record.remapped_src // pp_stride
-        dst_stage = record.remapped_dst // pp_stride
-        if src_stage == dst_stage:
-            continue
-        if not (
-            0 <= record.remapped_src < config.world_size
-            and 0 <= record.remapped_dst < config.world_size
-        ):
-            continue
-        src_ranks = _ranks_for_stage(src_stage, config)
-        dst_ranks = _ranks_for_stage(dst_stage, config)
-        for src, dst in zip(src_ranks, dst_ranks, strict=False):
-            dedup = (src, dst, record.microbatch_id, record.direction)
-            if dedup in seen:
+    with log_progress("  wiring PP transfers", len(pending), logger) as advance:
+        for record in pending:
+            pp_stride = config.ranks_per_stage
+            src_stage = record.remapped_src // pp_stride
+            dst_stage = record.remapped_dst // pp_stride
+            if src_stage == dst_stage:
+                advance()
                 continue
-            seen.add(dedup)
-            src_node, dst_node = _resolve_pp_nodes(
-                src, dst, record, slot_entry_node, slot_last_node
-            )
-            if src_node is None or dst_node is None:
+            if not (
+                0 <= record.remapped_src < config.world_size
+                and 0 <= record.remapped_dst < config.world_size
+            ):
+                advance()
                 continue
-            if _should_skip_pp_pair(src_stage, dst_stage, record.direction):
-                continue
-            _create_pp_send(src, dst, record, src_node, dst_node, node_id, flow_id, dag)
+            src_ranks = _ranks_for_stage(src_stage, config)
+            dst_ranks = _ranks_for_stage(dst_stage, config)
+            for src, dst in zip(src_ranks, dst_ranks, strict=False):
+                dedup = (src, dst, record.microbatch_id, record.direction)
+                if dedup in seen:
+                    continue
+                seen.add(dedup)
+                src_node, dst_node = _resolve_pp_nodes(
+                    src, dst, record, slot_entry_node, slot_last_node
+                )
+                if src_node is None or dst_node is None:
+                    continue
+                if _should_skip_pp_pair(src_stage, dst_stage, record.direction):
+                    continue
+                _create_pp_send(src, dst, record, src_node, dst_node, node_id, flow_id, dag)
+            advance()
     return node_id[0], flow_id[0]
 
 
@@ -788,30 +794,34 @@ def _wire_cross_slot_edges(
     keys_by_rank: dict[int, list] = {}
     for key in slot_first_timestamp:
         keys_by_rank.setdefault(key[0], []).append(key)
-    for _, keys in keys_by_rank.items():
-        keys.sort(key=lambda k: slot_first_timestamp[k])
-        for i in range(len(keys) - 1):
-            prev_last = slot_last_node.get(keys[i])
-            next_first = slot_entry_node.get(keys[i + 1])
-            if prev_last is not None and next_first is not None:
-                dag.add_edge(DAGEdge(src_node_id=prev_last, dst_node_id=next_first))
+    with log_progress("  wiring cross-slot edges", len(keys_by_rank), logger) as advance:
+        for _, keys in keys_by_rank.items():
+            keys.sort(key=lambda k: slot_first_timestamp[k])
+            for i in range(len(keys) - 1):
+                prev_last = slot_last_node.get(keys[i])
+                next_first = slot_entry_node.get(keys[i + 1])
+                if prev_last is not None and next_first is not None:
+                    dag.add_edge(DAGEdge(src_node_id=prev_last, dst_node_id=next_first))
+            advance()
 
 
 def _wire_bwd_to_step(
     dag: ExecutionDAG, slot_last_node: dict, slot_entry_node: dict, config: ParallelConfig
 ) -> None:
-    for rank in range(config.world_size):
-        bwd_keys = [k for k in slot_last_node if k[0] == rank and k[2] == "bwd"]
-        if bwd_keys:
-            last_bwd_key = max(bwd_keys, key=lambda k: k[1])
-            step_key = (rank, 0, "step")
-            if step_key in slot_entry_node:
-                dag.add_edge(
-                    DAGEdge(
-                        src_node_id=slot_last_node[last_bwd_key],
-                        dst_node_id=slot_entry_node[step_key],
+    with log_progress("  wiring bwd-to-step", config.world_size, logger) as advance:
+        for rank in range(config.world_size):
+            bwd_keys = [k for k in slot_last_node if k[0] == rank and k[2] == "bwd"]
+            if bwd_keys:
+                last_bwd_key = max(bwd_keys, key=lambda k: k[1])
+                step_key = (rank, 0, "step")
+                if step_key in slot_entry_node:
+                    dag.add_edge(
+                        DAGEdge(
+                            src_node_id=slot_last_node[last_bwd_key],
+                            dst_node_id=slot_entry_node[step_key],
+                        )
                     )
-                )
+            advance()
 
 
 def _decompose_collectives_in_dag(
@@ -826,72 +836,80 @@ def _decompose_collectives_in_dag(
     for n in dag.comm_nodes:
         node_id_to_rank[n.node_id] = n.src_gpu
 
-    for C in sorted(dag.collective_nodes.values(), key=lambda n: n.node_id):
-        result, next_flow_id = decompose_collective(
-            collective_type=C.collective_type,
-            group_ranks=C.group_ranks,
-            data_size=C.data_size,
-            num_channels=tracer_cfg.num_channels,
-            algorithm=tracer_cfg.algorithm,
-            flow_id_start=flow_id[0],
-        )
-        first_p2p_id = node_id[0]
-        if len(result.flows) == 0:
-            continue
-        for flow in result.flows:
-            dag.add_comm_node(
-                CommNode(
-                    node_id=node_id[0],
-                    src_gpu=flow.src,
-                    dst_gpu=flow.dst,
-                    bytes=flow.flow_size,
-                    collective_type=C.collective_type,
-                    layer_id=-1,
-                    phase=C.phase,
-                    flow_id=flow.flow_id,
-                    parent_flow_ids=list(flow.parent_flow_ids),
-                )
+    collective_nodes = sorted(dag.collective_nodes.values(), key=lambda n: n.node_id)
+    with log_progress("  decomposing collectives", len(collective_nodes), logger) as advance:
+        for C in collective_nodes:
+            result, next_flow_id = decompose_collective(
+                collective_type=C.collective_type,
+                group_ranks=C.group_ranks,
+                data_size=C.data_size,
+                num_channels=tracer_cfg.num_channels,
+                algorithm=tracer_cfg.algorithm,
+                flow_id_start=flow_id[0],
             )
-            node_id_to_rank[node_id[0]] = flow.src
-            node_id[0] += 1
+            first_p2p_id = node_id[0]
+            if len(result.flows) == 0:
+                advance()
+                continue
+            for flow in result.flows:
+                dag.add_comm_node(
+                    CommNode(
+                        node_id=node_id[0],
+                        src_gpu=flow.src,
+                        dst_gpu=flow.dst,
+                        bytes=flow.flow_size,
+                        collective_type=C.collective_type,
+                        layer_id=-1,
+                        phase=C.phase,
+                        flow_id=flow.flow_id,
+                        parent_flow_ids=list(flow.parent_flow_ids),
+                    )
+                )
+                node_id_to_rank[node_id[0]] = flow.src
+                node_id[0] += 1
 
-        entry_flows: dict[int, list[int]] = {}
-        exit_flows: dict[int, list[int]] = {}
+            entry_flows: dict[int, list[int]] = {}
+            exit_flows: dict[int, list[int]] = {}
 
-        for idx, flow in enumerate(result.flows):
-            nid = first_p2p_id + idx
-            if not flow.parent_flow_ids:
-                entry_flows.setdefault(flow.src, []).append(nid)
-                entry_flows.setdefault(flow.dst, []).append(nid)
-            if not flow.child_flow_ids:
-                exit_flows.setdefault(flow.src, []).append(nid)
-                exit_flows.setdefault(flow.dst, []).append(nid)
+            for idx, flow in enumerate(result.flows):
+                nid = first_p2p_id + idx
+                if not flow.parent_flow_ids:
+                    entry_flows.setdefault(flow.src, []).append(nid)
+                    entry_flows.setdefault(flow.dst, []).append(nid)
+                if not flow.child_flow_ids:
+                    exit_flows.setdefault(flow.src, []).append(nid)
+                    exit_flows.setdefault(flow.dst, []).append(nid)
 
-        for edge in C.pending_edges or []:
-            if edge.dst_node_id == C.node_id:
-                src_rank = node_id_to_rank.get(edge.src_node_id)
-                if src_rank is not None and src_rank in entry_flows:
-                    for entry_nid in entry_flows[src_rank]:
-                        dag.add_edge(DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid))
-                else:
-                    for nids in entry_flows.values():
-                        for entry_nid in nids:
+            for edge in C.pending_edges or []:
+                if edge.dst_node_id == C.node_id:
+                    src_rank = node_id_to_rank.get(edge.src_node_id)
+                    if src_rank is not None and src_rank in entry_flows:
+                        for entry_nid in entry_flows[src_rank]:
                             dag.add_edge(
                                 DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid)
                             )
-            if edge.src_node_id == C.node_id:
-                dst_rank = node_id_to_rank.get(edge.dst_node_id)
-                if dst_rank is not None and dst_rank in exit_flows:
-                    for exit_nid in exit_flows[dst_rank]:
-                        dag.add_edge(DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id))
-                else:
-                    for nids in exit_flows.values():
-                        for exit_nid in nids:
+                    else:
+                        for nids in entry_flows.values():
+                            for entry_nid in nids:
+                                dag.add_edge(
+                                    DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid)
+                                )
+                if edge.src_node_id == C.node_id:
+                    dst_rank = node_id_to_rank.get(edge.dst_node_id)
+                    if dst_rank is not None and dst_rank in exit_flows:
+                        for exit_nid in exit_flows[dst_rank]:
                             dag.add_edge(
                                 DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
                             )
+                    else:
+                        for nids in exit_flows.values():
+                            for exit_nid in nids:
+                                dag.add_edge(
+                                    DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
+                                )
 
-        flow_id[0] = next_flow_id
+            flow_id[0] = next_flow_id
+            advance()
 
     dag.collective_nodes.clear()
 
