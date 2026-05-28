@@ -53,15 +53,15 @@ config:
   vocab-size: 32000
   grad-reduce-in-bf16: false
   fp8-format: hybrid
+  fp8-param-gather: false
   fp8-recipe: tensorwise
-  fp8-param-gather: true
   lr: 0.0003
   min-lr: 3.0e-05
   use-precision-aware-optimizer: true
   main-params-dtype: fp32
   main-grads-dtype: bf16
-  exp-avg-dtype: fp32
-  exp-avg-sq-dtype: fp32
+  exp-avg-dtype: bf16
+  exp-avg-sq-dtype: bf16
   adam-beta2: 0.95
   use-distributed-optimizer: true
   overlap-grad-reduce: true
