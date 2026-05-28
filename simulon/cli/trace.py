@@ -65,6 +65,9 @@ def generate_trace(
     warmup: int = typer.Option(
         5, "--warmup", help="Number of warmup iterations to run before tracing (default: 5)"
     ),
+    force_regenerate: bool = typer.Option(
+        False, "--force-regenerate", help="Re-generate traces even if they already exist"
+    ),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
     from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
@@ -221,6 +224,11 @@ def generate_trace(
         ranks_to_trace = [stage * ranks_per_stage for stage in stages_to_trace]
 
     for rank in ranks_to_trace:
+        trace_file = output_dir / f"trace_rank_{rank}.json"
+        if trace_file.exists() and not force_regenerate:
+            typer.echo(f"Skipping rank {rank}, trace already exists: {trace_file.name}")
+            continue
+
         cmd: list[str] = [sys.executable, str(_MEGATRON_ENTRYPOINT)]
         for flag, value in derived_args.items():
             if value is True:
