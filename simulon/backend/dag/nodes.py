@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict, dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class ComputeNode:
     node_id: int
     gpu_rank: int
@@ -27,7 +27,7 @@ class ComputeNode:
     )
 
 
-@dataclass
+@dataclass(slots=True)
 class CommNode:
     node_id: int
     src_gpu: int
@@ -43,7 +43,7 @@ class CommNode:
     finish_ms: float | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class CollectiveNode:
     node_id: int
     collective_type: str
@@ -64,13 +64,13 @@ class CollectiveNode:
         self.pending_edges.append(edge)
 
 
-@dataclass
+@dataclass(slots=True)
 class DAGEdge:
     src_node_id: int
     dst_node_id: int
 
 
-@dataclass
+@dataclass(slots=True)
 class ExecutionDAG:
     compute_nodes: list[ComputeNode] = field(default_factory=list)
     comm_nodes: list[CommNode] = field(default_factory=list)
