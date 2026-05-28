@@ -22,8 +22,8 @@ from simulon.config.dc import (
     ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
-    NICSpec,
     NetworkSpec,
+    NICSpec,
     NodeSpec,
     ScaleOutSpec,
     TopologySpec,
@@ -70,13 +70,13 @@ def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
         datacenter=DatacenterMeta(name=f"{num_nodes}n{gpus_per_node}g"),
         cluster=ClusterSpec(num_nodes=num_nodes),
         node=NodeSpec(
-            from_="snellius-h100-4g",  # loads real Snellius NCCL profile
+            from_="snellius-h100-4g"  # loads real Snellius NCCL profile
         ),
         network=NetworkSpec(
             scale_out=ScaleOutSpec(
                 nic=NICSpec(speed=_IB_HDR100_SPEED, latency=_IB_HDR100_LATENCY),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
-            ),
+            )
         ),
     )
 
@@ -95,9 +95,7 @@ def _bus_bw(collective: str, alg_bw_GBps: float, n: int) -> float:
         "AllToAll": (n - 1) / n,
     }
     if collective not in factors:
-        raise ValueError(
-            f"No bus-bw correction factor defined for collective {collective!r}"
-        )
+        raise ValueError(f"No bus-bw correction factor defined for collective {collective!r}")
     return alg_bw_GBps * factors[collective]
 
 
@@ -133,14 +131,7 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
         bus_bw = _bus_bw(collective, alg_bw, num_ranks)
 
         results.append(
-            {
-                "size": size,
-                "out_of_place": {
-                    "time": time_us,
-                    "alg_bw": alg_bw,
-                    "bus_bw": bus_bw,
-                },
-            }
+            {"size": size, "out_of_place": {"time": time_us, "alg_bw": alg_bw, "bus_bw": bus_bw}}
         )
 
     return {
@@ -174,11 +165,11 @@ def main() -> None:
     for cfg in CONFIGS:
         for collective in COLLECTIVES:
             label = cfg["label"]
-            print(f"[sim] {collective:15s}  {label} ...", flush=True)
+            print(f"[sim] {collective:15s}  {label} ...", flush=True)  # noqa: T201
             data = simulate_config(collective, cfg["num_nodes"], cfg["gpus_per_node"])
             out = args.output_dir / f"sim_{collective.lower()}_{label}.json"
             out.write_text(json.dumps(data, indent=2))
-            print(f"      -> {out}")
+            print(f"      -> {out}")  # noqa: T201
 
 
 if __name__ == "__main__":
