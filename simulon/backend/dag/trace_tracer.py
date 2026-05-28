@@ -47,12 +47,8 @@ class ParallelConfig:
                 "All parallelism dimensions must be >= 1, got "
                 f"tp={self.tp}, cp={self.cp}, ep={self.ep}, dp={self.dp}, pp={self.pp}"
             )
-        expected = self.tp * self.cp * self.ep * self.dp * self.pp
-        if expected != self.num_gpus:
-            raise ValueError(
-                f"Parallelism product ({expected}) != num_gpus ({self.num_gpus}). "
-                f"Config: tp={self.tp}, cp={self.cp}, ep={self.ep}, dp={self.dp}, pp={self.pp}"
-            )
+        if self.num_gpus % self.pp != 0:
+            raise ValueError(f"num_gpus ({self.num_gpus}) must be divisible by pp ({self.pp})")
 
     @classmethod
     def from_workload(cls, workload: MegatronWorkload) -> ParallelConfig:
