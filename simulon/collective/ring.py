@@ -126,10 +126,12 @@ def ring_reduce_scatter(
                 fid += 1
 
     # Back-fill child_flow_ids
+    fid_to_flow = {f.flow_id: f for f in flows}
     for flow in flows:
-        for child_fid in _get_children(flow, flows):
-            if child_fid not in flow.child_flow_ids:
-                flow.child_flow_ids.append(child_fid)
+        for pid in flow.parent_flow_ids:
+            parent_flow = fid_to_flow.get(pid)
+            if parent_flow and flow.flow_id not in parent_flow.child_flow_ids:
+                parent_flow.child_flow_ids.append(flow.flow_id)
 
     return flows, fid
 
@@ -193,10 +195,12 @@ def ring_all_gather(
                 fid += 1
 
     # Back-fill child_flow_ids
+    fid_to_flow = {f.flow_id: f for f in flows}
     for flow in flows:
-        for child_fid in _get_children(flow, flows):
-            if child_fid not in flow.child_flow_ids:
-                flow.child_flow_ids.append(child_fid)
+        for pid in flow.parent_flow_ids:
+            parent_flow = fid_to_flow.get(pid)
+            if parent_flow and flow.flow_id not in parent_flow.child_flow_ids:
+                parent_flow.child_flow_ids.append(flow.flow_id)
 
     return flows, fid
 
@@ -314,8 +318,3 @@ def ring_all_to_all(
                 parent_flow.child_flow_ids.append(flow.flow_id)
 
     return flows, fid
-
-
-def _get_children(flow: P2PFlow, all_flows: list[P2PFlow]) -> list[int]:
-    """Return flow_ids of flows whose parent_flow_ids include this flow's flow_id."""
-    return [f.flow_id for f in all_flows if flow.flow_id in f.parent_flow_ids]
