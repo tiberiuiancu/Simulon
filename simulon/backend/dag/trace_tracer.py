@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
+
+from pydantic import ConfigDict
 
 from simulon.backend.dag._progress import log_progress
 from simulon.backend.dag.nodes import CollectiveNode, CommNode, ComputeNode, DAGEdge, ExecutionDAG
@@ -19,47 +20,73 @@ logger = logging.getLogger(__name__)
 
 """Megatron-LM rank formula and parallelism helpers."""
 
+_COLLECTIVE_GROUPS = None
+
 
 class RankCoords(NamedTuple):
-    """Decomposed parallelism coordinates (tp, cp, ep, dp, pp)."""
+    """
+    See https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core/transformer/moe#moe-parallel-folding
+    """
 
+    # attention ranks
     tp: int
     cp: int
-    ep: int
     dp: int
+
+    # expert ranks
+    etp: int
+    ep: int
+    edp: int
+
+    # shared pp
     pp: int
 
 
 @dataclass(frozen=True)
 class ParallelConfig:
-    """Immutable parallelism dimensions."""
-
     tp: int
     cp: int
     ep: int
     dp: int
     pp: int
+    etp: int
+    edp: int
     num_gpus: int
-
-    def __post_init__(self) -> None:
-        if self.tp < 1 or self.cp < 1 or self.ep < 1 or self.dp < 1 or self.pp < 1:
-            raise ValueError(
-                "All parallelism dimensions must be >= 1, got "
-                f"tp={self.tp}, cp={self.cp}, ep={self.ep}, dp={self.dp}, pp={self.pp}"
-            )
-        if self.num_gpus % self.pp != 0:
-            raise ValueError(f"num_gpus ({self.num_gpus}) must be divisible by pp ({self.pp})")
 
     @classmethod
     def from_workload(cls, workload: MegatronWorkload) -> ParallelConfig:
+        def get_cfg_int(cfg: ConfigDict, key: str, default: int = None):
+            val = cfg.get(key, default)
+            return None if val is None else int(val)
+
         cfg = workload.config
-        tp = int(cfg.get("tensor-model-parallel-size", 1))
-        pp = int(cfg.get("pipeline-model-parallel-size", 1))
-        ep = int(cfg.get("expert-model-parallel-size", 1))
-        cp = 1  # hardcoded — see note above
-        num_gpus = int(cfg.get("num_gpus", cfg.get("num-gpus", tp * pp * ep)))
-        dp = max(1, num_gpus // (tp * pp * ep))
-        return cls(tp=tp, cp=cp, ep=ep, dp=dp, pp=pp, num_gpus=num_gpus)
+        tp = get_cfg_int(cfg, "tensor-model-parallel-size", 1)
+        pp = get_cfg_int(cfg, "pipeline-model-parallel-size", 1)
+        ep = get_cfg_int(cfg, "expert-model-parallel-size", 1)
+        cp = get_cfg_int(cfg, "context-model-parallel-size", 1)
+        etp = get_cfg_int(cfg, "expert-tensor-parallel-size", tp)
+        num_gpus = get_cfg_int(cfg, "num-gpus")
+
+        if num_gpus is None:
+            raise ValueError("num-gpus must be specified in the workload config")
+
+        non_expert_model_size = tp * cp * pp
+        if num_gpus % non_expert_model_size != 0:
+            raise ValueError(
+                f"num-gpus ({num_gpus}) not divisible by tp*cp*pp ({non_expert_model_size}). "
+                f"Config: tp={tp}, cp={cp}, pp={pp}"
+            )
+        dp = num_gpus // non_expert_model_size
+
+        expert_model_size = etp * ep * pp
+        if num_gpus % expert_model_size != 0:
+            raise ValueError(
+                f"num-gpus ({num_gpus}) not divisible by etp*ep*pp ({expert_model_size}). "
+                f"Config: etp={etp}, ep={ep}, pp={pp}"
+            )
+        edp = num_gpus // expert_model_size
+
+        return cls(tp=tp, cp=cp, ep=ep, dp=dp, pp=pp, num_gpus=num_gpus, etp=etp, edp=edp)
 
     @property
     def world_size(self) -> int:
@@ -67,44 +94,66 @@ class ParallelConfig:
 
     @property
     def ranks_per_stage(self) -> int:
-        return self.tp * self.cp * self.ep * self.dp
+        return self.num_gpus // self.pp
 
 
 # Rank conversion helpers
 
 
-def _global_rank(
-    tp_rank: int, cp_rank: int, ep_rank: int, dp_rank: int, pp_stage: int, config: ParallelConfig
+def _global_rank_attention(
+    tp_rank: int, cp_rank: int, dp_rank: int, pp_stage: int, config: ParallelConfig
 ) -> int:
-    """Compute the global rank from decomposed parallelism coordinates."""
     for name, value, size in (
         ("tp_rank", tp_rank, config.tp),
         ("cp_rank", cp_rank, config.cp),
-        ("ep_rank", ep_rank, config.ep),
         ("dp_rank", dp_rank, config.dp),
         ("pp_stage", pp_stage, config.pp),
     ):
         if not (0 <= value < size):
             raise ValueError(f"{name}={value} out of range [0, {size}) for config {config}")
+
     return (
         tp_rank
         + cp_rank * config.tp
-        + ep_rank * config.tp * config.cp
-        + dp_rank * config.tp * config.cp * config.ep
-        + pp_stage * config.tp * config.cp * config.ep * config.dp
+        + dp_rank * config.cp * config.tp
+        + pp_stage * config.tp * config.cp * config.dp
+    )
+
+
+def _global_rank_expert(
+    etp_rank: int, ep_rank: int, edp_rank: int, pp_stage: int, config: ParallelConfig
+) -> int:
+    for name, value, size in (
+        ("tp_rank", etp_rank, config.etp),
+        ("cp_rank", ep_rank, config.ep),
+        ("dp_rank", edp_rank, config.edp),
+        ("pp_stage", pp_stage, config.pp),
+    ):
+        if not (0 <= value < size):
+            raise ValueError(f"{name}={value} out of range [0, {size}) for config {config}")
+
+    return (
+        etp_rank
+        + ep_rank * config.etp
+        + edp_rank * config.ep * config.etp
+        + pp_stage * config.etp * config.ep * config.edp
     )
 
 
 def _decompose_rank(rank: int, config: ParallelConfig) -> RankCoords:
-    """Convert a global rank back to decomposed ``(tp, cp, ep, dp, pp)`` coordinates."""
+    """Convert a global rank back to decomposed coordinates."""
     if not (0 <= rank < config.world_size):
         raise ValueError(f"rank={rank} out of range [0, {config.world_size}) for config {config}")
     tp = rank % config.tp
     cp = (rank // config.tp) % config.cp
-    ep = (rank // (config.tp * config.cp)) % config.ep
-    dp = (rank // (config.tp * config.cp * config.ep)) % config.dp
+    dp = (rank // (config.tp * config.cp)) % config.dp
+
+    etp = rank % config.etp
+    ep = (rank // config.etp) % config.ep
+    edp = (rank // (config.etp * config.ep)) % config.edp
+
     pp = rank // config.ranks_per_stage
-    return RankCoords(tp=tp, cp=cp, ep=ep, dp=dp, pp=pp)
+    return RankCoords(tp=tp, cp=cp, dp=dp, etp=etp, ep=ep, edp=edp, pp=pp)
 
 
 def _stage_of(rank: int, config: ParallelConfig) -> int:
@@ -114,72 +163,16 @@ def _stage_of(rank: int, config: ParallelConfig) -> int:
 
 def _ranks_for_stage(pp_stage: int, config: ParallelConfig) -> list[int]:
     """Return every global rank that belongs to a given PP stage."""
-    ranks: list[int] = []
-    for dp_rank in range(config.dp):
-        for ep_rank in range(config.ep):
-            for cp_rank in range(config.cp):
-                for tp_rank in range(config.tp):
-                    ranks.append(_global_rank(tp_rank, cp_rank, ep_rank, dp_rank, pp_stage, config))
-    return ranks
-
-
-# Process-group membership helpers
-
-
-def _ranks_in_same_dp_group(
-    group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
-) -> bool:
-    """Return ``True`` iff *group_ranks* is exactly the DP group of *reference_rank*."""
-    return set(group_ranks) == set(_get_dp_group_ranks(reference_rank, config))
-
-
-def _ranks_in_same_ep_group(
-    group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
-) -> bool:
-    """Return ``True`` iff *group_ranks* is exactly the EP group of *reference_rank*."""
-    return set(group_ranks) == set(_get_ep_group_ranks(reference_rank, config))
-
-
-def _ranks_in_same_tp_group(
-    group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
-) -> bool:
-    """Return ``True`` iff *group_ranks* is exactly the TP group of *reference_rank*."""
-    return set(group_ranks) == set(_get_tp_group_ranks(reference_rank, config))
-
-
-def _ranks_in_same_cp_group(
-    group_ranks: Iterable[int], reference_rank: int, config: ParallelConfig
-) -> bool:
-    """Return ``True`` iff *group_ranks* is exactly the CP group of *reference_rank*."""
-    return set(group_ranks) == set(_get_cp_group_ranks(reference_rank, config))
-
-
-# Process-group builders
-
-
-def _get_dp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank in the DP group containing *rank*."""
-    coords = _decompose_rank(rank, config)
-    return [
-        _global_rank(coords.tp, coords.cp, coords.ep, dp, coords.pp, config)
-        for dp in range(config.dp)
-    ]
-
-
-def _get_ep_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
-    """Return every global rank in the EP group containing *rank*."""
-    coords = _decompose_rank(rank, config)
-    return [
-        _global_rank(coords.tp, coords.cp, ep, coords.dp, coords.pp, config)
-        for ep in range(config.ep)
-    ]
+    start = pp_stage * config.ranks_per_stage
+    end = (pp_stage + 1) * config.ranks_per_stage
+    return list(range(start, end))
 
 
 def _get_tp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
     """Return every global rank in the TP group containing *rank*."""
     coords = _decompose_rank(rank, config)
     return [
-        _global_rank(tp, coords.cp, coords.ep, coords.dp, coords.pp, config)
+        _global_rank_attention(tp, coords.cp, coords.dp, coords.pp, config)
         for tp in range(config.tp)
     ]
 
@@ -188,9 +181,63 @@ def _get_cp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
     """Return every global rank in the CP group containing *rank*."""
     coords = _decompose_rank(rank, config)
     return [
-        _global_rank(coords.tp, cp, coords.ep, coords.dp, coords.pp, config)
+        _global_rank_attention(coords.tp, cp, coords.dp, coords.pp, config)
         for cp in range(config.cp)
     ]
+
+
+def _get_dp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
+    """Return every global rank in the DP group containing *rank*."""
+    coords = _decompose_rank(rank, config)
+    return [
+        _global_rank_attention(coords.tp, coords.cp, dp, coords.pp, config)
+        for dp in range(config.dp)
+    ]
+
+
+def _get_etp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
+    """Return every global rank in the EP group containing *rank*."""
+    coords = _decompose_rank(rank, config)
+    return [
+        _global_rank_expert(etp, coords.ep, coords.edp, coords.pp, config)
+        for etp in range(config.etp)
+    ]
+
+
+def _get_ep_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
+    """Return every global rank in the EP group containing *rank*."""
+    coords = _decompose_rank(rank, config)
+    return [
+        _global_rank_expert(coords.etp, ep, coords.edp, coords.pp, config)
+        for ep in range(config.ep)
+    ]
+
+
+def _get_edp_group_ranks(rank: int, config: ParallelConfig) -> list[int]:
+    """Return every global rank in the EP group containing *rank*."""
+    coords = _decompose_rank(rank, config)
+    return [
+        _global_rank_expert(coords.etp, coords.ep, edp, coords.pp, config)
+        for edp in range(config.edp)
+    ]
+
+
+def _make_collective_groups(config: ParallelConfig):
+    funcs = [
+        _get_tp_group_ranks,
+        _get_cp_group_ranks,
+        _get_dp_group_ranks,
+        _get_etp_group_ranks,
+        _get_ep_group_ranks,
+        _get_edp_group_ranks,
+    ]
+
+    global _COLLECTIVE_GROUPS
+    groups: dict[int, list[list[int]]] = {}
+    for rank in range(config.world_size):
+        groups[rank] = [func(rank, config) for func in funcs]
+
+    _COLLECTIVE_GROUPS = groups
 
 
 @dataclass(frozen=True)
@@ -243,14 +290,6 @@ def _stage_has_exact_trace(pp_stage: int, traces_dir: Path, config: ParallelConf
     )
 
 
-def _load_exact_trace(rank: int, traces_dir: Path):
-    """Load trace_rank_{rank}.json from traces_dir."""
-    path = traces_dir / f"trace_rank_{rank}.json"
-    if not path.exists():
-        raise ValueError(f"Trace file not found: {path}")
-    return TraceFileParser.parse(str(path))
-
-
 def _load_first_traced_rank_in_stage(pp_stage: int, traces_dir: Path, config: ParallelConfig):
     """Return (trace, rank) of the first exact trace found in the stage."""
     for r in _ranks_for_stage(pp_stage, config):
@@ -265,6 +304,15 @@ def _load_first_traced_rank_in_stage(pp_stage: int, traces_dir: Path, config: Pa
     raise ValueError(f"No trace files found in {traces_dir}")
 
 
+def _remap_collective(group: list[int], from_rank: int, to_rank: int):
+    group = set(group)
+    for from_group, to_group in zip(
+        _COLLECTIVE_GROUPS[from_rank], _COLLECTIVE_GROUPS[to_rank], strict=False
+    ):
+        if set(from_group) == group:
+            return to_group
+
+
 def _remap_collectives(source_trace, from_rank: int, to_rank: int, config: ParallelConfig):
     """Return a new TraceFile with collectives remapped for *to_rank*."""
     new_events = []
@@ -275,7 +323,6 @@ def _remap_collectives(source_trace, from_rank: int, to_rank: int, config: Paral
         ct = str(ev.metadata.get("collective_type", ""))
         group_ranks_raw = ev.metadata.get("group_ranks", [])
         group_ranks = list(group_ranks_raw) if isinstance(group_ranks_raw, list | tuple) else []
-        ev_name = str(ev.metadata.get("name", ""))
 
         if ct in ("PP_Send", "PP_Recv"):
             if len(group_ranks) >= 2:
@@ -292,18 +339,7 @@ def _remap_collectives(source_trace, from_rank: int, to_rank: int, config: Paral
             new_events.append(ev)
             continue
 
-        new_group = None
-        if _ranks_in_same_dp_group(group_ranks, from_rank, config):
-            new_group = _get_dp_group_ranks(to_rank, config)
-        elif _ranks_in_same_ep_group(group_ranks, from_rank, config):
-            new_group = _get_ep_group_ranks(to_rank, config)
-        elif _ranks_in_same_tp_group(group_ranks, from_rank, config):
-            new_group = _get_tp_group_ranks(to_rank, config)
-        elif _ranks_in_same_cp_group(group_ranks, from_rank, config):
-            new_group = _get_cp_group_ranks(to_rank, config)
-        elif "DistributedDataParallel" in ev_name or "Distributed_DataParallel" in ev_name:
-            new_group = _get_dp_group_ranks(to_rank, config)
-
+        new_group = _remap_collective(group_ranks, from_rank, to_rank)
         if new_group is not None:
             new_ev = type(ev)(
                 type=ev.type,
@@ -871,6 +907,7 @@ class MegatronDagTracer(DAGTracer):
     def trace(self, workload: MegatronWorkload, datacenter: DatacenterConfig) -> ExecutionDAG:
         dag = ExecutionDAG()
         config = ParallelConfig.from_workload(workload)
+        _make_collective_groups(config)
         traces_dir = _resolve_traces_dir(datacenter, workload)
         activation_bytes = _compute_activation_bytes(workload)
 

@@ -57,7 +57,11 @@ def _run_subprocess(argv: list[str], log_path: Path) -> Path | None:
     cmd = [sys.executable, str(MEGATRON_DIR / "pretrain_gpt.py")] + argv
     with open(log_path, "w") as f:
         subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, env=env, check=True)
-    tb_dir = Path(argv[argv.index("--tensorboard-dir") + 1]) if "--tensorboard-dir" in argv else Path("tensorboard")
+    tb_dir = (
+        Path(argv[argv.index("--tensorboard-dir") + 1])
+        if "--tensorboard-dir" in argv
+        else Path("tensorboard")
+    )
     return _find_chrome_trace(tb_dir)
 
 
@@ -71,17 +75,17 @@ def _setup_megatron_path() -> None:
 def _run_real(config: dict, log_path: Path) -> Path | None:
     _setup_megatron_path()
 
-    import torch
-    from datasets import load_dataset
-    from transformers import AutoTokenizer
     from functools import partial
 
-    from megatron.training import pretrain, set_startup_timestamps, inprocess_restart
-    from megatron.training.arguments import parse_and_validate_args
-    from megatron.core.enums import ModelType
-    from gpt_builders import gpt_builder
-    from model_provider import model_provider
     import pretrain_gpt as pg
+    import torch
+    from datasets import load_dataset
+    from gpt_builders import gpt_builder
+    from megatron.core.enums import ModelType
+    from megatron.training import inprocess_restart, pretrain, set_startup_timestamps
+    from megatron.training.arguments import parse_and_validate_args
+    from model_provider import model_provider
+    from transformers import AutoTokenizer
 
     vocab_size = int(config.get("vocab-size", 32000))
     seq_length = int(config.get("seq-length", 8192))
@@ -142,20 +146,22 @@ def _run_real(config: dict, log_path: Path) -> Path | None:
 
         extra = pg.add_modelopt_args if getattr(pg, "has_nvidia_modelopt", False) else None
         parse_and_validate_args(
-            extra_args_provider=extra,
-            args_defaults={"tokenizer_type": "GPT2BPETokenizer"},
+            extra_args_provider=extra, args_defaults={"tokenizer_type": "GPT2BPETokenizer"}
         )
 
-        with open(log_path, "w") as log_file:
-            with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
-                pretrain_fn(
-                    c4_provider,
-                    partial(model_provider, gpt_builder),
-                    ModelType.encoder_or_decoder,
-                    pg.forward_step,
-                    store=store,
-                    get_embedding_ranks=pg.get_embedding_ranks,
-                )
+        with (
+            open(log_path, "w") as log_file,
+            contextlib.redirect_stdout(log_file),
+            contextlib.redirect_stderr(log_file),
+        ):
+            pretrain_fn(
+                c4_provider,
+                partial(model_provider, gpt_builder),
+                ModelType.encoder_or_decoder,
+                pg.forward_step,
+                store=store,
+                get_embedding_ranks=pg.get_embedding_ranks,
+            )
 
         tb_dir = Path(config.get("tensorboard-dir", "tensorboard"))
         trace_path = _find_chrome_trace(tb_dir)
@@ -186,12 +192,12 @@ def main() -> None:
     if trace_path and trace_path.exists():
         dst = RESULTS_DIR / f"chrome_trace_{args.mode}.json.gz"
         _copy_chrome_trace(trace_path, dst)
-        print(f"Chrome trace saved to {dst}")
-        print(f"Decompressed JSON at {dst.with_suffix('')}")
+        print(f"Chrome trace saved to {dst}")  # noqa: T201
+        print(f"Decompressed JSON at {dst.with_suffix('')}")  # noqa: T201
     else:
-        print(f"Warning: No chrome trace found for mode={args.mode}")
+        print(f"Warning: No chrome trace found for mode={args.mode}")  # noqa: T201
 
-    print(f"Logs saved to {log_path}")
+    print(f"Logs saved to {log_path}")  # noqa: T201
 
 
 if __name__ == "__main__":
