@@ -878,7 +878,7 @@ def _decompose_collectives_in_dag(
                         layer_id=-1,
                         phase=C.phase,
                         flow_id=flow.flow_id,
-                        parent_flow_ids=list(flow.parent_flow_ids),
+                        parent_flow_ids=flow.parent_flow_ids,
                     )
                 )
                 node_id_to_rank[node_id[0]] = flow.src
