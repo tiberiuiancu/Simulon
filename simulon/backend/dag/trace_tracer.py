@@ -830,6 +830,8 @@ def _decompose_collectives_in_dag(
     if not dag.collective_nodes:
         return
 
+    import time as _time
+
     node_id_to_rank: dict[int, int] = {}
     for n in dag.compute_nodes:
         node_id_to_rank[n.node_id] = n.gpu_rank
@@ -837,8 +839,16 @@ def _decompose_collectives_in_dag(
         node_id_to_rank[n.node_id] = n.src_gpu
 
     collective_nodes = sorted(dag.collective_nodes.values(), key=lambda n: n.node_id)
+
+    t_decompose = 0.0
+    t_add_comm = 0.0
+    t_categorize = 0.0
+    t_edges = 0.0
+    total_flows = 0
+
     with log_progress("  decomposing collectives", len(collective_nodes), logger) as advance:
         for C in collective_nodes:
+            t0 = _time.perf_counter()
             result, next_flow_id = decompose_collective(
                 collective_type=C.collective_type,
                 group_ranks=C.group_ranks,
@@ -847,10 +857,16 @@ def _decompose_collectives_in_dag(
                 algorithm=tracer_cfg.algorithm,
                 flow_id_start=flow_id[0],
             )
+            t_decompose += _time.perf_counter() - t0
+
             first_p2p_id = node_id[0]
             if len(result.flows) == 0:
                 advance()
                 continue
+
+            total_flows += len(result.flows)
+
+            t0 = _time.perf_counter()
             for flow in result.flows:
                 dag.add_comm_node(
                     CommNode(
@@ -867,7 +883,9 @@ def _decompose_collectives_in_dag(
                 )
                 node_id_to_rank[node_id[0]] = flow.src
                 node_id[0] += 1
+            t_add_comm += _time.perf_counter() - t0
 
+            t0 = _time.perf_counter()
             entry_flows: dict[int, list[int]] = {}
             exit_flows: dict[int, list[int]] = {}
 
@@ -879,7 +897,9 @@ def _decompose_collectives_in_dag(
                 if not flow.child_flow_ids:
                     exit_flows.setdefault(flow.src, []).append(nid)
                     exit_flows.setdefault(flow.dst, []).append(nid)
+            t_categorize += _time.perf_counter() - t0
 
+            t0 = _time.perf_counter()
             for edge in C.pending_edges or []:
                 if edge.dst_node_id == C.node_id:
                     src_rank = node_id_to_rank.get(edge.src_node_id)
@@ -907,9 +927,21 @@ def _decompose_collectives_in_dag(
                                 dag.add_edge(
                                     DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
                                 )
+            t_edges += _time.perf_counter() - t0
 
             flow_id[0] = next_flow_id
             advance()
+
+    logger.info(
+        "_decompose_collectives_in_dag profile: collectives=%d, flows=%d, "
+        "decompose=%.3fs, add_comm=%.3fs, categorize=%.3fs, edges=%.3fs",
+        len(collective_nodes),
+        total_flows,
+        t_decompose,
+        t_add_comm,
+        t_categorize,
+        t_edges,
+    )
 
     dag.collective_nodes.clear()
 
