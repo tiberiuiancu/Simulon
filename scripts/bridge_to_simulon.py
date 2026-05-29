@@ -81,6 +81,7 @@ _SKIP_INTERNAL: frozenset[str] = {
     "transformer_layer_spec",
     "hf_model_id",
     "check_for_nan_in_grad",
+    "use_te_rng_tracker",
 }
 
 # Flags related to training / logging / checkpointing / profiling we strip
