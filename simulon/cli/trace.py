@@ -235,6 +235,9 @@ def generate_trace(
                 cmd.append(flag)
             elif value is False:
                 continue
+            elif isinstance(value, list):
+                cmd.append(flag)
+                cmd.extend(str(v) for v in value)
             else:
                 cmd.append(flag)
                 cmd.append(str(value))

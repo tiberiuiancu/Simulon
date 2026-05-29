@@ -147,14 +147,14 @@ def _torch_dtype_to_str(value: Any) -> str | None:
 def _convert_value(value: Any) -> Any:
     if _is_torch_dtype(value):
         return _torch_dtype_to_str(value)
-    if isinstance(value, list | tuple):
+    if isinstance(value, list | tuple | set):
         return [_convert_value(v) for v in value]
     if isinstance(value, dict):
         return {k: _convert_value(v) for k, v in value.items()}
     return value
 
 
-def _list_to_cli_string(value: list | tuple) -> str:
+def _list_to_cli_string(value: list | tuple) -> str | list:
     if not value:
         return ""
     if isinstance(value[0], list | tuple):
@@ -166,7 +166,7 @@ def _list_to_cli_string(value: list | tuple) -> str:
     if all(isinstance(x, int) for x in value):
         return str(value).replace(" ", "")
     if all(isinstance(x, str) for x in value):
-        return ",".join(value)
+        return list(value)
     return str(value).replace(" ", "")
 
 
