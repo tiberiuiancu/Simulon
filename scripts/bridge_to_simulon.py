@@ -327,6 +327,15 @@ def main() -> None:
         abs_path = recipe_path.resolve()
         module_name = abs_path.stem
         sys.path.insert(0, str(abs_path.parent))
+
+        perf_dir = abs_path.parent
+        while perf_dir != perf_dir.parent:
+            if (perf_dir / "utils" / "overrides.py").exists() and (perf_dir / "configs").exists():
+                if str(perf_dir) not in sys.path:
+                    sys.path.insert(0, str(perf_dir))
+                break
+            perf_dir = perf_dir.parent
+
         try:
             recipe_mod = importlib.import_module(module_name)
         except ImportError as e:
