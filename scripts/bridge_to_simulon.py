@@ -307,6 +307,12 @@ def main() -> None:
         default=None,
         help="Path to Megatron-Bridge source (added to PYTHONPATH). If not set, assumes it's installed.",
     )
+    arg_parser.add_argument(
+        "--config-arg",
+        action="append",
+        default=[],
+        help="Override a config function argument as key=value (can be used multiple times).",
+    )
     args = arg_parser.parse_args()
 
     perf_utils_dir = (
@@ -358,9 +364,23 @@ def main() -> None:
         logger.error("'%s' is not callable", args.function)
         sys.exit(1)
 
+    config_kwargs: dict[str, Any] = {}
+    if args.config_arg:
+        for kv in args.config_arg:
+            if "=" not in kv:
+                logger.error("--config-arg must be 'key=value', got: %s", kv)
+                sys.exit(1)
+            key, val = kv.split("=", 1)
+            config_kwargs[key] = val
+
     # Build the Bridge ConfigContainer
-    logger.info("Running %s.%s() ...", args.recipe, args.function)
-    cfg = config_fn()
+    logger.info(
+        "Running %s.%s(%s) ...",
+        args.recipe,
+        args.function,
+        ", ".join(f"{k}={v!r}" for k, v in config_kwargs.items()),
+    )
+    cfg = config_fn(**config_kwargs)
 
     # Flatten to simulon flags
     simulon_config = _build_simulon_config(cfg)
