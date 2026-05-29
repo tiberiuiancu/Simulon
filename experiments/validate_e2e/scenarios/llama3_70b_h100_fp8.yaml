@@ -30,43 +30,4 @@ collective:
   algorithm: ring
   num_channels: 1
 
-workload:
-  framework: megatron
-  config:
-#    attention-backend: fused
-#    transformer-impl: transformer_engine
-    tensor-model-parallel-size: 4
-    pipeline-model-parallel-size: 8
-    num-layers-per-virtual-pipeline-stage: 2
-    overlap-grad-reduce: true
-    overlap-param-gather: true
-    num-layers: 80
-    hidden-size: 8192
-    ffn-hidden-size: 28672
-    num-attention-heads: 64
-    num-query-groups: 8
-    vocab-size: 128256
-    swiglu: true
-    position-embedding-type: rope
-    rotary-base: 500000
-    group-query-attention: true
-    kv-channels: 128
-    attention-softmax-in-fp32: false
-    bf16: true
-    #fp8-format: e4m3
-    #fp8-recipe: blockwise
-    #fp8-param-gather: true
-    disable-bias-linear: true
-    no-bias-dropout-fusion: true
-    no-rope-fusion: true
-    gradient-accumulation-fusion: false
-    multi-latent-attention: false
-    hidden-dropout: 0.0
-    attention-dropout: 0.0
-    micro-batch-size: 1
-    global-batch-size: 256
-    seq-length: 8192
-    max-position-embeddings: 8192
-    num-gpus: 64
-    distributed-optimizer: true
-    mock-data: true
+workload: experiments/validate_e2e/scenarios/llama70b_workload_64.yaml
