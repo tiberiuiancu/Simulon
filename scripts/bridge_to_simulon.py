@@ -309,9 +309,15 @@ def main() -> None:
     )
     args = arg_parser.parse_args()
 
-    # Ensure Bridge is importable
-    if args.megatron_bridge_path:
-        sys.path.insert(0, args.megatron_bridge_path)
+    perf_utils_dir = (
+        Path(__file__).resolve().parents[1]
+        / "vendor"
+        / "Megatron-Bridge"
+        / "scripts"
+        / "performance"
+    )
+    if perf_utils_dir.exists() and str(perf_utils_dir) not in sys.path:
+        sys.path.insert(0, str(perf_utils_dir))
 
     # Import recipe module
     recipe_arg = args.recipe
