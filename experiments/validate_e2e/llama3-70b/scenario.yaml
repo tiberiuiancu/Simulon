@@ -7,10 +7,6 @@ datacenter:
     gpus_per_node: 8
     gpu:
       from: h100
-      cost:
-        value: 25000
-        min: 20000
-        max: 32000
   network:
     scale_up:
       switch:
@@ -27,7 +23,6 @@ datacenter:
 
 collective:
   library: nccl
-  algorithm: ring
-  num_channels: 1
+  algorithm: auto
 
-workload: experiments/validate_e2e/scenarios/llama70b_workload_64.yaml
+workload: experiments/validate_e2e/llama3-70b/workload.yaml
