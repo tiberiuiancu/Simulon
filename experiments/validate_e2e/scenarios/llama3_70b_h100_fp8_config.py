@@ -22,7 +22,7 @@ def llama3_70b_pretrain_config() -> ConfigContainer:
     """
     cfg = _pretrain_common()
 
-    cfg.model = AutoBridge.from_hf_pretrained("meta-llama/Meta-Llama-3-70B").to_megatron_provider(
+    cfg.model = AutoBridge.from_hf_pretrained("NousResearch/Meta-Llama-3-70B").to_megatron_provider(
         load_weights=False
     )
 
