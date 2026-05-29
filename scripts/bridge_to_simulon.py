@@ -309,25 +309,15 @@ def main() -> None:
     )
     args = arg_parser.parse_args()
 
-    if args.megatron_bridge_path:
-        mb_path = Path(args.megatron_bridge_path)
-    else:
-        mb_path = Path(__file__).resolve().parents[1] / "vendor" / "Megatron-Bridge" / "src"
-
-    if mb_path.exists() and str(mb_path) not in sys.path:
-        sys.path.insert(0, str(mb_path))
-
-    mcore_path = mb_path.parent / "3rdparty" / "Megatron-LM"
-    if mcore_path.exists() and str(mcore_path) not in sys.path:
-        sys.path.insert(0, str(mcore_path))
-
-    try:
-        import megatron.core.dist_checkpointing.strategies.nvrx as _nvrx_mod
-
-        _nvrx_mod.has_nvrx_async_support = lambda: False
-        _nvrx_mod.is_nvrx_min_version = lambda *a, **k: False
-    except Exception:
-        pass
+    perf_utils_dir = (
+        Path(__file__).resolve().parents[1]
+        / "vendor"
+        / "Megatron-Bridge"
+        / "scripts"
+        / "performance"
+    )
+    if perf_utils_dir.exists() and str(perf_utils_dir) not in sys.path:
+        sys.path.insert(0, str(perf_utils_dir))
 
     # Import recipe module
     recipe_arg = args.recipe
@@ -343,15 +333,6 @@ def main() -> None:
         abs_path = recipe_path.resolve()
         module_name = abs_path.stem
         sys.path.insert(0, str(abs_path.parent))
-
-        perf_dir = abs_path.parent
-        while perf_dir != perf_dir.parent:
-            if (perf_dir / "utils" / "overrides.py").exists() and (perf_dir / "configs").exists():
-                if str(perf_dir) not in sys.path:
-                    sys.path.insert(0, str(perf_dir))
-                break
-            perf_dir = perf_dir.parent
-
         try:
             recipe_mod = importlib.import_module(module_name)
         except ImportError as e:
