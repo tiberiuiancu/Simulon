@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
@@ -987,20 +987,21 @@ def _decompose_collectives_in_dag_parallel(
     with log_progress("  decomposing collectives", len(collective_nodes), logger) as advance:
         t0 = _time.perf_counter()
         with ProcessPoolExecutor() as executor:
-            futures = []
-            for C in collective_nodes:
-                future = executor.submit(
+            future_to_C = {
+                executor.submit(
                     _decompose_single,
                     C.collective_type,
                     C.group_ranks,
                     C.data_size,
                     tracer_cfg.num_channels,
                     tracer_cfg.algorithm,
-                )
-                futures.append((C, future))
+                ): C
+                for C in collective_nodes
+            }
 
             results = []
-            for C, future in futures:
+            for future in as_completed(future_to_C):
+                C = future_to_C[future]
                 flows = future.result()
                 results.append((C, flows))
                 advance()
