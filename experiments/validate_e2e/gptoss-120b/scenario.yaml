@@ -1,6 +1,6 @@
 datacenter:
   datacenter:
-    name: "dgx-64"
+    name: "dgx-h100-64"
   cluster:
     num_nodes: 8
   node:
@@ -22,8 +22,7 @@ datacenter:
 
 collective:
   library: nccl
-  algorithm: ring
-  num_channels: 1
+  algorithm: auto
 
 workload:
   framework: megatron

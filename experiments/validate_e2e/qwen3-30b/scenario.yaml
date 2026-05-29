@@ -12,9 +12,9 @@
 
 datacenter:
   datacenter:
-    name: dgx-h100-1024gpu
+    name: dgx-h100-16gpu
   cluster:
-    num_nodes: 128
+    num_nodes: 2
   node:
     gpus_per_node: 8
     gpu: h100
@@ -34,8 +34,6 @@ datacenter:
 
 collective:
   library: nccl
-  algorithm: ring
-  num_channels: 1
+  algorithm: auto
 
-workload: experiments/usecase_deepseek/workload_1024.yaml
-
+workload: experiments/validate_e2e/qwen3-30b/workload.yaml
