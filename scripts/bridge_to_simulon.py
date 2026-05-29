@@ -309,9 +309,11 @@ def main() -> None:
     )
     args = arg_parser.parse_args()
 
-    # Ensure Bridge is importable
     if args.megatron_bridge_path:
-        sys.path.insert(0, args.megatron_bridge_path)
+        try:
+            importlib.import_module("megatron.bridge")
+        except ImportError:
+            sys.path.insert(0, args.megatron_bridge_path)
 
     # Import recipe module
     recipe_arg = args.recipe
