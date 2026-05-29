@@ -165,6 +165,8 @@ def _list_to_cli_string(value: list | tuple) -> str:
         return "|".join(stages)
     if all(isinstance(x, int) for x in value):
         return str(value).replace(" ", "")
+    if all(isinstance(x, str) for x in value):
+        return ",".join(value)
     return str(value).replace(" ", "")
 
 
