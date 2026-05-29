@@ -310,10 +310,16 @@ def main() -> None:
     args = arg_parser.parse_args()
 
     if args.megatron_bridge_path:
-        try:
-            importlib.import_module("megatron.bridge")
-        except ImportError:
-            sys.path.insert(0, args.megatron_bridge_path)
+        mb_path = Path(args.megatron_bridge_path)
+    else:
+        mb_path = Path(__file__).resolve().parents[1] / "vendor" / "Megatron-Bridge" / "src"
+
+    if mb_path.exists() and str(mb_path) not in sys.path:
+        sys.path.insert(0, str(mb_path))
+
+    mcore_path = mb_path.parent / "3rdparty" / "Megatron-LM"
+    if mcore_path.exists() and str(mcore_path) not in sys.path:
+        sys.path.insert(0, str(mcore_path))
 
     # Import recipe module
     recipe_arg = args.recipe
