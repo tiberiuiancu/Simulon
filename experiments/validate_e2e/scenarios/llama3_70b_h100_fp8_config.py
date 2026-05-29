@@ -69,6 +69,9 @@ def llama3_70b_pretrain_config() -> ConfigContainer:
     cfg.model.fine_grained_activation_offloading = False
     cfg.model.offload_modules = None
 
+    # Mixed precision - explicitly use bf16_mixed
+    cfg.mixed_precision = bf16_mixed()
+
     # FP8 & MXFP8
     cfg.mixed_precision.fp8_recipe = "tensorwise"
     cfg.mixed_precision.fp8 = "hybrid"
