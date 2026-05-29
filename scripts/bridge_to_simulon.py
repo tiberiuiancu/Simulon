@@ -49,6 +49,8 @@ _KNOWN_REVERSE_OVERRIDES: dict[str, str] = {
     "layernorm_zero_centered_gamma": "layernorm-zero-centered-gamma",
     "random_seed": "seed",
     "sequence_length": "seq-length",
+    "virtual_pipeline_model_parallel_size": "num-virtual-stages-per-pipeline-rank",
+    "apply_rope_fusion": "no-|rope-fusion",
     # Inverted booleans (store_false in argparse — default True, emit --no-* when False)
     "masked_softmax_fusion": "no-|masked-softmax-fusion",
     "gradient_accumulation_fusion": "no-|gradient-accumulation-fusion",
