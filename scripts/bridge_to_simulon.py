@@ -321,6 +321,14 @@ def main() -> None:
     if mcore_path.exists() and str(mcore_path) not in sys.path:
         sys.path.insert(0, str(mcore_path))
 
+    try:
+        import megatron.core.dist_checkpointing.strategies.nvrx as _nvrx_mod
+
+        _nvrx_mod.has_nvrx_async_support = lambda: False
+        _nvrx_mod.is_nvrx_min_version = lambda *a, **k: False
+    except Exception:
+        pass
+
     # Import recipe module
     recipe_arg = args.recipe
     recipe_path = Path(recipe_arg)
