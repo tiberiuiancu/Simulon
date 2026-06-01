@@ -70,7 +70,12 @@ def generate_trace(
     ),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
-    from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
+    from simulon.config.resolve import (
+        resolve_datacenter,
+        resolve_gpu_spec,
+        resolve_workload,
+        workload_hash,
+    )
     from simulon.config.scenario import ScenarioConfig
     from simulon.config.workload import MegatronWorkload
 
@@ -81,6 +86,9 @@ def generate_trace(
     try:
         sc = ScenarioConfig.model_validate(raw)
         is_scenario = True
+        # If datacenter was given as a file path, resolve it to a DatacenterConfig.
+        if isinstance(sc.datacenter, Path):
+            sc.datacenter = resolve_datacenter(sc.datacenter)
         workload = sc.workload
         # If workload was given as a file path, resolve it to a MegatronWorkload.
         if isinstance(workload, Path):
