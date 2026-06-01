@@ -212,6 +212,14 @@ def _load_workload_yaml(path_or_name: str, source_file: Path | None) -> dict:
     return yaml.safe_load(rel_path.read_text())
 
 
+def resolve_datacenter(path: Path | str) -> DatacenterConfig:
+    """Load a DatacenterConfig from a YAML file path."""
+    source = Path(path) if isinstance(path, str) else path
+    with open(source) as f:
+        data = yaml.safe_load(f)
+    return DatacenterConfig.model_validate(data)
+
+
 def resolve_workload(
     path_or_dict: Path | str | dict,
     _visited: set[str] | None = None,

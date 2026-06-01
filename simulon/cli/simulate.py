@@ -6,7 +6,7 @@ import yaml
 
 from simulon.backend.analytical import AnalyticalBackend
 from simulon.backend.dag.chrome_trace import to_chrome_trace
-from simulon.config.resolve import resolve_node_spec, resolve_workload
+from simulon.config.resolve import resolve_datacenter, resolve_node_spec, resolve_workload
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import MegatronWorkload
 from simulon.tracking import get_trackers
@@ -59,6 +59,9 @@ def simulate(
     with open(scenario) as f:
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.model_validate(raw)
+
+    if isinstance(sc.datacenter, Path):
+        sc.datacenter = resolve_datacenter(sc.datacenter)
 
     if isinstance(sc.workload, Path):
         sc.workload = resolve_workload(sc.workload)
