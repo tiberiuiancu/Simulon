@@ -1,15 +1,8 @@
-#!/usr/bin/env python3
-"""Simulate CCL collectives with simulon and write nccl-tests-compatible JSON.
-
-Sweeps AllReduce, AllGather, ReduceScatter over message sizes 8 MB – 8192 MB
-for three cluster configs: 1×4 GPUs, 2×4 GPUs, 4×4 GPUs (H100 + NVSwitch 4 +
-InfiniBand HDR100).
-
-Usage (from repo root):
-    uv run python experiments/validate_simccl/sim_ccl.py
-    uv run python experiments/validate_simccl/sim_ccl.py --output-dir /path/to/results
+"""
+Runs simulon sweeps for 1, 2, and 4 nodes.
 """
 
+#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -52,13 +45,8 @@ MESSAGE_SIZES_BYTES = [8 * 1024 * 1024 * (2**i) for i in range(11)]
 # ---------------------------------------------------------------------------
 # Hardware config
 # ---------------------------------------------------------------------------
-
-# InfiniBand HDR100: 100 Gbps per direction per port.
-# Snellius nodes have 1 IB port per node (not per GPU). For ring collectives this is
-# correct: only one GPU per node uses the inter-node link at a time, so each inter-node
-# P2P flow gets the full 100 Gbps link.
-_IB_HDR100_SPEED = "100Gbps"
-_IB_HDR100_LATENCY = "0.005ms"  # 5 µs
+_IB_SPEED = "200Gbps"
+_IB_LATENCY = "0.005ms"  # 5 µs
 
 
 def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
@@ -74,7 +62,7 @@ def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
         ),
         network=NetworkSpec(
             scale_out=ScaleOutSpec(
-                nic=NICSpec(speed=_IB_HDR100_SPEED, latency=_IB_HDR100_LATENCY),
+                nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
             )
         ),
