@@ -48,6 +48,11 @@ def simulate(
         "--ignore-missing",
         help="Suppress errors for kernels with no profiling data (treat as 0 duration)",
     ),
+    trace: bool = typer.Option(
+        False,
+        "--trace",
+        help="Auto-generate execution traces if they are missing before simulating",
+    ),
 ):
     """Run simulation and print an iteration summary.
 
@@ -65,6 +70,12 @@ def simulate(
 
     if isinstance(sc.workload, Path):
         sc.workload = resolve_workload(sc.workload)
+
+    if trace and isinstance(sc.workload, MegatronWorkload):
+        from simulon.cli.trace import generate_trace
+
+        typer.echo("Ensuring traces exist ...")
+        generate_trace(scenario=scenario)
 
     if verbose:
         import logging
