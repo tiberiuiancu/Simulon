@@ -74,7 +74,7 @@ def _single_node_duration_ms(collective_node: CollectiveNode, nccl_profile: Nccl
         )
 
     # SimAI formula: duration = size / busbw * factor
-    # bus_bw is in GB/s = 1e9 bytes/s
+    # bus_bw is in GB/s
     # We want ms: size / (bus_bw * 1e9) * 1000 = size * 1e-6 / bus_bw
     base = size_bytes * 1e-6 / bus_bw
 
@@ -138,7 +138,9 @@ def _multi_node_duration_ms(
             )
         ratio = 1.0
 
-    # SimAI formula
+    # SimAI formula: duration = size / busbw * factor
+    # busbw is in GB/s
+    # We want ms: size / (busbw * 1e9) * 1000 = size * 1e-6 / busbw
     base = size_bytes * 1e-6 / (ratio * busbw)
 
     if collective_type == "AllReduce":
