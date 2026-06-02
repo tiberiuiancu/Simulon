@@ -79,6 +79,7 @@ class ExecutionDAG:
         return {
             "compute_nodes": [asdict(n) for n in self.compute_nodes],
             "comm_nodes": [asdict(n) for n in self.comm_nodes],
+            "collective_nodes": [asdict(n) for n in self.collective_nodes.values()],
             "edges": [asdict(e) for e in self.edges],
             "total_flops": self.total_flops,
             "profiled_ranks": sorted(self.profiled_ranks),

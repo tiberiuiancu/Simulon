@@ -4,7 +4,7 @@ from pathlib import Path
 import typer
 import yaml
 
-from simulon.backend.analytical import AnalyticalBackend
+from simulon.backend.analytical import simulate as run_simulation
 from simulon.backend.dag.chrome_trace import to_chrome_trace
 from simulon.config.resolve import resolve_datacenter, resolve_node_spec, resolve_workload
 from simulon.config.scenario import ScenarioConfig
@@ -53,6 +53,11 @@ def simulate(
         "--trace",
         help="Auto-generate execution traces if they are missing before simulating",
     ),
+    network_simulation: str = typer.Option(
+        "collective",
+        "--network-simulation",
+        help="Network simulation backend: 'flow' (per-flow BW) or 'collective' (analytical)",
+    ),
 ):
     """Run simulation and print an iteration summary.
 
@@ -95,10 +100,12 @@ def simulate(
         except Exception:
             gpu_spec = None
 
-        # TODO NOW:
-        backend = AnalyticalBackend()
-        dag, result = backend.simulate(
-            sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing
+        dag, result = run_simulation(
+            sc,
+            network_simulation=network_simulation,
+            compact=compact,
+            ignore_oom=ignore_oom,
+            ignore_missing=ignore_missing,
         )
 
         if trackers:

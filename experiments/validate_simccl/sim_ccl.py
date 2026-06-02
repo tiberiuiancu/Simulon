@@ -10,7 +10,7 @@ import json
 import logging
 from pathlib import Path
 
-from simulon.backend.analytical import AnalyticalBackend
+from simulon.backend.analytical import simulate as run_simulation
 from simulon.config.dc import (
     ClusterSpec,
     DatacenterConfig,
@@ -96,7 +96,6 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
     """Run all message-size points for one (collective, cluster) combo."""
     dc = _make_datacenter(num_nodes, gpus_per_node)
     num_ranks = num_nodes * gpus_per_node
-    backend = AnalyticalBackend()
     results = []
 
     for size in MESSAGE_SIZES_BYTES:
@@ -112,7 +111,7 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
                 num_channels=1,
             ),
         )
-        _, result = backend.simulate(scenario)
+        _, result = run_simulation(scenario)
 
         time_us = result.total_time_ms * 1000
         alg_bw = (size / 1e9) / (result.total_time_ms / 1000)  # GB/s

@@ -4,7 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from simulon.backend.analytical import AnalyticalBackend
+from simulon.backend.analytical import simulate as run_simulation
 from simulon.backend.dag.replayer import replay
 from simulon.config.dc import (
     ClusterSpec,
@@ -133,8 +133,7 @@ def test_e2e_trace_driven_simulation():
             collective=NcclConfig(library="nccl", algorithm="ring", num_channels=1),
         )
 
-        backend = AnalyticalBackend()
-        dag, result = backend.simulate(scenario)
+        dag, result = run_simulation(scenario)
 
         # 1. Total iteration time is positive
         assert result.total_time_ms > 0

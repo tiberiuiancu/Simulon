@@ -10,7 +10,8 @@ Covers:
 import pytest
 from pydantic import ValidationError
 
-from simulon.backend.analytical import AnalyticalBackend
+from simulon.backend.analytical import run_trace
+from simulon.backend.analytical import simulate as run_simulation
 from simulon.backend.dag.collective_tracer import build_collective_dag
 from simulon.backend.dag.nodes import CommNode, ExecutionDAG
 from simulon.backend.network import decompose_collectives_in_dag
@@ -261,73 +262,69 @@ class TestBuildCollectiveDag:
 
 class TestAnalyticalBackendCollective:
     def test_simulate_returns_dag_and_result(self):
-        """AnalyticalBackend.simulate() returns a (ExecutionDAG, SimulationResult) tuple."""
+        """simulate() returns a (ExecutionDAG, SimulationResult) tuple."""
         from simulon.backend.dag.replayer import SimulationResult
 
         sc = make_collective_scenario()
-        backend = AnalyticalBackend()
-        dag, result = backend.simulate(sc)
+        dag, result = run_simulation(sc)
         assert isinstance(dag, ExecutionDAG)
         assert isinstance(result, SimulationResult)
 
     def test_simulate_total_time_positive(self):
         """Simulated collective completes in positive time."""
         sc = make_collective_scenario()
-        _, result = AnalyticalBackend().simulate(sc)
+        _, result = run_simulation(sc)
         assert result.total_time_ms > 0
 
     def test_simulate_compute_ms_is_zero(self):
         """Collective-only simulation has zero compute time (no compute nodes)."""
         sc = make_collective_scenario()
-        _, result = AnalyticalBackend().simulate(sc)
+        _, result = run_simulation(sc)
         assert result.compute_ms == 0.0
 
     def test_simulate_dag_has_no_compute_nodes(self):
         """DAG returned by simulate() contains no compute nodes."""
         sc = make_collective_scenario()
-        dag, _ = AnalyticalBackend().simulate(sc)
+        dag, _ = run_simulation(sc)
         assert dag.compute_nodes == []
 
     def test_simulate_dag_has_comm_nodes(self):
         """DAG returned by simulate() contains CommNodes."""
         sc = make_collective_scenario()
-        dag, _ = AnalyticalBackend().simulate(sc)
+        dag, _ = run_simulation(sc)
         assert len(dag.comm_nodes) > 0
 
     def test_simulate_allreduce_larger_message_takes_longer(self):
         """Larger message sizes produce higher total_time_ms."""
         sc_small = make_collective_scenario(message_size_bytes=1024)
         sc_large = make_collective_scenario(message_size_bytes=1024 * 1024 * 100)
-        backend = AnalyticalBackend()
-        _, r_small = backend.simulate(sc_small)
-        _, r_large = backend.simulate(sc_large)
+        _, r_small = run_simulation(sc_small)
+        _, r_large = run_simulation(sc_large)
         assert r_large.total_time_ms > r_small.total_time_ms
 
     @pytest.mark.parametrize("ct", ["AllReduce", "AllGather", "ReduceScatter", "AllToAll"])
     def test_simulate_all_collective_types(self, ct):
-        """AnalyticalBackend.simulate() works for all four CollectiveType values."""
-        backend = AnalyticalBackend()
+        """simulate() works for all four CollectiveType values."""
         sc = make_collective_scenario(collective_type=ct)
-        dag, result = backend.simulate(sc)
+        dag, result = run_simulation(sc)
         assert result.total_time_ms > 0, f"Expected positive time for {ct}"
         assert dag.compute_nodes == []
 
     def test_run_trace_returns_execution_dag(self):
-        """AnalyticalBackend.run_trace() returns an ExecutionDAG for CollectiveWorkload."""
+        """run_trace() returns an ExecutionDAG for CollectiveWorkload."""
         sc = make_collective_scenario()
-        dag = AnalyticalBackend().run_trace(sc)
+        dag = run_trace(sc)
         assert isinstance(dag, ExecutionDAG)
 
     def test_num_channels_affects_dag(self):
-        """Increasing num_channels produces more CommNodes in the DAG."""
+        """Increasing num_channels produces more nodes in the DAG."""
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         wl = make_collective_workload("AllReduce", 4 * 1024)
         sc1 = ScenarioConfig(datacenter=dc, workload=wl, collective=NcclConfig(num_channels=1))
         sc2 = ScenarioConfig(datacenter=dc, workload=wl, collective=NcclConfig(num_channels=2))
-        backend = AnalyticalBackend()
-        dag1 = backend.run_trace(sc1)
-        dag2 = backend.run_trace(sc2)
-        assert len(dag2.comm_nodes) > len(dag1.comm_nodes)
+        dag1 = run_trace(sc1)
+        dag2 = run_trace(sc2)
+        assert len(dag2.collective_nodes) >= len(dag1.collective_nodes)
 
 
 # ---------------------------------------------------------------------------

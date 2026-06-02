@@ -66,13 +66,13 @@ MESSAGE_SIZES_BYTES = [8 * 1024 * 1024 * (2**i) for i in range(11)]
 _NV_BW_GBps = 370.8
 
 # IB HDR100: 100 Gbps = 12.5 GB/s per port
-_NIC_BW_GBps = 12.5
-_NICS_PER_NODE = 1
+_NIC_BW_GBps = 25
+_NICS_PER_NODE = 4
 _GPU_TYPE = "H100"
 
 # NS3 topology link speeds (what gets written into the topo file)
 _NS3_NVLINK_BW = "2554Gbps"  # 319.25 GB/s × 8 = 2554 Gbps, effective rate
-_NS3_NIC_BW = "100Gbps"  # IB HDR100
+_NS3_NIC_BW = "200Gbps"  # IB HDR100
 _NS3_NIC_LAT = "0.005ms"  # 5 µs
 
 

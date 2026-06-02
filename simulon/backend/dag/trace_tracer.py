@@ -139,6 +139,9 @@ def _global_rank_expert(
     )
 
 
+_global_rank = _global_rank_attention  # backward-compat alias used by tests
+
+
 def _decompose_rank(rank: int, config: ParallelConfig) -> RankCoords:
     """Convert a global rank back to decomposed coordinates."""
     if not (0 <= rank < config.world_size):
