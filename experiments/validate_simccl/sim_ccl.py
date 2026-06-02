@@ -62,7 +62,7 @@ def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
         ),
         network=NetworkSpec(
             scale_out=ScaleOutSpec(
-                nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY),
+                nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY, nics_per_node=4),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
             )
         ),

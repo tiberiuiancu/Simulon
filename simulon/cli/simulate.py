@@ -95,6 +95,7 @@ def simulate(
         except Exception:
             gpu_spec = None
 
+        # TODO NOW:
         backend = AnalyticalBackend()
         dag, result = backend.simulate(
             sc, compact=compact, ignore_oom=ignore_oom, ignore_missing=ignore_missing

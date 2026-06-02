@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from simulon.backend.analytical import AnalyticalBackend
 from simulon.backend.dag.collective_tracer import build_collective_dag
 from simulon.backend.dag.nodes import CommNode, ExecutionDAG
+from simulon.backend.network import decompose_collectives_in_dag
 from simulon.collective import NCCLDecomposer
 from simulon.config.dc import (
     ClusterSpec,
@@ -176,70 +177,69 @@ class TestBuildCollectiveDag:
         assert dag.edges == []
 
     def test_allreduce_4ranks_1channel_flow_count(self):
-        """Ring AllReduce with N=4, C=1 produces exactly 24 CommNodes.
-
-        AllReduce = ReduceScatter(12 flows) + AllGather(12 flows):
-          each phase has N * (N-1) = 4 * 3 = 12 flows per channel.
-        """
+        """Ring AllReduce with N=4, C=1 produces exactly 24 CommNodes."""
         wl = make_collective_workload("AllReduce", 4 * 1024)
-        dc = make_datacenter(num_nodes=2, gpus_per_node=2)  # 4 ranks
+        dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         assert len(dag.comm_nodes) == 24
 
     def test_allreduce_4ranks_2channels_doubles_flows(self):
         """Doubling num_channels doubles the CommNode count for AllReduce."""
         wl = make_collective_workload("AllReduce", 4 * 1024)
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
-        dag1 = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         dag2 = build_collective_dag(wl, dc, algorithm="ring", num_channels=2, ccl=NCCLDecomposer())
-        assert len(dag2.comm_nodes) == 2 * len(dag1.comm_nodes)
+        decompose_collectives_in_dag(dag2)
+        assert len(dag2.comm_nodes) == 2 * len(dag.comm_nodes)
 
     def test_reduce_scatter_4ranks_1channel_flow_count(self):
-        """Ring ReduceScatter with N=4, C=1 produces exactly 12 CommNodes (N*(N-1))."""
         wl = make_collective_workload("ReduceScatter", 4 * 1024)
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         assert len(dag.comm_nodes) == 12
 
     def test_allgather_4ranks_1channel_flow_count(self):
-        """Ring AllGather with N=4, C=1 produces exactly 12 CommNodes (N*(N-1))."""
         wl = make_collective_workload("AllGather", 4 * 1024)
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         assert len(dag.comm_nodes) == 12
 
     def test_comm_nodes_are_comm_node_instances(self):
-        """All nodes in the collective DAG are CommNode instances."""
         wl = make_collective_workload("AllReduce", 1024)
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         for node in dag.comm_nodes:
             assert isinstance(node, CommNode)
 
     def test_comm_nodes_have_correct_collective_type(self):
-        """CommNodes carry the collective_type from the workload."""
         for ct in ["AllReduce", "AllGather", "ReduceScatter"]:
             wl = make_collective_workload(ct, 4 * 1024)
             dc = make_datacenter(num_nodes=2, gpus_per_node=2)
             dag = build_collective_dag(
                 wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer()
             )
+            decompose_collectives_in_dag(dag)
             for node in dag.comm_nodes:
                 assert node.collective_type == ct
 
     def test_comm_node_phase_is_collective(self):
-        """All CommNodes in a collective DAG have phase='collective'."""
         wl = make_collective_workload("AllReduce", 1024)
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         for node in dag.comm_nodes:
             assert node.phase == "collective"
 
     def test_comm_node_ids_are_unique(self):
-        """Every CommNode in the DAG has a unique node_id."""
         wl = make_collective_workload("AllReduce", 4 * 1024)
         dc = make_datacenter(num_nodes=2, gpus_per_node=2)
         dag = build_collective_dag(wl, dc, algorithm="ring", num_channels=1, ccl=NCCLDecomposer())
+        decompose_collectives_in_dag(dag)
         ids = [n.node_id for n in dag.comm_nodes]
         assert len(ids) == len(set(ids))
 
