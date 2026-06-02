@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import logging
 
+from simulon.backend.dag._progress import log_progress
+from simulon.backend.dag.network_populate import _get_link_params
 from simulon.backend.dag.nodes import CollectiveNode, ExecutionDAG
 from simulon.collective.calbusbw import _interp_profile, cal_busbw
 from simulon.config.dc import DatacenterConfig
@@ -85,7 +87,11 @@ def _single_node_duration_ms(collective_node: CollectiveNode, nccl_profile: Nccl
 
 
 def _multi_node_duration_ms(
-    collective_node: CollectiveNode, dc: DatacenterConfig, nccl_profile: NcclProfile
+    collective_node: CollectiveNode,
+    gpus_per_node: int,
+    nic_bw_GBps: float,
+    nics_per_node: int,
+    nccl_profile: NcclProfile,
 ) -> float:
     """Compute multi-node collective duration using cal_busbw + NIC efficiency.
 
@@ -93,31 +99,20 @@ def _multi_node_duration_ms(
     For multi-node, use cal_busbw to get theoretical bus bandwidth, then
     apply NIC efficiency ratio from nic_efficiency_defaults.yaml.
     """
-    from simulon.backend.analytical import _nic_bw_GBps
-
     collective_type = collective_node.collective_type
     nranks = len(collective_node.group_ranks)
     size_bytes = collective_node.data_size
     algorithm = collective_node.algorithm
 
-    resolved_node = resolve_node_spec(dc)
-    gpus_per_node = resolved_node.gpus_per_node
-    if gpus_per_node is None:
-        raise ValueError("node.gpus_per_node must be set after resolution")
-
     node_count = nranks // gpus_per_node
 
-    # Get NIC bandwidth
-    nic_bw, nics_per_node = _nic_bw_GBps(dc)
-
-    # Call cal_busbw to get the effective bus bandwidth
     selected_algorithm, intra_bw_GBps, inter_bw_GBps = cal_busbw(
         collective_type=collective_type,
         message_size_bytes=size_bytes,
         num_nodes=node_count,
         gpus_per_node=gpus_per_node,
         nics_per_node=nics_per_node,
-        nic_bw_GBps=nic_bw,
+        nic_bw_GBps=nic_bw_GBps,
         nccl_profile=nccl_profile,
         algorithm=algorithm,
     )
@@ -164,18 +159,70 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
             "Provide a node template with an nccl profile."
         )
 
-    for node in dag.collective_nodes.values():
-        nranks = len(node.group_ranks)
-        resolved_node = resolve_node_spec(datacenter)
-        gpus_per_node = resolved_node.gpus_per_node
-        if gpus_per_node is None:
-            raise ValueError("node.gpus_per_node must be set after resolution")
+    resolved_node = resolve_node_spec(datacenter)
+    gpus_per_node = resolved_node.gpus_per_node
+    if gpus_per_node is None:
+        raise ValueError("node.gpus_per_node must be set after resolution")
 
-        node_count = nranks // gpus_per_node
+    from simulon.backend.dag.network_populate import _ensure_defaults, _parse_latency, _parse_speed
 
-        if node_count == 1:
-            node.duration_ms = _single_node_duration_ms(node, nccl_profile)
-        else:
-            node.duration_ms = _multi_node_duration_ms(node, datacenter, nccl_profile)
+    _ensure_defaults()
+    if resolved_node.scale_up and resolved_node.scale_up.switch:
+        sw = resolved_node.scale_up.switch
+        if isinstance(sw, str):
+            raise ValueError(
+                f"node.scale_up.switch is a string reference {sw!r} -- string switch templates "
+                "not yet supported. Specify inline or use a node template with inline switch spec."
+            )
+        intra_bw = _parse_speed(sw.port_speed) if sw.port_speed else 0.0
+        intra_latency = _parse_latency(sw.latency) if sw.latency else 0.0
+    else:
+        intra_bw, intra_latency = 0.0, 0.0
+
+    if resolved_node.scale_out and resolved_node.scale_out.nic:
+        nic = resolved_node.scale_out.nic
+        if isinstance(nic, str):
+            raise ValueError(
+                f"node.scale_out.nic is a string reference {nic!r} -- string NIC templates "
+                "not yet supported. Specify inline or use a node template with inline NIC spec."
+            )
+        inter_bw = _parse_speed(nic.speed) * nic.bandwidth_efficiency if nic.speed else 0.0
+        inter_latency = _parse_latency(nic.latency) if nic.latency else 0.0
+    else:
+        inter_bw, inter_latency = 0.0, 0.0
+
+    from simulon.backend.analytical import _nic_bw_GBps
+
+    nic_bw_GBps, nics_per_node = _nic_bw_GBps(datacenter)
+
+    with log_progress(
+        "  populating collective durations", len(dag.collective_nodes), logger
+    ) as advance:
+        for node in dag.collective_nodes.values():
+            nranks = len(node.group_ranks)
+            node_count = nranks // gpus_per_node
+
+            if node_count == 1:
+                node.duration_ms = _single_node_duration_ms(node, nccl_profile)
+            else:
+                node.duration_ms = _multi_node_duration_ms(
+                    node, gpus_per_node, nic_bw_GBps, nics_per_node, nccl_profile
+                )
+            advance()
+
+    pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
+    with log_progress("  populating PP_Send durations", len(pp_sends), logger) as advance:
+        for comm_node in pp_sends:
+            bw, latency_ms = _get_link_params(
+                comm_node.src_gpu,
+                comm_node.dst_gpu,
+                gpus_per_node,
+                intra_bw,
+                intra_latency,
+                inter_bw,
+                inter_latency,
+            )
+            comm_node.duration_ms = latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+            advance()
 
     return dag

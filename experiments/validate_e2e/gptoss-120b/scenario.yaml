@@ -1,28 +1,6 @@
 datacenter:
-  datacenter:
-    name: "dgx-h100-64"
-  cluster:
-    num_nodes: 8
-  node:
-    gpus_per_node: 8
-    gpu: h100
-  network:
-    scale_up:
-      switch:
-        port_speed: 7200Gbps
-        latency: 0.000025ms
-    scale_out:
-      nic:
-        speed: 400Gbps
-        latency: 0.005ms
-      topology:
-        type: fat_tree
-        params:
-          k: 8
-
-collective:
-  library: nccl
-  algorithm: auto
+  num_nodes: 8
+  node: dgx-h100
 
 workload:
   framework: megatron

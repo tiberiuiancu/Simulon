@@ -259,7 +259,7 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
     from simulon.config.resolve import resolve_gpu_spec, workload_hash
 
     try:
-        gpu_spec = resolve_gpu_spec(datacenter, include_profile=False)
+        gpu_spec = resolve_gpu_spec(datacenter)
         gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
     except Exception:
         gpu_name = "default"

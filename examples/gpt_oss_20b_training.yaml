@@ -1,58 +1,10 @@
-# GPT-OSS-20B (MoE) training scenario — NEW flat-config format
-#
-# Parallelism: TP=1, PP=4, EP=4, DP=1
-# Total GPUs:  1 × 4 × 4 × 1 = 16  (4 nodes × 4 GPUs/node)
-#
-# This uses the trace-driven path (framework: megatron) with a flat "config"
-# dict that mirrors Megatron-LM CLI flags.  Compute durations come from real
-# GPU execution traces (saved under datacenter.datacenter.traces_dir) rather
-# than analytical layer expansion.
-#
-# Network: standard H100 cluster
-#   Scale-up:  NVLink → port_speed = 3600 Gbps
-#   Scale-out: 400 Gbps InfiniBand, fat-tree
-
 datacenter:
-  datacenter:
-    name: h100-16gpu
-    pue: 1.3
-    electricity_cost_per_kwh: 0.10   # Netherlands commercial rate (EUR)
-    datacenter_lifetime_years: 5
-    idle_fraction: 0.4
-  cluster:
-    num_nodes: 4
-  node:
-    gpus_per_node: 4
-    gpu:
-      from: h100
-      cost:
-        value: 25000
-        min: 20000
-        max: 32000
-  network:
-    scale_up:
-      switch:
-        port_speed: 3600Gbps
-        latency: 0.000025ms
-        power_model:
-          tdp_w: 110
-        cost: 3000
-    scale_out:
-      nic:
-        speed: 100Gbps
-        latency: 0.005ms
-        power_model:
-          tdp_w: 25
-        cost: 2000
-      topology:
-        type: fat_tree
-        params:
-          k: 8
+  num_nodes: 4
+  node: snellius-h100-4gpu
 
 collective:
   library: nccl
-  algorithm: ring
-  num_channels: 1
+  algorithm: auto
 
 workload:
   framework: megatron
@@ -119,4 +71,3 @@ workload:
     distributed-optimizer: true
 
     mock-data: true
-

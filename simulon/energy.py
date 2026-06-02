@@ -79,7 +79,7 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
     run_duration_hours = total_time_ms * _MS_TO_HOURS
 
     # --- Cluster scale ---
-    num_nodes = dc.cluster.num_nodes
+    num_nodes = dc.num_nodes
     resolved_node = resolve_node_spec(dc)
     gpus_per_node = resolved_node.gpus_per_node
     if gpus_per_node is None:
@@ -107,12 +107,13 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
     else:
         num_racks = 1
 
+    node = resolve_node_spec(dc)
+
     # --- Topology switch counts (read from params dict if present) ---
     num_leaf_switches = 0
     num_spine_switches = 0
-    network = dc.network
-    if network is not None and network.scale_out is not None:
-        topo = network.scale_out.topology
+    if node.scale_out is not None:
+        topo = node.scale_out.topology
         if topo is not None and isinstance(topo.params, dict):
             num_leaf_switches = topo.params.get("num_leaf_switches", 0) or 0
             num_spine_switches = topo.params.get("num_spine_switches", 0) or 0
@@ -137,8 +138,8 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
             )
 
     # NIC
-    if network is not None and network.scale_out is not None:
-        nic = network.scale_out.nic
+    if node.scale_out is not None:
+        nic = node.scale_out.nic
         if nic is not None and not isinstance(nic, str) and nic.power_model is not None:
             nic_power = _power_w(nic.power_model, 0.0)
             components.append(
@@ -146,8 +147,8 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
             )
 
     # NVSwitch (one per node)
-    if network is not None and network.scale_up is not None:
-        nvswitch = network.scale_up.switch
+    if node.scale_up is not None:
+        nvswitch = node.scale_up.switch
         if (
             nvswitch is not None
             and not isinstance(nvswitch, str)
@@ -157,8 +158,8 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
             components.append(("nvswitch", _component_wh(nvswitch_power, num_nodes, total_time_ms)))
 
     # Leaf switches
-    if network is not None and network.scale_out is not None and num_leaf_switches > 0:
-        leaf = network.scale_out.leaf_switch
+    if node.scale_out is not None and num_leaf_switches > 0:
+        leaf = node.scale_out.leaf_switch
         if leaf is not None and not isinstance(leaf, str) and leaf.power_model is not None:
             leaf_power = _power_w(leaf.power_model, 0.0)
             components.append(
@@ -166,8 +167,8 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
             )
 
     # Spine switches
-    if network is not None and network.scale_out is not None and num_spine_switches > 0:
-        spine = network.scale_out.spine_switch
+    if node.scale_out is not None and num_spine_switches > 0:
+        spine = node.scale_out.spine_switch
         if spine is not None and not isinstance(spine, str) and spine.power_model is not None:
             spine_power = _power_w(spine.power_model, 0.0)
             components.append(

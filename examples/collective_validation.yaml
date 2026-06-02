@@ -10,27 +10,12 @@
 # Sweeping message sizes and node counts is done by sim_ccl.py.
 
 datacenter:
-  datacenter:
-    name: collective-validation-4n4g
-  cluster:
-    num_nodes: 4
-  node:
-    from: snellius-h100-4g
-  network:
-    scale_out:
-      nic:
-        speed: 200Gbps
-        latency: 0.005ms
-        nics_per_node: 4
-      topology:
-        type: fat_tree
-        params:
-          k: 4
+  num_nodes: 4
+  node: snellius-h100-4g
 
 collective:
   library: nccl
-  algorithm: ring
-  num_channels: 1
+  algorithm: auto
 
 workload:
   framework: collective

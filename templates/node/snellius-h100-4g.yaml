@@ -1,10 +1,15 @@
-# Snellius 4-GPU H100 node (real NCCL measurements from nccl-tests on gcn133)
-# Hardware: H100 SXM 80GB, NVSwitch 4 (partial node), InfiniBand HDR100
-# Source: experiments/validate_simccl/results/nccl_*.json
 name: snellius-h100-4g
-# Hardware: H100 SXM 96GB, NVSwitch 4 (partial node), InfiniBand HDR100
 gpus_per_node: 4
-gpu: h100-96gb
+gpu: h100
+scale_out:
+  nic:
+    speed: 200Gbps
+    latency: 0.005ms
+  topology:
+    type: fat_tree
+    params:
+      k: 8
+
 scale_up:
   switch:
     port_speed: 2554Gbps

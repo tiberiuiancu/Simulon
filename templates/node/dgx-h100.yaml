@@ -1,6 +1,3 @@
-# DGX H100 — canonical 8-GPU node (SimAI-derived NCCL measurements)
-# Hardware: H100 SXM 80GB, NVSwitch 8 (full DGX), InfiniBand HDR200
-# Peak NVLink: 20.6 GB/s/link × 18 links × 2 (bidirectional) = 740 GB/s total fabric BW
 name: dgx-h100
 gpus_per_node: 8
 gpu: h100
@@ -8,7 +5,15 @@ scale_up:
   switch:
     port_speed: 7200Gbps
     latency: 0.000025ms
-# NCCL profile derived from SimAI nvlink_ratio.csv. Replace with real nccl-tests data.
+scale_out:
+  nic:
+    speed: 400Gbps
+    latency: 0.005ms
+  topology:
+    type: fat_tree
+    params:
+      k: 8
+# NCCL profile derived from SimAI nvlink_ratio.csv
 nccl:
   name: dgx-h100
   gpus_per_node: 8

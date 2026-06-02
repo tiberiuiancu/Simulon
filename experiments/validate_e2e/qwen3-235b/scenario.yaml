@@ -1,39 +1,5 @@
-# DeepSeek-V3 (671B MoE) training scenario — 1024 H100 GPUs
-#
-# Parallelism: TP=2, PP=16, EP=64, DP=8
-# Total GPUs:  2 × 16 × 64 × 8 = 1024  (128 nodes × 8 GPUs/node)
-# Recommended parallelism from NVIDIA Megatron-Bridge recipe.
-#
-# This uses the trace-driven path (framework: megatron).
-#
-# Network: H100 cluster
-#   Scale-up:  NVLink → port_speed = 7200 Gbps
-#   Scale-out: 400 Gbps InfiniBand, fat-tree
-
 datacenter:
-  datacenter:
-    name: dgx-h100-256gpu
-  cluster:
-    num_nodes: 32
-  node:
-    gpus_per_node: 8
-    gpu: h100
-  network:
-    scale_up:
-      switch:
-        port_speed: 7200Gbps
-        latency: 0.000025ms
-    scale_out:
-      nic:
-        speed: 400Gbps
-        latency: 0.005ms
-      topology:
-        type: fat_tree
-        params:
-          k: 8
-
-collective:
-  library: nccl
-  algorithm: auto
+  num_nodes: 32
+  node: dgx-h100
 
 workload: experiments/validate_e2e/qwen3-235b/workload.yaml

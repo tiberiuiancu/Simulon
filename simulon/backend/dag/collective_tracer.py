@@ -16,7 +16,7 @@ def build_collective_dag(
     gpus_per_node = node.gpus_per_node
     if gpus_per_node is None:
         raise ValueError("node.gpus_per_node must be set after resolution")
-    num_ranks = datacenter.cluster.num_nodes * gpus_per_node
+    num_ranks = datacenter.num_nodes * gpus_per_node
     group_ranks = list(range(num_ranks))
 
     dag = ExecutionDAG()

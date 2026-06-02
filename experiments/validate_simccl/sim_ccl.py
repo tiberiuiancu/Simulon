@@ -12,10 +12,8 @@ from pathlib import Path
 
 from simulon.backend.analytical import simulate as run_simulation
 from simulon.config.dc import (
-    ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
-    NetworkSpec,
     NICSpec,
     NodeSpec,
     ScaleOutSpec,
@@ -56,15 +54,13 @@ def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
     # at runtime to interpolate from it.
     return DatacenterConfig(
         datacenter=DatacenterMeta(name=f"{num_nodes}n{gpus_per_node}g"),
-        cluster=ClusterSpec(num_nodes=num_nodes),
+        num_nodes=num_nodes,
         node=NodeSpec(
-            from_="snellius-h100-4g"  # loads real Snellius NCCL profile
-        ),
-        network=NetworkSpec(
+            from_="snellius-h100-4g",
             scale_out=ScaleOutSpec(
                 nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY, nics_per_node=4),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
-            )
+            ),
         ),
     )
 

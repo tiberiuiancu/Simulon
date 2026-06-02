@@ -17,11 +17,9 @@ from simulon.backend.dag.nodes import CommNode, ExecutionDAG
 from simulon.backend.network import decompose_collectives_in_dag
 from simulon.collective import NCCLDecomposer
 from simulon.config.dc import (
-    ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
     GPUSpec,
-    NetworkSpec,
     NICSpec,
     NodeSpec,
     ScaleOutSpec,
@@ -43,11 +41,10 @@ def make_datacenter(num_nodes: int = 2, gpus_per_node: int = 2) -> DatacenterCon
     """Minimal DatacenterConfig with num_nodes * gpus_per_node ranks."""
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test"),
-        cluster=ClusterSpec(num_nodes=num_nodes),
+        num_nodes=num_nodes,
         node=NodeSpec(
-            gpus_per_node=gpus_per_node, gpu=GPUSpec(from_="h100", memory_capacity_gb=80.0)
-        ),
-        network=NetworkSpec(
+            gpus_per_node=gpus_per_node,
+            gpu=GPUSpec(from_="h100", memory_capacity_gb=80.0),
             scale_up=ScaleUpSpec(switch=SwitchSpec(port_speed="2880Gbps", latency="0.000025ms")),
             scale_out=ScaleOutSpec(
                 nic=NICSpec(speed="400Gbps", latency="0.005ms"),

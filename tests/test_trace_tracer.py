@@ -17,7 +17,7 @@ from simulon.backend.dag.tracer import DAGTracerConfig
 from simulon.backend.network import decompose_collectives_in_dag
 from simulon.collective import NCCLDecomposer
 from simulon.collective.decompose import decompose_collective
-from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
+from simulon.config.dc import DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
 from simulon.config.workload import MegatronWorkload
 
 
@@ -42,7 +42,7 @@ def _make_trace(
 def _make_datacenter(num_gpus: int = 2, traces_dir: str | None = None) -> DatacenterConfig:
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test", traces_dir=traces_dir),
-        cluster=ClusterSpec(num_nodes=1),
+        num_nodes=1,
         node=NodeSpec(gpus_per_node=num_gpus, gpu=GPUSpec(name="H100", memory_capacity_gb=80.0)),
     )
 

@@ -121,7 +121,7 @@ def simulate(
         gpus_per_node = resolved_node.gpus_per_node
         if gpus_per_node is None:
             raise ValueError("node.gpus_per_node must be set after resolution")
-        num_ranks = dc.cluster.num_nodes * gpus_per_node
+        num_ranks = dc.num_nodes * gpus_per_node
         collective_type = wl.collective_type.value
 
         nccl_profile = resolve_nccl_profile(dc)
@@ -131,7 +131,7 @@ def simulate(
         resolved_algorithm, intra_bw_GBps, inter_bw_GBps = _cal_busbw(
             collective_type=collective_type,
             message_size_bytes=wl.message_size_bytes,
-            num_nodes=dc.cluster.num_nodes,
+            num_nodes=dc.num_nodes,
             gpus_per_node=gpus_per_node,
             nics_per_node=nics_per_node,
             nic_bw_GBps=nic_bw,

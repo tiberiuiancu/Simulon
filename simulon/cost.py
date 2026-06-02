@@ -76,7 +76,7 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
         datacenter_lifetime_years is set) combined cost per run.
     """
     dc = scenario.datacenter
-    num_nodes = dc.cluster.num_nodes
+    num_nodes = dc.num_nodes
     node = resolve_node_spec(dc)
     gpus_per_node = node.gpus_per_node
     if gpus_per_node is None:
@@ -93,9 +93,9 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
     # --- Topology switch counts ---
     num_leaf_switches = 0
     num_spine_switches = 0
-    network = dc.network
-    if network is not None and network.scale_out is not None:
-        topo = network.scale_out.topology
+    node = resolve_node_spec(dc)
+    if node.scale_out is not None:
+        topo = node.scale_out.topology
         if topo is not None and isinstance(topo.params, dict):
             num_leaf_switches = topo.params.get("num_leaf_switches", 0) or 0
             num_spine_switches = topo.params.get("num_spine_switches", 0) or 0
@@ -123,26 +123,26 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
         raw.append(("node_cooling", _scale_cost(node_cooling.cost, num_nodes)))
 
     # NIC
-    if network is not None and network.scale_out is not None:
-        nic = network.scale_out.nic
+    if node.scale_out is not None:
+        nic = node.scale_out.nic
         if nic is not None and not isinstance(nic, str):
             raw.append(("nic", _scale_cost(nic.cost, nics_per_node * num_nodes)))
 
     # NVSwitch (one per node)
-    if network is not None and network.scale_up is not None:
-        nvswitch = network.scale_up.switch
+    if node.scale_up is not None:
+        nvswitch = node.scale_up.switch
         if nvswitch is not None and not isinstance(nvswitch, str):
             raw.append(("nvswitch", _scale_cost(nvswitch.cost, num_nodes)))
 
     # Leaf switches
-    if network is not None and network.scale_out is not None and num_leaf_switches > 0:
-        leaf = network.scale_out.leaf_switch
+    if node.scale_out is not None and num_leaf_switches > 0:
+        leaf = node.scale_out.leaf_switch
         if leaf is not None and not isinstance(leaf, str):
             raw.append(("leaf_switches", _scale_cost(leaf.cost, num_leaf_switches)))
 
     # Spine switches
-    if network is not None and network.scale_out is not None and num_spine_switches > 0:
-        spine = network.scale_out.spine_switch
+    if node.scale_out is not None and num_spine_switches > 0:
+        spine = node.scale_out.spine_switch
         if spine is not None and not isinstance(spine, str):
             raw.append(("spine_switches", _scale_cost(spine.cost, num_spine_switches)))
 

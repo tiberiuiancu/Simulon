@@ -30,23 +30,12 @@ def simulate(
     goal: Path | None = typer.Option(
         None, "--goal", help="Write GOAL trace to this path for use with ATLAHS/LogGOPSim"
     ),
-    compact: bool = typer.Option(
-        False, "--compact", help="Fuse consecutive compute-only sublayers into single DAG nodes"
-    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
     energy: bool = typer.Option(
         False, "--energy", help="Compute and print per-iteration energy breakdown"
     ),
     cost: bool = typer.Option(
         False, "--cost", help="Compute and print cost breakdown (implies --energy)"
-    ),
-    ignore_oom: bool = typer.Option(
-        False, "--ignore-oom", help="Suppress errors for configs matching OOM profile entries"
-    ),
-    ignore_missing: bool = typer.Option(
-        False,
-        "--ignore-missing",
-        help="Suppress errors for kernels with no profiling data (treat as 0 duration)",
     ),
     trace: bool = typer.Option(
         False,
@@ -96,17 +85,11 @@ def simulate(
         from simulon.config.resolve import resolve_gpu_spec
 
         try:
-            gpu_spec = resolve_gpu_spec(sc.datacenter, include_profile=False)
+            gpu_spec = resolve_gpu_spec(sc.datacenter)
         except Exception:
             gpu_spec = None
 
-        dag, result = run_simulation(
-            sc,
-            network_simulation=network_simulation,
-            compact=compact,
-            ignore_oom=ignore_oom,
-            ignore_missing=ignore_missing,
-        )
+        dag, result = run_simulation(sc, network_simulation=network_simulation)
 
         if trackers:
             params = extract_params(sc)
@@ -286,7 +269,7 @@ def _print_collective_summary(workload, result, datacenter) -> None:
     gpus_per_node = node.gpus_per_node
     if gpus_per_node is None:
         gpus_per_node = 0
-    num_ranks = datacenter.cluster.num_nodes * gpus_per_node
+    num_ranks = datacenter.num_nodes * gpus_per_node
     typer.echo(f"\nCollective wall time:  {result.total_time_ms:.3f} ms")
     typer.echo(f"  Type:          {workload.collective_type.value}")
     typer.echo(f"  Message size:  {workload.message_size_bytes:,} bytes")

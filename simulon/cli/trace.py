@@ -106,7 +106,7 @@ def generate_trace(
     if output_dir is None:
         if is_scenario:
             try:
-                gpu_spec = resolve_gpu_spec(sc.datacenter, include_profile=False)
+                gpu_spec = resolve_gpu_spec(sc.datacenter)
                 gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
             except Exception:
                 gpu_name = "default"

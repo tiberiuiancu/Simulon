@@ -11,11 +11,9 @@ from simulon.backend.dag.network_populate import (
 from simulon.backend.dag.nodes import CommNode, ComputeNode, DAGEdge, ExecutionDAG
 from simulon.backend.dag.replayer import _intersection_duration, _merge_intervals, replay
 from simulon.config.dc import (
-    ClusterSpec,
     DatacenterConfig,
     DatacenterMeta,
     GPUSpec,
-    NetworkSpec,
     NICSpec,
     NodeSpec,
     ScaleOutSpec,
@@ -38,9 +36,10 @@ def _dc(
 ) -> DatacenterConfig:
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test"),
-        cluster=ClusterSpec(num_nodes=4),
-        node=NodeSpec(gpus_per_node=gpus_per_node, gpu=GPUSpec(name="test-gpu")),
-        network=NetworkSpec(
+        num_nodes=4,
+        node=NodeSpec(
+            gpus_per_node=gpus_per_node,
+            gpu=GPUSpec(name="test-gpu"),
             scale_up=ScaleUpSpec(
                 switch=SwitchSpec(port_speed=nvswitch_speed, latency=nvswitch_latency)
             ),
