@@ -94,7 +94,6 @@ def _multi_node_duration_ms(
     apply NIC efficiency ratio from nic_efficiency_defaults.yaml.
     """
     from simulon.backend.analytical import _nic_bw_GBps
-    from simulon.collective.calbusbw import _nic_efficiency
 
     collective_type = collective_node.collective_type
     nranks = len(collective_node.group_ranks)
@@ -128,15 +127,16 @@ def _multi_node_duration_ms(
         busbw = intra_bw_GBps
         ratio = 1.0  # No NIC efficiency adjustment for single-node
     else:
-        # For multi-node, the bottleneck is the inter-node BW
-        # We apply NIC efficiency ratio
+        # For multi-node, cal_busbw already returned the effective inter-node BW
+        # (nic_bw * nics_per_node * NIC_efficiency).  Do NOT apply the efficiency
+        # ratio again — that would double-count it and inflate duration by ~2×.
         busbw = inter_bw_GBps if inter_bw_GBps is not None else intra_bw_GBps
         if busbw is None or busbw <= 0:
             raise ValueError(
                 f"cal_busbw returned invalid busbw for {collective_type!r} "
                 f"nodes={node_count} gpus_per_node={gpus_per_node}"
             )
-        ratio = _nic_efficiency(size_bytes, node_count)
+        ratio = 1.0
 
     # SimAI formula
     base = size_bytes * 1e-6 / (ratio * busbw)

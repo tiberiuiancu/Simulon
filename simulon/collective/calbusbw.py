@@ -241,11 +241,25 @@ def cal_busbw(
         )
 
     # -----------------------------------------------------------------------
-    # Inter-node BW: nic_bw × nics_per_node × NIC efficiency
+    # Inter-node BW: collective-specific formulas
     # -----------------------------------------------------------------------
     inter_bw_GBps: float | None = None
     if num_nodes > 1:
-        eff = _nic_efficiency(message_size_bytes, num_nodes)
-        inter_bw_GBps = nic_bw_GBps * nics_per_node * eff
+        if collective_type == "AllToAll":
+            # SimAI formula for AllToAll: accounts for the fact that each GPU
+            # only uses the NIC for inter-node peers, not intra-node peers.
+            nranks = num_nodes * gpus_per_node
+            inter_bw_GBps = (
+                nic_bw_GBps
+                * nics_per_node
+                / gpus_per_node
+                * (nranks - 1)
+                / ((num_nodes - 1) * gpus_per_node)
+            )
+        else:
+            # Ring-based collectives (AllReduce, AllGather, ReduceScatter):
+            # bottleneck is the aggregate NIC bandwidth scaled by efficiency.
+            eff = _nic_efficiency(message_size_bytes, num_nodes)
+            inter_bw_GBps = nic_bw_GBps * nics_per_node * eff
 
     return selected_algorithm, intra_bw_GBps, inter_bw_GBps
