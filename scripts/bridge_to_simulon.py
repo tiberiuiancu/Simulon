@@ -82,6 +82,7 @@ _SKIP_INTERNAL: frozenset[str] = {
     "hf_model_id",
     "check_for_nan_in_grad",
     "use_te_rng_tracker",
+    "autocast_dtype",
 }
 
 # Flags related to training / logging / checkpointing / profiling we strip
@@ -151,6 +152,8 @@ def _convert_value(value: Any) -> Any:
         return [_convert_value(v) for v in value]
     if isinstance(value, dict):
         return {k: _convert_value(v) for k, v in value.items()}
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
     return value
 
 

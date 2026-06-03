@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from enum import StrEnum
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
@@ -80,15 +82,6 @@ class DatacenterMeta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Cluster block
-# ---------------------------------------------------------------------------
-
-
-class ClusterSpec(BaseModel):
-    num_nodes: int
-
-
-# ---------------------------------------------------------------------------
 # Node block
 # ---------------------------------------------------------------------------
 
@@ -142,9 +135,8 @@ class NodeSpec(BaseModel):
     gpu: str | GPUSpec | None = None
     cpu: str | CPUSpec | None = None
     cooling: NodeCoolingSpec | None = None
-    # Intra-node fabric (NVLink/NVSwitch). Moved here from network.scale_up.
-    scale_up: Optional["ScaleUpSpec"] = None
-    # Embedded NCCL measurement profile for this node's GPU + topology combination.
+    scale_up: ScaleUpSpec | None = None
+    scale_out: ScaleOutSpec | None = None
     nccl: NcclProfile | None = None
 
 
@@ -305,9 +297,6 @@ def _coerce_node(v):
 
 
 class DatacenterConfig(BaseModel):
-    datacenter: DatacenterMeta
-    cluster: ClusterSpec
+    datacenter: DatacenterMeta | None = None
+    num_nodes: int
     node: Annotated[NodeSpec, BeforeValidator(_coerce_node)]
-    network: NetworkSpec | None = None  # deprecated, use scale_out
-    # New top-level scale-out, replacing network.scale_out.
-    scale_out: ScaleOutSpec | None = None

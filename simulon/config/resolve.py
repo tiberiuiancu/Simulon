@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import warnings
 from pathlib import Path
 
 import yaml
@@ -31,20 +30,8 @@ from simulon.config.nccl_profile import NcclProfile  # noqa: E402
 from simulon.config.workload import MegatronWorkload  # noqa: E402
 
 
-def _load_profile_data(template_path: Path) -> dict:
-    profile_path = template_path.with_suffix("").with_suffix(".profile.yaml")
-    if profile_path.exists():
-        with open(profile_path) as f:
-            return yaml.safe_load(f) or {}
-    return {}
-
-
-def load_gpu_template(name: str, include_profile: bool = True) -> GPUSpec:
-    """Load a GPU spec from a named YAML template file.
-
-    Searches templates/gpu/<name>.yaml (case-insensitive fallback).
-    Merges kernel_runs / oom_configs from the companion .profile.yaml if present.
-    """
+def load_gpu_template(name: str) -> GPUSpec:
+    """Load a GPU spec from a named YAML template file."""
     template_path = Path("templates/gpu") / f"{name}.yaml"
     if not template_path.exists():
         candidates = (
@@ -60,8 +47,6 @@ def load_gpu_template(name: str, include_profile: bool = True) -> GPUSpec:
             )
     with open(template_path) as f:
         data = yaml.safe_load(f)
-    if include_profile:
-        data.update(_load_profile_data(template_path))
     return GPUSpec.model_validate(data)
 
 
@@ -125,7 +110,7 @@ def resolve_node_spec(dc: DatacenterConfig) -> NodeSpec:
     return node
 
 
-def resolve_gpu_spec(dc: DatacenterConfig, include_profile: bool = True) -> GPUSpec:
+def resolve_gpu_spec(dc: DatacenterConfig) -> GPUSpec:
     """Return the effective GPUSpec for a datacenter config.
 
     Handles three forms:
@@ -137,9 +122,9 @@ def resolve_gpu_spec(dc: DatacenterConfig, include_profile: bool = True) -> GPUS
     node = resolve_node_spec(dc)
     gpu = node.gpu
     if isinstance(gpu, str):
-        return load_gpu_template(gpu, include_profile=include_profile)
+        return load_gpu_template(gpu)
     if isinstance(gpu, GPUSpec) and gpu.from_:
-        base = load_gpu_template(gpu.from_, include_profile=include_profile)
+        base = load_gpu_template(gpu.from_)
         # Merge override fields into the base dict and re-validate so that nested
         # objects (cost, power_model, …) are properly coerced by Pydantic, not stored
         # as raw dicts from model_dump().
@@ -185,20 +170,10 @@ def resolve_nccl_profile(dc: DatacenterConfig) -> NcclProfile | None:
 def resolve_scale_out(dc: DatacenterConfig) -> ScaleOutSpec | None:
     """Return the effective scale-out spec for a datacenter config.
 
-    Returns dc.scale_out if set, otherwise falls back to dc.network.scale_out
-    with a DeprecationWarning.
+    Reads from the resolved node's scale_out field.
     """
-    if dc.scale_out is not None:
-        return dc.scale_out
-    if dc.network is not None and dc.network.scale_out is not None:
-        warnings.warn(
-            "datacenter.network.scale_out is deprecated. "
-            "Move scale_out to the top-level datacenter.scale_out field.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return dc.network.scale_out
-    return None
+    node = resolve_node_spec(dc)
+    return node.scale_out
 
 
 def _load_workload_yaml(path_or_name: str, source_file: Path | None) -> dict:

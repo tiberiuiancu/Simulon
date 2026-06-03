@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
@@ -13,7 +12,6 @@ from simulon.backend.dag.nodes import CollectiveNode, CommNode, ComputeNode, DAG
 from simulon.backend.dag.trace_parser import TraceFileParser
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
 from simulon.collective import CCLDecomposer
-from simulon.collective.decompose import decompose_collective
 from simulon.config.dc import DatacenterConfig
 from simulon.config.workload import MegatronWorkload
 
@@ -141,6 +139,9 @@ def _global_rank_expert(
     )
 
 
+_global_rank = _global_rank_attention  # backward-compat alias used by tests
+
+
 def _decompose_rank(rank: int, config: ParallelConfig) -> RankCoords:
     """Convert a global rank back to decomposed coordinates."""
     if not (0 <= rank < config.world_size):
@@ -258,7 +259,7 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
     from simulon.config.resolve import resolve_gpu_spec, workload_hash
 
     try:
-        gpu_spec = resolve_gpu_spec(datacenter, include_profile=False)
+        gpu_spec = resolve_gpu_spec(datacenter)
         gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
     except Exception:
         gpu_name = "default"
@@ -825,281 +826,6 @@ def _wire_bwd_to_step(
             advance()
 
 
-def _decompose_collectives_in_dag(
-    dag: ExecutionDAG, tracer_cfg: DAGTracerConfig, node_id: list, flow_id: list
-) -> None:
-    if not dag.collective_nodes:
-        return
-
-    import time as _time
-
-    node_id_to_rank: dict[int, int] = {}
-    for n in dag.compute_nodes:
-        node_id_to_rank[n.node_id] = n.gpu_rank
-    for n in dag.comm_nodes:
-        node_id_to_rank[n.node_id] = n.src_gpu
-
-    collective_nodes = sorted(dag.collective_nodes.values(), key=lambda n: n.node_id)
-
-    t_decompose = 0.0
-    t_add_comm = 0.0
-    t_categorize = 0.0
-    t_edges = 0.0
-    total_flows = 0
-
-    with log_progress("  decomposing collectives", len(collective_nodes), logger) as advance:
-        for C in collective_nodes:
-            t0 = _time.perf_counter()
-            result, next_flow_id = decompose_collective(
-                collective_type=C.collective_type,
-                group_ranks=C.group_ranks,
-                data_size=C.data_size,
-                num_channels=tracer_cfg.num_channels,
-                algorithm=tracer_cfg.algorithm,
-                flow_id_start=flow_id[0],
-            )
-            t_decompose += _time.perf_counter() - t0
-
-            first_p2p_id = node_id[0]
-            if len(result.flows) == 0:
-                advance()
-                continue
-
-            total_flows += len(result.flows)
-
-            t0 = _time.perf_counter()
-            for flow in result.flows:
-                dag.add_comm_node(
-                    CommNode(
-                        node_id=node_id[0],
-                        src_gpu=flow.src,
-                        dst_gpu=flow.dst,
-                        bytes=flow.flow_size,
-                        collective_type=C.collective_type,
-                        layer_id=-1,
-                        phase=C.phase,
-                        flow_id=flow.flow_id,
-                        parent_flow_ids=flow.parent_flow_ids,
-                    )
-                )
-                node_id_to_rank[node_id[0]] = flow.src
-                node_id[0] += 1
-            t_add_comm += _time.perf_counter() - t0
-
-            t0 = _time.perf_counter()
-            entry_flows: dict[int, list[int]] = {}
-            exit_flows: dict[int, list[int]] = {}
-
-            for idx, flow in enumerate(result.flows):
-                nid = first_p2p_id + idx
-                if not flow.parent_flow_ids:
-                    entry_flows.setdefault(flow.src, []).append(nid)
-                    entry_flows.setdefault(flow.dst, []).append(nid)
-                if not flow.child_flow_ids:
-                    exit_flows.setdefault(flow.src, []).append(nid)
-                    exit_flows.setdefault(flow.dst, []).append(nid)
-            t_categorize += _time.perf_counter() - t0
-
-            t0 = _time.perf_counter()
-            for edge in C.pending_edges or []:
-                if edge.dst_node_id == C.node_id:
-                    src_rank = node_id_to_rank.get(edge.src_node_id)
-                    if src_rank is not None and src_rank in entry_flows:
-                        for entry_nid in entry_flows[src_rank]:
-                            dag.add_edge(
-                                DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid)
-                            )
-                    else:
-                        for nids in entry_flows.values():
-                            for entry_nid in nids:
-                                dag.add_edge(
-                                    DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid)
-                                )
-                if edge.src_node_id == C.node_id:
-                    dst_rank = node_id_to_rank.get(edge.dst_node_id)
-                    if dst_rank is not None and dst_rank in exit_flows:
-                        for exit_nid in exit_flows[dst_rank]:
-                            dag.add_edge(
-                                DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
-                            )
-                    else:
-                        for nids in exit_flows.values():
-                            for exit_nid in nids:
-                                dag.add_edge(
-                                    DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
-                                )
-            t_edges += _time.perf_counter() - t0
-
-            flow_id[0] = next_flow_id
-            advance()
-
-    logger.info(
-        "_decompose_collectives_in_dag profile: collectives=%d, flows=%d, "
-        "decompose=%.3fs, add_comm=%.3fs, categorize=%.3fs, edges=%.3fs",
-        len(collective_nodes),
-        total_flows,
-        t_decompose,
-        t_add_comm,
-        t_categorize,
-        t_edges,
-    )
-
-    dag.collective_nodes.clear()
-
-
-def _decompose_single(
-    collective_type: str, group_ranks: list[int], data_size: int, num_channels: int, algorithm: str
-) -> list:
-    """Worker: decompose one collective into P2PFlows (flow_id_start=0)."""
-    result, _ = decompose_collective(
-        collective_type=collective_type,
-        group_ranks=group_ranks,
-        data_size=data_size,
-        num_channels=num_channels,
-        algorithm=algorithm,
-        flow_id_start=0,
-    )
-    return result.flows
-
-
-def _decompose_collectives_in_dag_parallel(
-    dag: ExecutionDAG, tracer_cfg: DAGTracerConfig, node_id: list, flow_id: list
-) -> None:
-    if not dag.collective_nodes:
-        return
-
-    import time as _time
-
-    node_id_to_rank: dict[int, int] = {}
-    for n in dag.compute_nodes:
-        node_id_to_rank[n.node_id] = n.gpu_rank
-    for n in dag.comm_nodes:
-        node_id_to_rank[n.node_id] = n.src_gpu
-
-    collective_nodes = sorted(dag.collective_nodes.values(), key=lambda n: n.node_id)
-
-    t_decompose = 0.0
-    t_add_comm = 0.0
-    t_categorize = 0.0
-    t_edges = 0.0
-    total_flows = 0
-
-    with log_progress("  decomposing collectives", len(collective_nodes), logger) as advance:
-        t0 = _time.perf_counter()
-        with ProcessPoolExecutor() as executor:
-            future_to_C = {
-                executor.submit(
-                    _decompose_single,
-                    C.collective_type,
-                    C.group_ranks,
-                    C.data_size,
-                    tracer_cfg.num_channels,
-                    tracer_cfg.algorithm,
-                ): C
-                for C in collective_nodes
-            }
-
-            results = []
-            for future in as_completed(future_to_C):
-                C = future_to_C[future]
-                flows = future.result()
-                results.append((C, flows))
-                advance()
-        t_decompose += _time.perf_counter() - t0
-
-        for C, flows in results:
-            first_p2p_id = node_id[0]
-            if len(flows) == 0:
-                continue
-
-            total_flows += len(flows)
-
-            offset = flow_id[0]
-            for flow in flows:
-                flow.flow_id += offset
-                if flow.parent_flow_ids:
-                    flow.parent_flow_ids = [pid + offset for pid in flow.parent_flow_ids]
-                if flow.child_flow_ids:
-                    flow.child_flow_ids = [cid + offset for cid in flow.child_flow_ids]
-            flow_id[0] += len(flows)
-
-            t0 = _time.perf_counter()
-            for flow in flows:
-                dag.add_comm_node(
-                    CommNode(
-                        node_id=node_id[0],
-                        src_gpu=flow.src,
-                        dst_gpu=flow.dst,
-                        bytes=flow.flow_size,
-                        collective_type=C.collective_type,
-                        layer_id=-1,
-                        phase=C.phase,
-                        flow_id=flow.flow_id,
-                        parent_flow_ids=flow.parent_flow_ids,
-                    )
-                )
-                node_id_to_rank[node_id[0]] = flow.src
-                node_id[0] += 1
-            t_add_comm += _time.perf_counter() - t0
-
-            t0 = _time.perf_counter()
-            entry_flows: dict[int, list[int]] = {}
-            exit_flows: dict[int, list[int]] = {}
-
-            for idx, flow in enumerate(flows):
-                nid = first_p2p_id + idx
-                if not flow.parent_flow_ids:
-                    entry_flows.setdefault(flow.src, []).append(nid)
-                    entry_flows.setdefault(flow.dst, []).append(nid)
-                if not flow.child_flow_ids:
-                    exit_flows.setdefault(flow.src, []).append(nid)
-                    exit_flows.setdefault(flow.dst, []).append(nid)
-            t_categorize += _time.perf_counter() - t0
-
-            t0 = _time.perf_counter()
-            for edge in C.pending_edges or []:
-                if edge.dst_node_id == C.node_id:
-                    src_rank = node_id_to_rank.get(edge.src_node_id)
-                    if src_rank is not None and src_rank in entry_flows:
-                        for entry_nid in entry_flows[src_rank]:
-                            dag.add_edge(
-                                DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid)
-                            )
-                    else:
-                        for nids in entry_flows.values():
-                            for entry_nid in nids:
-                                dag.add_edge(
-                                    DAGEdge(src_node_id=edge.src_node_id, dst_node_id=entry_nid)
-                                )
-                if edge.src_node_id == C.node_id:
-                    dst_rank = node_id_to_rank.get(edge.dst_node_id)
-                    if dst_rank is not None and dst_rank in exit_flows:
-                        for exit_nid in exit_flows[dst_rank]:
-                            dag.add_edge(
-                                DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
-                            )
-                    else:
-                        for nids in exit_flows.values():
-                            for exit_nid in nids:
-                                dag.add_edge(
-                                    DAGEdge(src_node_id=exit_nid, dst_node_id=edge.dst_node_id)
-                                )
-            t_edges += _time.perf_counter() - t0
-
-    logger.info(
-        "_decompose_collectives_in_dag_parallel profile: collectives=%d, flows=%d, "
-        "decompose=%.3fs, add_comm=%.3fs, categorize=%.3fs, edges=%.3fs",
-        len(collective_nodes),
-        total_flows,
-        t_decompose,
-        t_add_comm,
-        t_categorize,
-        t_edges,
-    )
-
-    dag.collective_nodes.clear()
-
-
 class MegatronDagTracer(DAGTracer):
     cfg: DAGTracerConfig
     ccl: CCLDecomposer
@@ -1174,5 +900,4 @@ class MegatronDagTracer(DAGTracer):
         )
         _wire_cross_slot_edges(dag, slot_first_timestamp, slot_last_node, slot_entry_node)
         _wire_bwd_to_step(dag, slot_last_node, slot_entry_node, config)
-        _decompose_collectives_in_dag_parallel(dag, self.cfg, node_id, flow_id)
         return dag

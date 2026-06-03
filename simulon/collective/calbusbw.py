@@ -13,6 +13,7 @@ Key differences from SimAI:
 
 from __future__ import annotations
 
+import csv
 import math
 from pathlib import Path
 
@@ -48,6 +49,46 @@ def _load_nic_efficiency() -> dict[int, list[tuple[int, float]]]:
         table[n_nodes] = sorted((r["size_bytes"], r["efficiency"]) for r in rows)
 
     _NIC_EFF_CACHE = table
+    return table
+
+
+# ---------------------------------------------------------------------------
+# AllToAll ratio table (lazy-loaded)
+# ---------------------------------------------------------------------------
+
+_ALLTOALL_RATIO_CACHE: dict[int, list[tuple[int, float]]] | None = None
+
+
+def _load_alltoall_ratio() -> dict[int, list[tuple[int, float]]]:
+    """Load the AllToAll ratio table from the bundled CSV file.
+
+    The CSV maps node_count → sorted list of (size_bytes, ratio).
+    """
+    global _ALLTOALL_RATIO_CACHE
+    if _ALLTOALL_RATIO_CACHE is not None:
+        return _ALLTOALL_RATIO_CACHE
+
+    data_path = Path(__file__).parent.parent / "data" / "alltoall_ratio_defaults.csv"
+    with open(data_path) as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        col_to_nodes: dict[int, int] = {}
+        for i, h in enumerate(header):
+            if "Node" in h:
+                nodes_str = h.split("Node")[0]
+                if nodes_str.isdigit():
+                    col_to_nodes[i] = int(nodes_str)
+
+        table: dict[int, list[tuple[int, float]]] = {n: [] for n in col_to_nodes.values()}
+        for row in reader:
+            size = int(row[0])
+            for col, nodes in col_to_nodes.items():
+                val = row[col].strip()
+                if val:
+                    table[nodes].append((size, float(val)))
+
+    table = {n: sorted(v) for n, v in table.items() if v}
+    _ALLTOALL_RATIO_CACHE = table
     return table
 
 
@@ -95,6 +136,35 @@ def _interp_size(size: int, curve: list[tuple[int, float]]) -> float:
             log_t = math.log(size / s0) / math.log(s1 / s0)
             return e0 + log_t * (e1 - e0)
     return curve[-1][1]
+
+
+def _alltoall_ratio(message_size_bytes: int, num_nodes: int) -> float:
+    """AllToAll ratio with SimAI-style normalization (divide by max)."""
+    table = _load_alltoall_ratio()
+    available_nodes = sorted(table.keys())
+
+    if not available_nodes:
+        return 1.0
+    if num_nodes <= available_nodes[0]:
+        lo_node = available_nodes[0]
+        lo_val = _interp_size(message_size_bytes, table[lo_node])
+        mx_val = max(r for _, r in table[lo_node])
+        return lo_val / mx_val
+    if num_nodes >= available_nodes[-1]:
+        hi_node = available_nodes[-1]
+        hi_val = _interp_size(message_size_bytes, table[hi_node])
+        mx_val = max(r for _, r in table[hi_node])
+        return hi_val / mx_val
+
+    lo = max(n for n in available_nodes if n <= num_nodes)
+    hi = min(n for n in available_nodes if n >= num_nodes)
+    if lo == hi:
+        return _interp_size(message_size_bytes, table[lo]) / max(r for _, r in table[lo])
+
+    eff_lo = _interp_size(message_size_bytes, table[lo]) / max(r for _, r in table[lo])
+    eff_hi = _interp_size(message_size_bytes, table[hi]) / max(r for _, r in table[hi])
+    t = (num_nodes - lo) / (hi - lo)
+    return eff_lo + t * (eff_hi - eff_lo)
 
 
 # ---------------------------------------------------------------------------
@@ -241,11 +311,23 @@ def cal_busbw(
         )
 
     # -----------------------------------------------------------------------
-    # Inter-node BW: nic_bw × nics_per_node × NIC efficiency
+    # Inter-node BW: collective-specific formulas
     # -----------------------------------------------------------------------
     inter_bw_GBps: float | None = None
     if num_nodes > 1:
-        eff = _nic_efficiency(message_size_bytes, num_nodes)
-        inter_bw_GBps = nic_bw_GBps * nics_per_node * eff
+        if collective_type == "AllToAll":
+            nranks = num_nodes * gpus_per_node
+            base_bw = (
+                nic_bw_GBps
+                * nics_per_node
+                / gpus_per_node
+                * (nranks - 1)
+                / ((num_nodes - 1) * gpus_per_node)
+            )
+            ratio = _alltoall_ratio(message_size_bytes, num_nodes)
+            inter_bw_GBps = base_bw * ratio
+        else:
+            eff = _nic_efficiency(message_size_bytes, num_nodes)
+            inter_bw_GBps = nic_bw_GBps * nics_per_node * eff
 
     return selected_algorithm, intra_bw_GBps, inter_bw_GBps

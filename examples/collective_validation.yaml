@@ -1,0 +1,23 @@
+# Collective validation scenario (AllReduce 4n4g, 8GiB)
+# Based on experiments/validate_simccl/sim_ccl.py hardware config.
+#
+# Node:  Snellius H100 NVSwitch4  (4 GPUs)  — loads real nccl-tests profile
+# NIC:   200 Gbps InfiniBand, 4 NICs per node, 5 µs latency
+#
+# Use with simulon simulate to run a single collective point:
+#   simulon simulate examples/collective_validation.yaml -o trace.json
+#
+# Sweeping message sizes and node counts is done by sim_ccl.py.
+
+datacenter:
+  num_nodes: 4
+  node: snellius-h100-4g
+
+collective:
+  library: nccl
+  algorithm: auto
+
+workload:
+  framework: collective
+  collective_type: AllReduce
+  message_size_bytes: 8589934592

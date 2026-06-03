@@ -5,7 +5,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 from simulon.backend.dag._progress import log_progress
-from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
+from simulon.backend.dag.nodes import CollectiveNode, CommNode, ComputeNode, ExecutionDAG
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +104,12 @@ def _intersection_duration(
 # ---------------------------------------------------------------------------
 
 
-def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
+def _summarize(dag: ExecutionDAG, total_time_ms: float, network_simulation: str = "flow") -> dict:
     """Derive averaged summary metrics from a fully-replayed DAG."""
     compute_by_gpu: dict[int, list[tuple[float, float]]] = defaultdict(list)
     recv_by_gpu: dict[int, list[tuple[float, float, str]]] = defaultdict(list)
     comm_by_gpu: dict[int, list[tuple[float, float]]] = defaultdict(list)
+    collective_by_gpu: dict[int, list[tuple[float, float, str]]] = defaultdict(list)
 
     for n in dag.compute_nodes:
         if n.start_ms is not None and n.finish_ms is not None:
@@ -122,7 +123,16 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
         comm_by_gpu[n.src_gpu].append(iv)
         comm_by_gpu[n.dst_gpu].append(iv)
 
-    all_gpus = set(compute_by_gpu) | set(recv_by_gpu) | set(comm_by_gpu)
+    if network_simulation == "collective":
+        for cn in dag.collective_nodes.values():
+            if cn.start_ms is None or cn.finish_ms is None or cn.duration_ms is None:
+                continue
+            iv = (cn.start_ms, cn.finish_ms)
+            for gpu in cn.group_ranks:
+                collective_by_gpu[gpu].append((cn.start_ms, cn.finish_ms, cn.collective_type))
+                comm_by_gpu[gpu].append(iv)
+
+    all_gpus = set(compute_by_gpu) | set(recv_by_gpu) | set(comm_by_gpu) | set(collective_by_gpu)
     if not all_gpus:
         return {
             "compute_ms": 0.0,
@@ -142,15 +152,15 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
         compute_ivs = _merge_intervals(compute_by_gpu.get(gpu, []))
         recv_entries = recv_by_gpu.get(gpu, [])
         comm_ivs = _merge_intervals(comm_by_gpu.get(gpu, []))
+        collective_entries = collective_by_gpu.get(gpu, [])
 
         compute_ms = sum(e - s for s, e in compute_ivs)
 
-        # Per-type exposed comm: group by type, compute union per type,
-        # then subtract hidden portion (overlap with compute).  This avoids
-        # double-counting overlapping recv nodes of the same type.
         exposed_by_type: dict[str, float] = defaultdict(float)
         by_type: dict[str, list[tuple[float, float]]] = defaultdict(list)
         for start, finish, ctype in recv_entries:
+            by_type[ctype].append((start, finish))
+        for start, finish, ctype in collective_entries:
             by_type[ctype].append((start, finish))
         for ctype, ivs in by_type.items():
             type_union = _merge_intervals(ivs)
@@ -159,9 +169,7 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
             )
             exposed_by_type[ctype] = exp
 
-        # Compute total exposed using the union of all recv intervals to avoid
-        # double-counting when two recv nodes overlap on the same GPU.
-        all_recv_ivs = _merge_intervals([(s, e) for s, e, _ in recv_entries])
+        all_recv_ivs = _merge_intervals([(s, e) for s, e, _ in recv_entries + collective_entries])
         exposed_total = max(
             0.0, _union_duration(all_recv_ivs) - _intersection_duration(all_recv_ivs, compute_ivs)
         )
@@ -195,23 +203,26 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def replay(dag: ExecutionDAG) -> SimulationResult:
+def replay(dag: ExecutionDAG, *, network_simulation: str = "flow") -> SimulationResult:
     """Critical-path walk over a fully-populated DAG.
 
     Assumes all node.duration_ms fields have been set before calling:
       - ComputeNode.duration_ms: already set by trace_tracer (trace-driven path)
-      - CommNode.duration_ms:    filled by populate_network() (or a network simulator)
+      - CommNode.duration_ms:    filled by populate_network() (flow mode)
+      - CollectiveNode.duration_ms: filled by populate_collective_network() (collective mode)
 
-    Pure scheduler — no duration computation happens here. This means any
-    network simulator (analytical, NS-3, etc.) can populate CommNode durations
-    independently before replay is called.
+    network_simulation controls whether CollectiveNodes are treated as atomic
+    ("collective" mode) or whether the DAG only contains CommNodes ("flow" mode).
     """
     # Build unified node map
-    all_nodes: dict[int, ComputeNode | CommNode] = {}
+    all_nodes: dict[int, ComputeNode | CommNode | CollectiveNode] = {}
     for n in dag.compute_nodes:
         all_nodes[n.node_id] = n
     for n in dag.comm_nodes:
         all_nodes[n.node_id] = n
+    if network_simulation == "collective":
+        for n in dag.collective_nodes.values():
+            all_nodes[n.node_id] = n
 
     # flow_id → node_id (CommNode.parent_flow_ids uses flow_ids, not node_ids)
     flow_to_node: dict[int, int] = {n.flow_id: n.node_id for n in dag.comm_nodes}
@@ -310,20 +321,25 @@ def replay(dag: ExecutionDAG) -> SimulationResult:
                 if finish > per_gpu_finish[node.gpu_rank]:
                     per_gpu_finish[node.gpu_rank] = finish
 
-            else:  # CommNode
+            else:
                 duration = node.duration_ms if node.duration_ms is not None else 0.0
                 finish = start_time + duration
                 finish_time[nid] = finish
                 node.start_ms = start_time
                 node.finish_ms = finish
-                if finish > per_gpu_finish[node.src_gpu]:
-                    per_gpu_finish[node.src_gpu] = finish
-                if finish > per_gpu_finish[node.dst_gpu]:
-                    per_gpu_finish[node.dst_gpu] = finish
+                if isinstance(node, CommNode):
+                    if finish > per_gpu_finish[node.src_gpu]:
+                        per_gpu_finish[node.src_gpu] = finish
+                    if finish > per_gpu_finish[node.dst_gpu]:
+                        per_gpu_finish[node.dst_gpu] = finish
+                elif isinstance(node, CollectiveNode):
+                    for gpu in node.group_ranks:
+                        if finish > per_gpu_finish[gpu]:
+                            per_gpu_finish[gpu] = finish
 
             advance()
 
     total = max(per_gpu_finish.values(), default=0.0)
-    summary = _summarize(dag, total)
+    summary = _summarize(dag, total, network_simulation)
 
     return SimulationResult(total_time_ms=total, per_gpu_times_ms=dict(per_gpu_finish), **summary)

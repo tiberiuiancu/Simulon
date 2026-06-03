@@ -71,6 +71,8 @@ def to_chrome_trace(
     for n in dag.comm_nodes:
         all_gpus.add(n.src_gpu)
         all_gpus.add(n.dst_gpu)
+    for cn in dag.collective_nodes.values():
+        all_gpus.update(cn.group_ranks)
 
     if only_profiled:
         all_gpus &= dag.profiled_ranks
@@ -250,6 +252,38 @@ def to_chrome_trace(
                     "ph": "X",
                     "pid": 1000 + n.dst_gpu,
                     "tid": tid_recv,
+                    "ts": ts_us,
+                    "dur": dur_us,
+                    "args": args,
+                }
+            )
+
+    # Collective events — emitted on all participating GPUs when CollectiveNodes
+    # are kept intact (collective-level network simulation).
+    for cn in dag.collective_nodes.values():
+        if cn.start_ms is None or cn.finish_ms is None:
+            continue
+        ts_us = cn.start_ms * 1_000
+        dur_us = (cn.duration_ms or 0.0) * 1_000
+        args = {
+            "collective_type": cn.collective_type,
+            "phase": cn.phase,
+            "layer_id": cn.layer_id,
+            "data_size": cn.data_size,
+            "duration_ms": cn.duration_ms,
+            "algorithm": cn.algorithm,
+            "num_channels": cn.num_channels,
+            "group_ranks": cn.group_ranks,
+        }
+        for gpu in cn.group_ranks:
+            if only_profiled and gpu not in dag.profiled_ranks:
+                continue
+            events.append(
+                {
+                    "name": f"{cn.collective_type}",
+                    "ph": "X",
+                    "pid": 1000 + gpu,
+                    "tid": _TID_COLL_SEND,
                     "ts": ts_us,
                     "dur": dur_us,
                     "args": args,

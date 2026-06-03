@@ -1,6 +1,5 @@
 """Simulation backend for simulon."""
 
-from .analytical import AnalyticalBackend
-from .base import Backend
+from .analytical import run_trace, simulate
 
-__all__ = ["Backend", "AnalyticalBackend"]
+__all__ = ["run_trace", "simulate"]

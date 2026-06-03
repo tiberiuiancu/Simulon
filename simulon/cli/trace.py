@@ -106,7 +106,7 @@ def generate_trace(
     if output_dir is None:
         if is_scenario:
             try:
-                gpu_spec = resolve_gpu_spec(sc.datacenter, include_profile=False)
+                gpu_spec = resolve_gpu_spec(sc.datacenter)
                 gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
             except Exception:
                 gpu_name = "default"
@@ -141,21 +141,12 @@ def generate_trace(
             _set_arg(f"--{key}", cfg[key])
     if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
         _set_arg("--max-position-embeddings", derived_args["--seq-length"])
-    skip = {
-        "num_gpus",
-        "num-gpus",
-        "num_microbatches",
-        "num-microbatches",
-        "autocast_dtype",
-        "autocast-dtype",
-    }
+    skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
     for key, value in cfg.items():
         flag = "--use-distributed-optimizer" if key == "distributed-optimizer" else f"--{key}"
         if flag not in derived_args and key not in skip:
             if isinstance(value, bool):
                 _set_arg(flag, value)
-            elif key == "rotary-base":
-                _set_arg(flag, int(value))
             else:
                 _set_arg(flag, value)
 

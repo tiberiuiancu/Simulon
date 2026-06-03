@@ -1,27 +1,5 @@
 datacenter:
-  datacenter:
-    name: dgx-h100-16gpu
-  cluster:
-    num_nodes: 2
-  node:
-    gpus_per_node: 8
-    gpu: h100
-  network:
-    scale_up:
-      switch:
-        port_speed: 7200Gbps
-        latency: 0.000025ms
-    scale_out:
-      nic:
-        speed: 400Gbps
-        latency: 0.005ms
-      topology:
-        type: fat_tree
-        params:
-          k: 8
-
-collective:
-  library: nccl
-  algorithm: auto
+  num_nodes: 32
+  node: dgx-h100
 
 workload: experiments/validate_e2e/qwen3-30b/workload.yaml

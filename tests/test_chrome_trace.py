@@ -125,4 +125,5 @@ class TestOnlyProfiledFiltering:
         assert compute_x[0]["pid"] == 1000
 
         comm_x = [e for e in events if e.get("ph") == "X" and e.get("tid") != _TID_COMPUTE]
-        assert len(comm_x) == 0
+        assert len(comm_x) == 1
+        assert comm_x[0]["pid"] == 1000

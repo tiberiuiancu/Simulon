@@ -7,11 +7,17 @@ import pytest
 
 from simulon.backend.dag.nodes import DAGEdge
 from simulon.backend.dag.trace_parser import TraceFileParser
-from simulon.backend.dag.trace_tracer import MegatronDagTracer, ParallelConfig, _remap_collectives
+from simulon.backend.dag.trace_tracer import (
+    MegatronDagTracer,
+    ParallelConfig,
+    _make_collective_groups,
+    _remap_collectives,
+)
 from simulon.backend.dag.tracer import DAGTracerConfig
+from simulon.backend.network import decompose_collectives_in_dag
 from simulon.collective import NCCLDecomposer
 from simulon.collective.decompose import decompose_collective
-from simulon.config.dc import ClusterSpec, DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
+from simulon.config.dc import DatacenterConfig, DatacenterMeta, GPUSpec, NodeSpec
 from simulon.config.workload import MegatronWorkload
 
 
@@ -36,7 +42,7 @@ def _make_trace(
 def _make_datacenter(num_gpus: int = 2, traces_dir: str | None = None) -> DatacenterConfig:
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test", traces_dir=traces_dir),
-        cluster=ClusterSpec(num_nodes=1),
+        num_nodes=1,
         node=NodeSpec(gpus_per_node=num_gpus, gpu=GPUSpec(name="H100", memory_capacity_gb=80.0)),
     )
 
@@ -59,12 +65,15 @@ def _make_workload(tp: int = 1, pp: int = 1, num_gpus: int = 2) -> MegatronWorkl
     )
 
 
-def _run_tracer(workload: MegatronWorkload, datacenter: DatacenterConfig):
+def _run_tracer(workload: MegatronWorkload, datacenter: DatacenterConfig, decompose: bool = True):
     tracer = MegatronDagTracer(cfg=DAGTracerConfig(), ccl=NCCLDecomposer())
-    return tracer.trace(workload, datacenter)
+    dag = tracer.trace(workload, datacenter)
+    if decompose:
+        decompose_collectives_in_dag(dag)
+    return dag
 
 
-def test_trace_builds_dag_with_compute_and_comm_nodes():
+def test_trace_builds_dag_with_compute_and_collective_nodes():
     events = [
         {"type": "slot_begin", "timestamp_ms": 0.0, "metadata": {"slot": "fwd"}},
         {
@@ -80,9 +89,9 @@ def test_trace_builds_dag_with_compute_and_comm_nodes():
         _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
-        dag = _run_tracer(workload, dc)
+        dag = _run_tracer(workload, dc, decompose=False)
         assert len(dag.compute_nodes) > 0
-        assert len(dag.comm_nodes) > 0
+        assert len(dag.collective_nodes) > 0
 
 
 def test_compute_nodes_have_duration_ms():
@@ -165,7 +174,7 @@ def test_dag_edges_wired_sequentially():
         _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
-        dag = _run_tracer(workload, dc)
+        dag = _run_tracer(workload, dc, decompose=False)
         for rank in {n.gpu_rank for n in dag.compute_nodes}:
             rank_cnodes = sorted(
                 [n for n in dag.compute_nodes if n.gpu_rank == rank], key=lambda n: n.node_id
@@ -247,11 +256,15 @@ def test_slot_markers_assign_microbatch_and_phase():
         _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
-        dag = _run_tracer(workload, dc)
+        dag = _run_tracer(workload, dc, decompose=False)
         for rank in {n.gpu_rank for n in dag.compute_nodes}:
             rank_cnodes = sorted(
                 [n for n in dag.compute_nodes if n.gpu_rank == rank], key=lambda n: n.node_id
             )
+            for i in range(len(rank_cnodes) - 1):
+                assert _has_path(dag.edges, rank_cnodes[i].node_id, rank_cnodes[i + 1].node_id), (
+                    f"No path between compute nodes on rank {rank}"
+                )
             assert rank_cnodes[0].microbatch_id == -1
             assert rank_cnodes[0].phase == ""
             for cn in rank_cnodes[1:]:
@@ -386,7 +399,8 @@ def test_missing_last_trace_raises():
 
 
 def test_remap_dp_allreduce_to_target_dp_group():
-    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
+    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4, etp=2, edp=2)
+    _make_collective_groups(config)
     events = [
         {
             "type": "collective",
@@ -412,7 +426,8 @@ def test_remap_dp_allreduce_to_target_dp_group():
 
 
 def test_remap_tp_allreduce_to_target_tp_group():
-    config = ParallelConfig(tp=4, cp=1, pp=1, ep=1, dp=1, num_gpus=4)
+    config = ParallelConfig(tp=4, cp=1, pp=1, ep=1, dp=1, num_gpus=4, etp=4, edp=1)
+    _make_collective_groups(config)
     events = [
         {
             "type": "collective",
@@ -498,7 +513,7 @@ def test_collective_node_comes_before_compute_after_it():
         _write_trace(trace, traces_dir, rank=0)
         workload = _make_workload(tp=2, pp=1, num_gpus=2)
         dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
-        dag = _run_tracer(workload, dc)
+        dag = _run_tracer(workload, dc, decompose=False)
 
         rank0_compute = sorted(
             [n for n in dag.compute_nodes if n.gpu_rank == 0], key=lambda n: n.node_id
@@ -509,9 +524,9 @@ def test_collective_node_comes_before_compute_after_it():
         c_before = rank0_compute[0]
         c_after = rank0_compute[1]
 
-        rank0_comm = [n for n in dag.comm_nodes if n.src_gpu == 0 or n.dst_gpu == 0]
-        assert len(rank0_comm) > 0, "Expected at least one comm node on rank 0"
-        collective_node = rank0_comm[0]
+        collective_nodes_list = list(dag.collective_nodes.values())
+        assert len(collective_nodes_list) > 0, "Expected at least one collective node"
+        collective_node = collective_nodes_list[0]
 
         assert _has_path(dag.edges, c_before.node_id, collective_node.node_id), (
             f"Expected edge from compute before ({c_before.node_id}) to collective ({collective_node.node_id})"
@@ -522,7 +537,8 @@ def test_collective_node_comes_before_compute_after_it():
 
 
 def test_unknown_collective_kept_unchanged():
-    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
+    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4, etp=2, edp=2)
+    _make_collective_groups(config)
     events = [
         {
             "type": "collective",
@@ -550,7 +566,8 @@ def test_unknown_collective_kept_unchanged():
 
 
 def test_pp_send_preserved_in_remap():
-    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4)
+    config = ParallelConfig(tp=2, cp=1, pp=1, ep=1, dp=2, num_gpus=4, etp=2, edp=2)
+    _make_collective_groups(config)
     events = [
         {
             "type": "collective",

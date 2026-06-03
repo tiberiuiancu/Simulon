@@ -58,10 +58,6 @@ class CollectiveNode:
     duration_ms: float | None = None
     start_ms: float | None = None
     finish_ms: float | None = None
-    pending_edges: list[DAGEdge] | None = field(default_factory=list)
-
-    def add_pending_edge(self, edge: DAGEdge):
-        self.pending_edges.append(edge)
 
 
 @dataclass(slots=True)
@@ -83,6 +79,7 @@ class ExecutionDAG:
         return {
             "compute_nodes": [asdict(n) for n in self.compute_nodes],
             "comm_nodes": [asdict(n) for n in self.comm_nodes],
+            "collective_nodes": [asdict(n) for n in self.collective_nodes.values()],
             "edges": [asdict(e) for e in self.edges],
             "total_flops": self.total_flops,
             "profiled_ranks": sorted(self.profiled_ranks),
@@ -101,9 +98,4 @@ class ExecutionDAG:
         self.collective_nodes[node.node_id] = node
 
     def add_edge(self, edge: DAGEdge):
-        if edge.dst_node_id in self.collective_nodes:
-            self.collective_nodes[edge.dst_node_id].add_pending_edge(edge)
-        elif edge.src_node_id in self.collective_nodes:
-            self.collective_nodes[edge.src_node_id].add_pending_edge(edge)
-        else:
-            self.edges.append(edge)
+        self.edges.append(edge)
