@@ -43,6 +43,9 @@ def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
 
 
 def _nic_bw_GBps(dc: DatacenterConfig) -> tuple[float, int]:
+    node = resolve_node_spec(dc)
+    nics_per_node = node.nics_per_node
+
     scale_out = resolve_scale_out(dc)
     if scale_out and scale_out.nic:
         nic = scale_out.nic
@@ -50,8 +53,8 @@ def _nic_bw_GBps(dc: DatacenterConfig) -> tuple[float, int]:
             from simulon.backend.dag.network_populate import _parse_speed
 
             bw = _parse_speed(nic.speed) / 1e6
-            return bw, nic.nics_per_node
-    return 400e9 / 8 / 1e9, 1
+            return bw, nics_per_node
+    return 400e9 / 8 / 1e9, nics_per_node
 
 
 def run_trace(scenario: ScenarioConfig, _resolved_algorithm: str | None = None) -> ExecutionDAG:

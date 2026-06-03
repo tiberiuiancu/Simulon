@@ -184,8 +184,7 @@ def to_chrome_trace(
         }
         if n.fused_kernels:
             args["fused_kernels"] = ", ".join(n.fused_kernels)
-        phase_label = n.phase if n.phase else "compute"
-        base_name = f"{phase_label} {n.kernel}"
+        base_name = f"{n.phase} {n.kernel}" if n.phase else n.kernel
         event_name = ("! " + base_name) if n.is_extrapolated else base_name
         entry: dict[str, Any] = {
             "name": event_name,

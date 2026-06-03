@@ -81,8 +81,9 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
     gpus_per_node = node.gpus_per_node
     if gpus_per_node is None:
         raise ValueError("node.gpus_per_node must be set after resolution")
-    gpus_per_nic = node.gpus_per_nic
-    nics_per_node = gpus_per_node // gpus_per_nic
+    nics_per_node = node.nics_per_node
+    if nics_per_node is None:
+        raise ValueError("node.nics_per_node must be set after resolution")
 
     rack = dc.datacenter.rack
     if rack is not None and rack.nodes_per_rack is not None and rack.nodes_per_rack > 0:
