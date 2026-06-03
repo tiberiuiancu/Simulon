@@ -57,8 +57,9 @@ def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
         num_nodes=num_nodes,
         node=NodeSpec(
             from_="snellius-h100-4g",
+            nics_per_node=4,
             scale_out=ScaleOutSpec(
-                nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY, nics_per_node=4),
+                nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
             ),
         ),

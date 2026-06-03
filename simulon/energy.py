@@ -97,8 +97,9 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
     num_gpus_total = num_nodes * gpus_per_node
     avg_active_ms = sum(active_ms_by_rank.values()) / num_gpus_total if num_gpus_total > 0 else 0.0
     utilisation = avg_active_ms / total_time_ms if total_time_ms > 0 else 0.0
-    gpus_per_nic = resolved_node.gpus_per_nic
-    nics_per_node = gpus_per_node // gpus_per_nic
+    nics_per_node = resolved_node.nics_per_node
+    if nics_per_node is None:
+        raise ValueError("node.nics_per_node must be set after resolution")
 
     # nodes_per_rack for rack count derivation
     rack = dc.datacenter.rack
@@ -106,7 +107,6 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
         num_racks = math.ceil(num_nodes / rack.nodes_per_rack)
     else:
         num_racks = 1
-
     node = resolve_node_spec(dc)
 
     # --- Topology switch counts (read from params dict if present) ---
