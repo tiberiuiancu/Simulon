@@ -9,19 +9,6 @@ from .common import CostField, PowerModel
 from .nccl_profile import NcclProfile
 
 # ---------------------------------------------------------------------------
-# GPU profiling results
-# ---------------------------------------------------------------------------
-
-
-class KernelRun(BaseModel):
-    """A single kernel benchmark: name, parameters, and measured runtimes."""
-
-    kernel: str
-    params: dict[str, Any]
-    times_ms: list[float]
-
-
-# ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
