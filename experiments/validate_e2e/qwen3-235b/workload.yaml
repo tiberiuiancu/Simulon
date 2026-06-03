@@ -1,6 +1,9 @@
 framework: megatron
 config:
   num-gpus: 256
+  disable-bias-linear: false
+  no-bias-dropout-fusion: true
+  swiglu: true
 
   tensor-model-parallel-size: 2
   pipeline-model-parallel-size: 8
@@ -9,7 +12,6 @@ config:
   expert-model-parallel-size: 32
   expert-tensor-parallel-size: 1
   bf16: true
-  autocast-dtype: bf16
   cross-entropy-fusion-impl: te
   num-layers: 94
   account-for-embedding-in-pipeline-split: true
@@ -35,7 +37,7 @@ config:
   moe-router-fusion: true
   share-embeddings-and-output-weights: false
   position-embedding-type: rope
-  rotary-base: 1000000.0
+  rotary-base: 1000000
   seq-length: 4096
   vocab-size: 151936
   grad-reduce-in-bf16: false

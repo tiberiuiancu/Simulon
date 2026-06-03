@@ -3,8 +3,6 @@ config:
   num-gpus: 1024
   disable-bias-linear: true
   no-bias-dropout-fusion: true
-#  swiglu: true
-  
   tensor-model-parallel-size: 2
   pipeline-model-parallel-size: 8
   sequence-parallel: true
@@ -78,7 +76,7 @@ config:
   global-batch-size: 8192
   manual-gc: true
   manual-gc-interval: 5
-  override-opt_param-scheduler: true
+  override-opt-param-scheduler: true
   num-workers: 8
   seed: 1234
   split: 1000,0,0
