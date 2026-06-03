@@ -258,11 +258,8 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
         return Path(traces_dir)
     from simulon.config.resolve import resolve_gpu_spec, workload_hash
 
-    try:
-        gpu_spec = resolve_gpu_spec(datacenter)
-        gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
-    except Exception:
-        gpu_name = "default"
+    gpu_spec = resolve_gpu_spec(datacenter)
+    gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
     h = workload_hash(workload)
     p = Path("templates/gpu") / gpu_name / "traces" / h
     if not p.exists():
