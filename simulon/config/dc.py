@@ -131,9 +131,6 @@ class NodeSpec(BaseModel):
     name: str | None = None
     from_: str | None = Field(None, alias="from")
     gpus_per_node: int | None = None
-    # Mutually-derived: set one or the other.  If neither is set, default to
-    # one NIC per GPU (gpus_per_nic=1, nics_per_node=gpus_per_node).
-    gpus_per_nic: int | None = None
     nics_per_node: int | None = None
     gpu: str | GPUSpec | None = None
     cpu: str | CPUSpec | None = None
@@ -143,46 +140,9 @@ class NodeSpec(BaseModel):
     nccl: NcclProfile | None = None
 
     @model_validator(mode="after")
-    def _sync_nic_counts(self):
-        """Ensure gpus_per_nic and nics_per_node are consistent.
-
-        Defaults: if neither is set, assume 1 NIC per GPU.
-        """
-        gpus = self.gpus_per_node
-
-        if self.gpus_per_nic is None and self.nics_per_node is None:
-            # default: one NIC per GPU
-            self.gpus_per_nic = 1
-            if gpus is not None:
-                self.nics_per_node = gpus
-            return self
-
-        if self.gpus_per_nic is not None and self.nics_per_node is not None:
-            if gpus is not None and self.gpus_per_nic * self.nics_per_node != gpus:
-                msg = (
-                    f"node.gpus_per_nic ({self.gpus_per_nic}) * node.nics_per_node "
-                    f"({self.nics_per_node}) must equal node.gpus_per_node ({gpus})"
-                )
-                raise ValueError(msg)
-            return self
-
-        # Exactly one of the two is set
-        if gpus is None:
-            raise ValueError(
-                "node.gpus_per_node must be set to derive the missing value between gpus_per_nic and nics_per_node"
-            )
-
-        if self.gpus_per_nic is None:
-            nics = self.nics_per_node
-            if nics is None:
-                raise ValueError("node.nics_per_node must not be None when gpus_per_nic is not set")
-            if nics == 0:
-                raise ValueError("node.nics_per_node cannot be 0")
-            self.gpus_per_nic = gpus // nics
-        else:
-            if self.gpus_per_nic == 0:
-                raise ValueError("node.gpus_per_nic cannot be 0")
-            self.nics_per_node = gpus // self.gpus_per_nic
+    def set_display_name_default(self) -> NodeSpec:
+        if self.nics_per_node is None:
+            self.nics_per_node = self.gpus_per_node
         return self
 
 
