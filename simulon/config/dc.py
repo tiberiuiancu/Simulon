@@ -97,13 +97,6 @@ class GPUSpec(BaseModel):
     memory_capacity_gb: float | None = None
     power_model: PowerModel | None = None
     cost: CostField | None = None
-    # Populated by `simulon profile gpu`; empty when declared inline in a DC config.
-    kernel_runs: list[KernelRun] = []
-    # Per-kernel OOM entries: same structure as kernel_runs but with times_ms=[].
-    # Recorded when a profiling config OOMs; also covers inferred-OOM configs
-    # (dominated by a confirmed OOM).  Used at simulation time to raise an early
-    # error, and by the CLI to skip already-attempted configs.
-    oom_kernel_runs: list[KernelRun] = []
 
 
 class CPUSpec(BaseModel):
