@@ -30,6 +30,11 @@ def generate_trace(
     all_ranks: bool = typer.Option(
         False, "--all-ranks", help="Trace every GPU rank (default: first rank per PP stage)"
     ),
+    ranks: list[int] | None = typer.Option(
+        None,
+        "--ranks",
+        help="Specific GPU ranks to trace (overrides default stage-based selection)",
+    ),
     mock_data: bool | None = typer.Option(
         None,
         "--mock-data/--no-mock-data",
@@ -228,6 +233,8 @@ def generate_trace(
 
     if all_ranks:
         ranks_to_trace = list(range(world_size))
+    elif ranks is not None:
+        ranks_to_trace = ranks
     else:
         ranks_to_trace = [stage * ranks_per_stage for stage in stages_to_trace]
 
