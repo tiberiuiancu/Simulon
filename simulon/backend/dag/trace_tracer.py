@@ -472,6 +472,9 @@ def _add_non_pp_collective(
     name = str(event.metadata.get("name", ""))
     timestamp_ms = float(event.timestamp_ms)
 
+    if len(group_ranks) < 2:
+        return
+
     match_key = (collective_type, frozenset(group_ranks), name, round(timestamp_ms, 3), data_size)
 
     collective = _collective_registry.get(match_key)
