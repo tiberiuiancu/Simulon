@@ -587,7 +587,7 @@ def _handle_event_gap(
                 activation_bytes,
                 pending_pp_transfers,
             )
-        else:
+        elif len(event.metadata.get("group_ranks", [])) > 1:
             _add_non_pp_collective(
                 dag,
                 event,
