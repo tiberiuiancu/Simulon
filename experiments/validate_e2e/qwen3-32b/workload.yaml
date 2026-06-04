@@ -1,0 +1,99 @@
+framework: megatron
+config:
+  num-gpus: 64
+  tokenizer-type: NullTokenizer
+  mock-data: true
+  # tokenizer-model: EleutherAI/gpt-neox-20b
+  vocab-size: 262144
+  padded-vocab-size: 262144
+
+  tensor-model-parallel-size: 4
+  pipeline-model-parallel-size: 2
+  # num-virtual-stages-per-pipeline-rank: 5
+  sequence-parallel: true
+
+
+  # Base training configuration (overridden by sweep)
+  micro-batch-size: 1    # overridden by sweep
+  global-batch-size: 64  # overridden by sweep
+  lr: 0.0006
+  seed: 1234
+
+  # MODEL
+  num-layers: 64
+  hidden-size: 5120
+  ffn-hidden-size: 25600      # dense FFN
+  init-method-std: 0.02
+  seq-length: 4096
+  kv-channels: 128            # head-dim = 128; Q: 64×128=8192=2×hidden, KV: 4×128=512
+  max-position-embeddings: 4096
+  swiglu: true
+  overlap-grad-reduce: true
+  overlap-param-gather: true
+  # tp-comm-overlap: true
+
+  # Not supported by Simulon's MegatronBridge?
+  # apply-rope-fusion: true
+  # gradient-accumulation-fusion: true
+  # bias-dropout-fusion: true
+  # masked-softmax-fusion: true
+  # async-tensor-model-parallel-allreduce: true
+
+  # Attention
+  num-attention-heads: 64
+  num-query-groups: 8
+  group-query-attention: True
+  attention-softmax-in-fp32: True # TODO check with oellm
+  use-flash-attn: True
+  attention-backend: "auto"
+
+  # Position Embedding
+  position-embedding-type: "rope"
+  rotary-base: 10000
+  rotary-percent: 1.0
+  untie-embeddings-and-output-weights: true
+
+  # Normalization
+  normalization: "RMSNorm"
+  norm-epsilon: 1.e-5 # rmsnorm epsilon
+  qk-layernorm: True # enable qk-norm
+  bf16: True
+
+  # Disable dropout
+  attention-dropout: 0.0
+  hidden-dropout: 0.0
+
+  # OPTIMIZER
+  optimizer: adam
+  adam-beta1: 0.9
+  adam-beta2: 0.95
+  adam-eps: 1.e-8
+  clip-grad: 1.0
+  weight-decay: 0.05
+
+  # SCHEDULER
+  min-lr: 0.0
+  lr-decay-style: WSD
+  lr-wsd-decay-style: linear
+  lr-warmup-iters: 0 # Fixed for all.
+  lr-decay-iters: 1
+  lr-wsd-decay-iters: 1
+
+  # TRAINING, PARALLELISM
+  recompute-activations: False
+  use-torch-fsdp2: False
+  context-parallel-size: 1
+
+  add-bias-linear: false
+
+  # DISTRIBUTED OPTIM
+  use-distributed-optimizer: True
+
+  # COMM OPTIONS
+  distributed-backend: nccl
+  distributed-timeout-minutes: 30
+  # EVALS
+  # Eval interval scales inversely with global batch size,
+  # calibrated so that gbsz=1024 evals every 200 iterations.
+  eval-interval: 999
+  eval-iters: 0

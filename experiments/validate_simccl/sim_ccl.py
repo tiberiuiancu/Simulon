@@ -1,5 +1,12 @@
-"""
-Runs simulon sweeps for 1, 2, and 4 nodes.
+"""Simulate CCL collectives with simulon and write nccl-tests-compatible JSON.
+
+Sweeps AllReduce, AllGather, ReduceScatter over message sizes 8 MB – 8192 MB
+for three cluster configs: 1×4 GPUs, 2×4 GPUs, 4×4 GPUs.
+
+Usage (from repo root):
+    uv run python experiments/validate_simccl/sim_ccl.py
+    uv run python experiments/validate_simccl/sim_ccl.py --cluster jupiter
+    uv run python experiments/validate_simccl/sim_ccl.py --output-dir /path/to/results
 """
 
 #!/usr/bin/env python3
@@ -43,23 +50,35 @@ MESSAGE_SIZES_BYTES = [8 * 1024 * 1024 * (2**i) for i in range(11)]
 # ---------------------------------------------------------------------------
 # Hardware config
 # ---------------------------------------------------------------------------
-_IB_SPEED = "200Gbps"
-_IB_LATENCY = "0.005ms"  # 5 µs
+
+_CLUSTERS = {
+    "snellius": {
+        "node_template": "snellius-h100-4g",
+        # Quad-rail NDR200: 4 × 200 Gbps = 800 Gbps per node
+        "nic_speed": "200Gbps",
+        "nic_latency": "0.005ms",
+        "nics_per_node": 4,
+    },
+    "jupiter": {
+        "node_template": "jupiter-gh200-4g",
+        # Quad-rail HDR: 4 × 200 Gbps = 800 Gbps per node
+        "nic_speed": "200Gbps",
+        "nic_latency": "0.005ms",
+        "nics_per_node": 4,
+    },
+}
 
 
-def _make_datacenter(num_nodes: int, gpus_per_node: int) -> DatacenterConfig:
-    # Use the Snellius node template (real NCCL measurements) for intra-node BW,
-    # and the datacenter spec for inter-node (IB) bandwidth. The node template
-    # provides per-collective bus BW via the nccl profile; calbusbw is used
-    # at runtime to interpolate from it.
+def _make_datacenter(num_nodes: int, gpus_per_node: int, cluster: str) -> DatacenterConfig:
+    cfg = _CLUSTERS[cluster]
     return DatacenterConfig(
         datacenter=DatacenterMeta(name=f"{num_nodes}n{gpus_per_node}g"),
         num_nodes=num_nodes,
         node=NodeSpec(
-            from_="snellius-h100-4g",
-            nics_per_node=4,
+            from_=cfg["node_template"],
+            nics_per_node=cfg["nics_per_node"],
             scale_out=ScaleOutSpec(
-                nic=NICSpec(speed=_IB_SPEED, latency=_IB_LATENCY),
+                nic=NICSpec(speed=cfg["nic_speed"], latency=cfg["nic_latency"]),
                 topology=TopologySpec(type=TopologyType.fat_tree, params={"k": 4}),
             ),
         ),
@@ -89,9 +108,9 @@ def _bus_bw(collective: str, alg_bw_GBps: float, n: int) -> float:
 # ---------------------------------------------------------------------------
 
 
-def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict:
+def simulate_config(collective: str, num_nodes: int, gpus_per_node: int, cluster: str) -> dict:
     """Run all message-size points for one (collective, cluster) combo."""
-    dc = _make_datacenter(num_nodes, gpus_per_node)
+    dc = _make_datacenter(num_nodes, gpus_per_node, cluster)
     num_ranks = num_nodes * gpus_per_node
     results = []
 
@@ -138,6 +157,12 @@ def simulate_config(collective: str, num_nodes: int, gpus_per_node: int) -> dict
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
+        "--cluster",
+        choices=list(_CLUSTERS),
+        default="snellius",
+        help="Cluster to simulate (default: snellius)",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("experiments/validate_simccl/results"),
@@ -150,8 +175,8 @@ def main() -> None:
         for collective in COLLECTIVES:
             label = cfg["label"]
             print(f"[sim] {collective:15s}  {label} ...", flush=True)  # noqa: T201
-            data = simulate_config(collective, cfg["num_nodes"], cfg["gpus_per_node"])
-            out = args.output_dir / f"sim_{collective.lower()}_{label}.json"
+            data = simulate_config(collective, cfg["num_nodes"], cfg["gpus_per_node"], args.cluster)
+            out = args.output_dir / f"sim_{collective.lower()}_{label}_{args.cluster}.json"
             out.write_text(json.dumps(data, indent=2))
             print(f"      -> {out}")  # noqa: T201
 
