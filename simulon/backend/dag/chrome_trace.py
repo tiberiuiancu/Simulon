@@ -201,7 +201,9 @@ def to_chrome_trace(
     # The tracer creates one CommNode per GPU participating in a collective, so the
     # same physical P2P transfer (src, dst, start_ms, bytes) may appear multiple times.
     # Deduplicate by physical identity before emitting.
-    seen_transfers: set[tuple[int, int, float, int]] = set()  # (src, dst, start_ms, bytes)
+    seen_transfers: set[tuple[int, int, float, float, int]] = (
+        set()
+    )  # (src, dst, start_ms, finish_ms, bytes)
 
     for n in dag.comm_nodes:
         if n.start_ms is None or n.finish_ms is None:
@@ -211,7 +213,7 @@ def to_chrome_trace(
         ):
             continue
 
-        key = (n.src_gpu, n.dst_gpu, n.start_ms, n.bytes)
+        key = (n.src_gpu, n.dst_gpu, n.start_ms, n.finish_ms, n.bytes)
         if key in seen_transfers:
             continue
         seen_transfers.add(key)
