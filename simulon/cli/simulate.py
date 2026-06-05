@@ -112,6 +112,12 @@ def simulate(
 
     _load_cascading_mlflow_env(scenario)
 
+    mlflow_envs = {k: v for k, v in os.environ.items() if k.startswith("MLFLOW_")}
+    if mlflow_envs:
+        typer.echo(f"MLflow env vars loaded: {mlflow_envs}")
+    else:
+        typer.echo("No MLFLOW_* env vars found after loading .mlflow.env files.")
+
     with open(scenario) as f:
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.model_validate(raw)

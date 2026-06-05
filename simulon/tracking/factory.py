@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from simulon.tracking.base import ExperimentTracker
+
+logger = logging.getLogger(__name__)
 
 
 def get_trackers() -> list[ExperimentTracker]:
@@ -13,6 +16,12 @@ def get_trackers() -> list[ExperimentTracker]:
     Multiple trackers may be active simultaneously.
     """
     trackers: list[ExperimentTracker] = []
+
+    mlflow_envs = {k: v for k, v in os.environ.items() if k.startswith("MLFLOW_")}
+    if mlflow_envs:
+        logger.info("MLflow env vars: %s", mlflow_envs)
+    else:
+        logger.info("No MLFLOW_* env vars found.")
 
     if any(
         os.environ.get(k) is not None for k in ("MLFLOW_TRACKING_URI", "MLFLOW_EXPERIMENT_NAME")
