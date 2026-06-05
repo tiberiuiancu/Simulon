@@ -31,20 +31,29 @@ from simulon.config.workload import MegatronWorkload  # noqa: E402
 
 
 def load_gpu_template(name: str) -> GPUSpec:
-    """Load a GPU spec from a named YAML template file."""
-    template_path = Path("templates/gpu") / f"{name}.yaml"
-    if not template_path.exists():
-        candidates = (
-            list(Path("templates/gpu").glob("*.yaml")) if Path("templates/gpu").exists() else []
-        )
-        for c in candidates:
-            if c.stem.lower() == name.lower():
-                template_path = c
-                break
-        else:
-            raise FileNotFoundError(
-                f"GPU template not found: {name!r}. Expected at templates/gpu/{name}.yaml"
+    """Load a GPU spec from a named YAML template file or a direct path.
+
+    If *name* ends with ``.yaml`` or contains path separators, it is treated
+    as a filesystem path. Otherwise searches ``templates/gpu/<name>.yaml``.
+    """
+    if name.endswith(".yaml") or "/" in name or "\\" in name:
+        template_path = Path(name)
+        if not template_path.exists():
+            raise FileNotFoundError(f"GPU template not found: {name!r}")
+    else:
+        template_path = Path("templates/gpu") / f"{name}.yaml"
+        if not template_path.exists():
+            candidates = (
+                list(Path("templates/gpu").glob("*.yaml")) if Path("templates/gpu").exists() else []
             )
+            for c in candidates:
+                if c.stem.lower() == name.lower():
+                    template_path = c
+                    break
+            else:
+                raise FileNotFoundError(
+                    f"GPU template not found: {name!r}. Expected at templates/gpu/{name}.yaml"
+                )
     with open(template_path) as f:
         data = yaml.safe_load(f)
     return GPUSpec.model_validate(data)
@@ -70,23 +79,31 @@ def load_nccl_profile(name: str) -> NcclProfile | None:
 
 
 def load_node_template(name: str) -> NodeSpec:
-    """Load a node spec from a named YAML template file.
+    """Load a node spec from a named YAML template file or a direct path.
 
-    Searches templates/node/<name>.yaml (case-insensitive fallback).
+    If *name* ends with ``.yaml`` or contains path separators, it is treated
+    as a filesystem path. Otherwise searches ``templates/node/<name>.yaml``.
     """
-    template_path = Path("templates/node") / f"{name}.yaml"
-    if not template_path.exists():
-        candidates = (
-            list(Path("templates/node").glob("*.yaml")) if Path("templates/node").exists() else []
-        )
-        for c in candidates:
-            if c.stem.lower() == name.lower():
-                template_path = c
-                break
-        else:
-            raise FileNotFoundError(
-                f"Node template not found: {name!r}. Expected at templates/node/{name}.yaml"
+    if name.endswith(".yaml") or "/" in name or "\\" in name:
+        template_path = Path(name)
+        if not template_path.exists():
+            raise FileNotFoundError(f"Node template not found: {name!r}")
+    else:
+        template_path = Path("templates/node") / f"{name}.yaml"
+        if not template_path.exists():
+            candidates = (
+                list(Path("templates/node").glob("*.yaml"))
+                if Path("templates/node").exists()
+                else []
             )
+            for c in candidates:
+                if c.stem.lower() == name.lower():
+                    template_path = c
+                    break
+            else:
+                raise FileNotFoundError(
+                    f"Node template not found: {name!r}. Expected at templates/node/{name}.yaml"
+                )
     with open(template_path) as f:
         data = yaml.safe_load(f)
     return NodeSpec.model_validate(data)
