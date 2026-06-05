@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from pathlib import Path
 
 from simulon.tracking.base import ExperimentTracker
@@ -15,14 +16,15 @@ class MLflowTracker(ExperimentTracker):
     All configuration is read from MLflow's own environment variables:
       MLFLOW_TRACKING_URI     — tracking server URI (default: local ./mlruns)
       MLFLOW_EXPERIMENT_NAME  — experiment to log into (default: "Default")
-      MLFLOW_RUN_NAME         — optional human-readable run name
+      MLFLOW_RUN_NAME        — optional human-readable run name (default: "simulon")
     """
 
     def start_run(self) -> None:
         import mlflow
 
         try:
-            mlflow.start_run()
+            run_name = os.environ.get("MLFLOW_RUN_NAME", "simulon")
+            mlflow.start_run(run_name=run_name)
             run = mlflow.active_run()
             if run is None:
                 logger.warning("MLflow run was not started (active_run() returned None).")
