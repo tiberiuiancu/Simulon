@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import contextlib
+import logging
 from pathlib import Path
 
 from simulon.tracking.base import ExperimentTracker
+
+logger = logging.getLogger(__name__)
 
 
 class MLflowTracker(ExperimentTracker):
@@ -17,24 +21,40 @@ class MLflowTracker(ExperimentTracker):
     def start_run(self) -> None:
         import mlflow
 
-        mlflow.start_run()
+        try:
+            mlflow.start_run()
+            run = mlflow.active_run()
+            if run is None:
+                logger.warning("MLflow run was not started (active_run() returned None).")
+        except Exception as exc:
+            logger.warning("Failed to start MLflow run: %s", exc)
 
     def log_params(self, params: dict[str, str | int | float | bool]) -> None:
         import mlflow
 
-        mlflow.log_params({k: str(v) for k, v in params.items()})
+        try:
+            mlflow.log_params({k: str(v) for k, v in params.items()})
+        except Exception as exc:
+            logger.warning("Failed to log parameters to MLflow: %s", exc)
 
     def log_metrics(self, metrics: dict[str, float]) -> None:
         import mlflow
 
-        mlflow.log_metrics(metrics)
+        try:
+            mlflow.log_metrics(metrics)
+        except Exception as exc:
+            logger.warning("Failed to log metrics to MLflow: %s", exc)
 
     def log_artifact(self, path: Path) -> None:
         import mlflow
 
-        mlflow.log_artifact(str(path))
+        try:
+            mlflow.log_artifact(str(path))
+        except Exception as exc:
+            logger.warning("Failed to log artifact '%s' to MLflow: %s", path, exc)
 
     def end_run(self) -> None:
         import mlflow
 
-        mlflow.end_run()
+        with contextlib.suppress(Exception):
+            mlflow.end_run()
