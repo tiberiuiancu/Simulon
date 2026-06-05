@@ -78,6 +78,7 @@ for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
         "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
                  -n "${ITERS}" -w "${WARMUP}" -g 1 \
                  -J "${OUT}"
+    python3 -m json.tool "${OUT}" > "${OUT}.tmp" && mv "${OUT}.tmp" "${OUT}"
     echo "    -> ${OUT}"
 done
 
