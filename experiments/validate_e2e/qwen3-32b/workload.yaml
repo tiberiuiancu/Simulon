@@ -7,15 +7,28 @@ config:
   vocab-size: 262144
   padded-vocab-size: 262144
 
+  # Difference between oellm:
+  add-bias-linear: False
+  add-qkv-bias: False
+  bias-gelu-fusion: False
+  # bias-swiglu-fusion: True
+  data-parallel-sharding-strategy: no_shard
+  # Not supported by Simulon's MegatronBridge?
+  # apply-rope-fusion: true
+  # gradient-accumulation-fusion: true
+  # bias-dropout-fusion: true
+  # masked-softmax-fusion: true
+  # async-tensor-model-parallel-allreduce: true
+
   tensor-model-parallel-size: 4
-  pipeline-model-parallel-size: 2
+  pipeline-model-parallel-size: 1
   # num-virtual-stages-per-pipeline-rank: 5
   sequence-parallel: true
 
 
   # Base training configuration (overridden by sweep)
   micro-batch-size: 1    # overridden by sweep
-  global-batch-size: 64  # overridden by sweep
+  global-batch-size: 256  # overridden by sweep
   lr: 0.0006
   seed: 1234
 
@@ -28,16 +41,10 @@ config:
   kv-channels: 128            # head-dim = 128; Q: 64×128=8192=2×hidden, KV: 4×128=512
   max-position-embeddings: 4096
   swiglu: true
-  overlap-grad-reduce: true
-  overlap-param-gather: true
+  # overlap-grad-reduce: true
+  # overlap-param-gather: true
   # tp-comm-overlap: true
 
-  # Not supported by Simulon's MegatronBridge?
-  # apply-rope-fusion: true
-  # gradient-accumulation-fusion: true
-  # bias-dropout-fusion: true
-  # masked-softmax-fusion: true
-  # async-tensor-model-parallel-allreduce: true
 
   # Attention
   num-attention-heads: 64
