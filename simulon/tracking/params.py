@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
-from simulon.config.dc import DatacenterConfig, GPUSpec
-from simulon.config.resolve import resolve_node_spec
+from simulon.config.dc import DatacenterConfig
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import CollectiveWorkload, MegatronWorkload
 
@@ -11,53 +11,45 @@ if TYPE_CHECKING:
     from simulon.backend.dag.replayer import SimulationResult
 
 
+def _flatten_dict(prefix: str, data: dict[str, object]) -> dict[str, str | int | float | bool]:
+    """Recursively flatten a dict into dot-separated keys with scalar values."""
+    out: dict[str, str | int | float | bool] = {}
+    for key, val in data.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(val, dict):
+            out.update(_flatten_dict(full_key, val))
+        elif isinstance(val, list):
+            # Serialize lists to JSON strings for logging
+            out[full_key] = json.dumps(val)
+        elif isinstance(val, bool):
+            out[full_key] = val
+        elif isinstance(val, (int, float)):
+            out[full_key] = val
+        elif val is not None:
+            out[full_key] = str(val)
+    return out
+
+
 def extract_params(scenario: ScenarioConfig) -> dict[str, str | int | float | bool]:
     params: dict[str, str | int | float | bool] = {}
 
-    c = scenario.collective
-    params["collective.library"] = c.library
-    params["collective.algorithm"] = c.algorithm
-    params["collective.num_channels"] = c.num_channels
+    # Flatten collective config
+    params.update(_flatten_dict("collective", scenario.collective.model_dump(mode="json")))
 
+    # Flatten workload config
     wl = scenario.workload
     if isinstance(wl, MegatronWorkload):
-        cfg = wl.config
         params["workload.framework"] = wl.framework
-        for key in (
-            "tensor-model-parallel-size",
-            "pipeline-model-parallel-size",
-            "expert-model-parallel-size",
-            "micro-batch-size",
-            "global-batch-size",
-            "seq-length",
-            "num-layers",
-            "hidden-size",
-            "num-attention-heads",
-            "ffn-hidden-size",
-            "vocab-size",
-        ):
-            if key in cfg:
-                params[f"workload.{key.replace('-', '_')}"] = cfg[key]
-        if "num_gpus" in cfg:
-            params["workload.num_gpus"] = cfg["num_gpus"]
+        params.update(_flatten_dict("workload.config", wl.config))
     elif isinstance(wl, CollectiveWorkload):
         params["workload.framework"] = wl.framework
         params["workload.collective_type"] = wl.collective_type.value
         params["workload.message_size_bytes"] = wl.message_size_bytes
 
-    from pathlib import Path
-
-    if isinstance(scenario.datacenter, Path):
-        params["datacenter.config_path"] = str(scenario.datacenter)
-    elif isinstance(scenario.datacenter, DatacenterConfig):
-        node = resolve_node_spec(scenario.datacenter)
-        gpu = node.gpu
-        if isinstance(gpu, str):
-            params["datacenter.gpu"] = gpu
-        elif isinstance(gpu, GPUSpec):
-            gpu_name = gpu.name or gpu.from_
-            if gpu_name is not None:
-                params["datacenter.gpu"] = gpu_name
+    # Flatten datacenter config
+    dc = scenario.datacenter
+    if isinstance(dc, DatacenterConfig):
+        params.update(_flatten_dict("datacenter", dc.model_dump(mode="json")))
 
     return params
 
