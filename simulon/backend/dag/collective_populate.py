@@ -104,14 +104,21 @@ def _multi_node_duration_ms(
     size_bytes = collective_node.data_size
     algorithm = collective_node.algorithm
 
-    node_count = nranks // gpus_per_node
+    # Count unique nodes from actual rank-to-node mapping rather than assuming
+    # all gpus_per_node GPUs on each node participate. This matters for DP
+    # groups where only 1 GPU per node is in the collective (e.g. TP=4, DP=16).
+    node_count = len(set(r // gpus_per_node for r in collective_node.group_ranks))
+    effective_gpus_per_node = nranks // node_count
+    # Scale nics proportionally: on quad-rail nodes each GPU has its own NIC,
+    # so a collective using k GPUs per node uses k NICs per node.
+    effective_nics_per_node = nics_per_node * effective_gpus_per_node / gpus_per_node
 
     selected_algorithm, intra_bw_GBps, inter_bw_GBps = cal_busbw(
         collective_type=collective_type,
         message_size_bytes=size_bytes,
         num_nodes=node_count,
-        gpus_per_node=gpus_per_node,
-        nics_per_node=nics_per_node,
+        gpus_per_node=effective_gpus_per_node,
+        nics_per_node=effective_nics_per_node,
         nic_bw_GBps=nic_bw_GBps,
         nccl_profile=nccl_profile,
         algorithm=algorithm,
@@ -195,12 +202,14 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
 
     nic_bw_GBps, nics_per_node = _nic_bw_GBps(datacenter)
 
+    launch_latency_ms = nccl_profile.launch_latency_ms
+
     with log_progress(
         "  populating collective durations", len(dag.collective_nodes), logger
     ) as advance:
         for node in dag.collective_nodes.values():
             nranks = len(node.group_ranks)
-            node_count = nranks // gpus_per_node
+            node_count = len(set(r // gpus_per_node for r in node.group_ranks))
 
             if node_count == 1:
                 node.duration_ms = _single_node_duration_ms(node, nccl_profile)
@@ -208,6 +217,7 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
                 node.duration_ms = _multi_node_duration_ms(
                     node, gpus_per_node, nic_bw_GBps, nics_per_node, nccl_profile
                 )
+            node.duration_ms += launch_latency_ms
             advance()
 
     pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
