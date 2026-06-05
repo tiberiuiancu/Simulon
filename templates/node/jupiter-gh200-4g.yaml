@@ -4,6 +4,15 @@
 name: jupiter-gh200-4g
 gpus_per_node: 4
 gpu: gh200_jupiter
+scale_out:
+  nic:
+    speed: 200Gbps
+    latency: 0.005ms
+  topology:
+    type: fat_tree
+    params:
+      k: 8
+
 scale_up:
   switch:
     port_speed: 2554Gbps # taken from snellius yaml
@@ -12,6 +21,10 @@ scale_up:
 nccl:
   name: jupiter-gh200-4g
   gpus_per_node: 4
+  # Per-call overhead beyond nccl-tests tight-loop bandwidth.
+  # Derived from: (SP=True gap − SP=False gap) / (8226 − 2066 calls) = 686ms / 6160 = 0.111ms.
+  # Accounts for Python/PyTorch dispatch + CUDA launch overhead not captured in nccl-tests.
+  launch_latency_ms: 0.111
   AllReduce:
     ring:
       - {size_bytes:       8388608, bus_bw_GBps: 204.795}
