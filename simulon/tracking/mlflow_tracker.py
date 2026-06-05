@@ -25,27 +25,15 @@ class MLflowTracker(ExperimentTracker):
         try:
             experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "Default")
             run_name = os.environ.get("MLFLOW_RUN_NAME", "simulon")
-            logger.info("MLflow: experiment_name=%r  run_name=%r", experiment_name, run_name)
 
             client = mlflow.tracking.MlflowClient()
             exp = client.get_experiment_by_name(experiment_name)
             if exp is None:
-                existing = [e.name for e in client.search_experiments()]
-                logger.error(
-                    "MLflow: experiment %r not found on server. Available experiments: %s",
-                    experiment_name,
-                    existing,
+                logger.warning(
+                    "MLflow experiment %r not found on server. Skipping tracking.", experiment_name
                 )
                 return
-            exp_id = exp.experiment_id
-            logger.info("MLflow: resolved experiment_id=%s", exp_id)
-
-            mlflow.start_run(experiment_id=exp_id, run_name=run_name)
-            run = mlflow.active_run()
-            if run is None:
-                logger.warning("MLflow run was not started (active_run() returned None).")
-            else:
-                logger.info("MLflow: run started id=%s", run.info.run_id)
+            mlflow.start_run(experiment_id=exp.experiment_id, run_name=run_name)
         except Exception as exc:
             logger.warning("Failed to start MLflow run: %s", exc)
 
