@@ -24,14 +24,15 @@ class TestLoadMlflowEnvFile:
         assert os.environ["FOO"] == "bar"
         del os.environ["FOO"]
 
-    def test_skips_existing_variable(self, tmp_path: Path) -> None:
+    def test_overrides_existing_variable(self, tmp_path: Path) -> None:
+        """Individual file loading overrides existing variables (matches cascade later-wins semantics)."""
         env_file = tmp_path / ".mlflow.env"
         env_file.write_text("FOO=later")
 
         os.environ["FOO"] = "existing"
         _load_mlflow_env_file(env_file)
 
-        assert os.environ["FOO"] == "existing"
+        assert os.environ["FOO"] == "later"
         del os.environ["FOO"]
 
     def test_strips_quotes(self, tmp_path: Path) -> None:
@@ -89,8 +90,8 @@ class TestLoadCascadingMlflowEnv:
 
         _load_cascading_mlflow_env(str(scenario))
 
-        assert os.environ["A"] == "root"
-        assert os.environ["B"] == "root"
+        assert os.environ["A"] == "level1"
+        assert os.environ["B"] == "level3"
         assert os.environ["C"] == "level2"
         del os.environ["A"], os.environ["B"], os.environ["C"]
 
@@ -146,7 +147,7 @@ class TestLoadCascadingMlflowEnv:
         del os.environ["SCENARIO_ONLY"]
 
     def test_single_level_below_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Scenario directly under cwd loads cwd then scenario dir."""
+        """Scenario directly under cwd loads cwd then scenario dir. Later files override."""
         monkeypatch.chdir(tmp_path)
         sub = tmp_path / "sub"
         sub.mkdir()
@@ -159,5 +160,5 @@ class TestLoadCascadingMlflowEnv:
         os.environ.pop("LEVEL", None)
         _load_cascading_mlflow_env(str(scenario_file))
 
-        assert os.environ["LEVEL"] == "root"
+        assert os.environ["LEVEL"] == "sub"
         del os.environ["LEVEL"]
