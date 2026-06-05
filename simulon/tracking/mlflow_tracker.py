@@ -23,7 +23,7 @@ class MLflowTracker(ExperimentTracker):
         import mlflow
 
         try:
-            experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "Default")
+            experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "simulon")
             run_name = os.environ.get("MLFLOW_RUN_NAME", "simulon")
 
             client = mlflow.tracking.MlflowClient()

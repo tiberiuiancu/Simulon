@@ -13,11 +13,11 @@ from simulon.config.workload import MegatronWorkload
 from simulon.tracking import get_trackers
 from simulon.tracking.params import extract_metrics, extract_params
 
-ENV_FILE_NAME = ".mlflow.env"
+ENV_FILE_NAME = ".tracking.env"
 
 
-def _load_mlflow_env_file(path: Path) -> None:
-    """Set variables from a .mlflow.env file into os.environ.
+def _load_tracking_env_file(path: Path) -> None:
+    """Set variables from a .tracking.env file into os.environ.
 
     Each non-empty, non-comment line must contain exactly one ``=``:
         KEY=value
@@ -39,14 +39,14 @@ def _load_mlflow_env_file(path: Path) -> None:
                 os.environ[key] = val
 
 
-def _load_cascading_mlflow_env(scenario_path: str) -> None:
-    """Load ``.mlflow.env`` files from CWD down to the scenario directory.
+def _load_cascading_tracking_env(scenario_path: str) -> None:
+    """Load ``.tracking.env`` files from CWD down to the scenario directory.
 
     For ``./experiments/validate_e2e/deepseekv3/scenario.yaml`` we load, in order:
-        ./.mlflow.env
-        ./experiments/.mlflow.env
-        ./experiments/validate_e2e/.mlflow.env
-        ./experiments/validate_e2e/deepseekv3/.mlflow.env
+        ./.tracking.env
+        ./experiments/.tracking.env
+        ./experiments/validate_e2e/.tracking.env
+        ./experiments/validate_e2e/deepseekv3/.tracking.env
     """
     scenario = Path(scenario_path).resolve()
     cwd = Path.cwd().resolve()
@@ -65,7 +65,7 @@ def _load_cascading_mlflow_env(scenario_path: str) -> None:
     for d in dirs:
         env_file = d / ENV_FILE_NAME
         if env_file.is_file():
-            _load_mlflow_env_file(env_file)
+            _load_tracking_env_file(env_file)
 
 
 def simulate(
@@ -110,7 +110,7 @@ def simulate(
     """
     import tempfile
 
-    _load_cascading_mlflow_env(scenario)
+    _load_cascading_tracking_env(scenario)
 
     with open(scenario) as f:
         raw = yaml.safe_load(f)
