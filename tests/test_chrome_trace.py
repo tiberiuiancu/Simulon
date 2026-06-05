@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from simulon.backend.dag.chrome_trace import _TID_COMPUTE, to_chrome_trace
 from simulon.backend.dag.nodes import CommNode, ComputeNode, ExecutionDAG
+from simulon.backend.dag.trace_tracer import ParallelConfig
 
 
 def _make_compute_node(
@@ -27,7 +28,8 @@ def _make_compute_node(
 
 def _compute_events(dag: ExecutionDAG) -> list[dict]:
     """Extract all compute 'X' events from the trace."""
-    trace = to_chrome_trace(dag, tp=1, pp=1, dp=1)
+    config = ParallelConfig(tp=1, cp=1, ep=1, dp=1, pp=1, etp=1, edp=1, num_gpus=1)
+    trace = to_chrome_trace(dag, config=config)
     return [e for e in trace["traceEvents"] if e.get("ph") == "X" and e.get("tid") == _TID_COMPUTE]
 
 
@@ -113,7 +115,8 @@ class TestOnlyProfiledFiltering:
             profiled_ranks={0},
         )
 
-        trace = to_chrome_trace(dag, tp=1, pp=1, dp=1, only_profiled=True)
+        config = ParallelConfig(tp=1, cp=1, ep=1, dp=1, pp=1, etp=1, edp=1, num_gpus=1)
+        trace = to_chrome_trace(dag, config=config, only_profiled=True)
         events = trace["traceEvents"]
 
         meta_events = [e for e in events if e.get("ph") == "M"]

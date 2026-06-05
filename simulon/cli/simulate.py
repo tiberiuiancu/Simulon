@@ -194,17 +194,14 @@ def simulate(
 
         if chrome is not None:
             if isinstance(sc.workload, MegatronWorkload):
-                cfg = sc.workload.config
-                tp = int(cfg.get("tensor-model-parallel-size", 1))
-                pp_val = int(cfg.get("pipeline-model-parallel-size", 1))
-                ep = int(cfg.get("expert-model-parallel-size", 1))
-                num_gpus = int(cfg.get("num_gpus", cfg.get("num-gpus", tp * pp_val * ep)))
-                dp = max(1, num_gpus // (tp * pp_val * ep))
+                from simulon.backend.dag.trace_tracer import ParallelConfig
+
+                config = ParallelConfig.from_workload(sc.workload)
             else:
-                tp = pp_val = ep = dp = 1
-            trace_dict = to_chrome_trace(
-                dag, tp=tp, pp=pp_val, dp=dp, ep=ep, only_profiled=chrome_compact
-            )
+                from simulon.backend.dag.trace_tracer import ParallelConfig
+
+                config = ParallelConfig(tp=1, cp=1, ep=1, dp=1, pp=1, etp=1, edp=1, num_gpus=1)
+            trace_dict = to_chrome_trace(dag, config=config, only_profiled=chrome_compact)
             with open(chrome, "w") as f:
                 json.dump(trace_dict, f)
             typer.echo(f"Chrome trace written to {chrome}  (open in https://ui.perfetto.dev)")

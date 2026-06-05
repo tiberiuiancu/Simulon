@@ -2,7 +2,9 @@
 
 Usage:
     dag, result = backend.simulate(scenario)
-    trace = to_chrome_trace(dag, tp=2, pp=2, dp=1)
+    from simulon.backend.dag.trace_tracer import ParallelConfig
+    config = ParallelConfig.from_workload(workload)
+    trace = to_chrome_trace(dag, config=config)
     with open("trace.json", "w") as f:
         json.dump(trace, f)
 
@@ -11,8 +13,8 @@ are populated on all nodes.
 
 Layout:
   - One pid per GPU (pid = 1000 + gpu_rank).
-  - PIDs are sorted by (dp_rank, pp_stage, tp_rank) — so within each DP replica
-    you see PP stages in order, and within each PP stage you see TP ranks together.
+  - PIDs are sorted by proper MoE/non-MoE parallel folding (dp, pp, ep, tp, edp, etp).
+  - GPU labels show both attention and expert coordinates for clarity.
   - Three tids per GPU:
       tid 1000 — Compute
       tid 1001 — Comm (Send)   [CommNode as src_gpu]
@@ -26,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from simulon.backend.dag.nodes import ExecutionDAG
+from simulon.backend.dag.trace_tracer import ParallelConfig, _decompose_rank
 
 _TID_COMPUTE = 1000
 _TID_COLL_SEND = 1001  # AllGather / ReduceScatter / AllReduce send
@@ -34,25 +37,20 @@ _TID_PP_SEND = 1003  # PP_Send (inter-stage point-to-point, send side)
 _TID_PP_RECV = 1004  # PP_Send recv side
 
 
-def _decode_rank(gpu_rank: int, tp: int, pp: int, ep: int = 1) -> tuple[int, int, int, int]:
-    """Return (dp_rank, pp_stage, ep_rank, tp_rank) for a gpu_rank."""
-    tp_rank = gpu_rank % tp
-    ep_rank = (gpu_rank // tp) % ep
-    pp_stage = (gpu_rank // (tp * ep)) % pp
-    dp_rank = gpu_rank // (tp * ep * pp)
-    return dp_rank, pp_stage, ep_rank, tp_rank
+def _decode_rank(gpu_rank: int, config: ParallelConfig) -> tuple[int, ...]:
+    """Return decomposed coordinates for a gpu_rank using proper MoE/non-MoE folding."""
+    coords = _decompose_rank(gpu_rank, config)
+    return coords.dp, coords.pp, coords.ep, coords.tp, coords.edp, coords.etp
 
 
 def to_chrome_trace(
-    dag: ExecutionDAG, tp: int, pp: int, dp: int, ep: int = 1, *, only_profiled: bool = False
+    dag: ExecutionDAG, config: ParallelConfig, *, only_profiled: bool = False
 ) -> dict[str, Any]:
     """Build a Chrome Trace dict from a timing-populated ExecutionDAG.
 
     Args:
         dag:  ExecutionDAG after replay() has been called.
-        tp:   Tensor parallelism degree.
-        pp:   Pipeline parallelism degree.
-        dp:   Data parallelism degree.
+        config: ParallelConfig with tp/cp/ep/dp/pp/etp/edp dimensions.
         only_profiled: If True, only emit events for ranks that had exact trace files.
 
     Returns:
@@ -77,14 +75,20 @@ def to_chrome_trace(
     if only_profiled:
         all_gpus &= dag.profiled_ranks
 
-    # Emit process/thread metadata sorted by (dp, pp, tp) = natural gpu_rank order
+    # Emit process/thread metadata sorted by (dp, pp, ep, tp, edp, etp) = natural gpu_rank order
     for gpu in sorted(all_gpus):
         pid = 1000 + gpu
-        dp_rank, pp_stage, ep_rank, tp_rank = _decode_rank(gpu, tp, pp, ep)
+        dp_rank, pp_stage, ep_rank, tp_rank, edp_rank, etp_rank = _decode_rank(gpu, config)
 
-        # Group label: DP replicas together, PP stages within, EP/TP ranks innermost
-        proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} EP={ep_rank} TP={tp_rank}"
-        sort_idx = dp_rank * (pp * ep * tp) + pp_stage * (ep * tp) + ep_rank * tp + tp_rank
+        proc_name = f"GPU {gpu} | DP={dp_rank} PP={pp_stage} TP={tp_rank}"
+        if config.ep > 1 or config.etp != config.tp:
+            proc_name += f" | EDP={edp_rank} EP={ep_rank} ETP={etp_rank}"
+        sort_idx = (
+            dp_rank * (config.pp * config.edp * config.etp)
+            + pp_stage * (config.edp * config.etp)
+            + edp_rank * config.etp
+            + etp_rank
+        )
 
         events += [
             {"name": "process_name", "ph": "M", "pid": pid, "tid": 0, "args": {"name": proc_name}},
@@ -295,17 +299,11 @@ def to_chrome_trace(
 
 
 def write_chrome_trace(
-    dag: ExecutionDAG,
-    tp: int,
-    pp: int,
-    dp: int,
-    path: str | Path,
-    ep: int = 1,
-    only_profiled: bool = False,
+    dag: ExecutionDAG, config: ParallelConfig, path: str | Path, *, only_profiled: bool = False
 ) -> None:
     """Write a Chrome Trace JSON file from a populated ExecutionDAG."""
     import json
 
-    trace = to_chrome_trace(dag, tp=tp, pp=pp, dp=dp, ep=ep, only_profiled=only_profiled)
+    trace = to_chrome_trace(dag, config=config, only_profiled=only_profiled)
     with open(path, "w") as f:
         json.dump(trace, f)
