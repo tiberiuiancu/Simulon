@@ -29,7 +29,15 @@ class MLflowTracker(ExperimentTracker):
 
             client = mlflow.tracking.MlflowClient()
             exp = client.get_experiment_by_name(experiment_name)
-            exp_id = client.create_experiment(experiment_name) if exp is None else exp.experiment_id
+            if exp is None:
+                existing = [e.name for e in client.search_experiments()]
+                logger.error(
+                    "MLflow: experiment %r not found on server. Available experiments: %s",
+                    experiment_name,
+                    existing,
+                )
+                return
+            exp_id = exp.experiment_id
             logger.info("MLflow: resolved experiment_id=%s", exp_id)
 
             mlflow.start_run(experiment_id=exp_id, run_name=run_name)
