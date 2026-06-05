@@ -252,46 +252,32 @@ def resolve_workload(
     return MegatronWorkload.model_validate(data)
 
 
-# Compute-relevant config keys for workload hashing.
-# Data-path / runtime keys are intentionally excluded.
-_COMPUTE_KEYS = frozenset(
+# Keys intentionally excluded from workload hashing.
+# Everything else in workload.config is automatically included.
+# Excluded categories: data/runtime/infra flags, tokenizer choices,
+# memory/GC tuning, and architecture knobs that don't change compute graph.
+_EXCLUDED_HASH_KEYS = frozenset(
     {
-        "tensor-model-parallel-size",
-        "tp",
-        "pipeline-model-parallel-size",
-        "pp",
-        "expert-model-parallel-size",
-        "ep",
-        "num_microbatches",
-        "num-microbatches",
-        "pipeline_schedule",
-        "num_layers",
-        "num-layers",
-        "hidden_size",
-        "hidden-size",
-        "num_attention_heads",
-        "num-attention-heads",
-        "ffn_hidden_size",
-        "ffn-hidden-size",
-        "vocab_size",
-        "vocab-size",
-        "seq_length",
-        "seq-length",
-        "sequence_length",
-        "global_batch_size",
-        "global-batch-size",
-        "micro_batch_size",
-        "micro-batch-size",
-        "dtype",
-        "num_gpus",
-        "num-gpus",
-        "flash_attention",
-        "flash-attention",
-        "swiglu",
-        "num_experts",
-        "num-experts",
-        "top_k",
-        "top-k",
+        # data / runtime / infra
+        "framework",
+        "seed",
+        "split",
+        "reset-position-ids",
+        "reset-attention-mask",
+        "eod-mask-loss",
+        "tokenizer-type",
+        "tokenizer-model",
+        "mock-data",
+        "mmap-bin-files",
+        "manual-gc",
+        "manual-gc-interval",
+        "num-workers",
+        "override-opt_param_scheduler",
+        "override-opt-param-scheduler",
+        # architecture knobs that don't change the compute graph
+        "q-lora-rank",
+        "init-method-std",
+        "make-vocab-size-divisible-by",
     }
 )
 
@@ -299,10 +285,12 @@ _COMPUTE_KEYS = frozenset(
 def workload_hash(workload: MegatronWorkload) -> str:
     """Return a 16-character hex hash of the workload's compute-relevant config.
 
-    Only fields in ``_COMPUTE_KEYS`` are included, so changing dataset paths,
-    tokenizer choices, or memory snapshots does not change the hash.
+    Every key in ``workload.config`` is included **except** those listed in
+    ``_EXCLUDED_HASH_KEYS``.  Adding a new config flag therefore automatically
+    changes the hash; data-path / runtime flags must be explicitly added to the
+    exclusion list to keep the hash stable.
     """
-    filtered = {k: v for k, v in workload.config.items() if k in _COMPUTE_KEYS}
+    filtered = {k: v for k, v in workload.config.items() if k not in _EXCLUDED_HASH_KEYS}
     return hashlib.sha256(json.dumps(filtered, sort_keys=True, default=str).encode()).hexdigest()[
         :16
     ]
