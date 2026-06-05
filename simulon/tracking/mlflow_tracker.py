@@ -23,7 +23,9 @@ class MLflowTracker(ExperimentTracker):
         import mlflow
 
         try:
+            experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "Default")
             run_name = os.environ.get("MLFLOW_RUN_NAME", "simulon")
+            mlflow.set_experiment(experiment_name)
             mlflow.start_run(run_name=run_name)
             run = mlflow.active_run()
             if run is None:
