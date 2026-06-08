@@ -66,3 +66,6 @@ class MLflowTracker(ExperimentTracker):
 
         with contextlib.suppress(Exception):
             mlflow.end_run()
+
+    def pull_metrics(self, workload_hash: str) -> None:
+        raise NotImplementedError("pull_metrics is not supported for MLflow")

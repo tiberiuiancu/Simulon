@@ -13,60 +13,6 @@ from simulon.config.workload import MegatronWorkload
 from simulon.tracking import get_trackers
 from simulon.tracking.params import extract_metrics, extract_params
 
-ENV_FILE_NAME = ".tracking.env"
-
-
-def _load_tracking_env_file(path: Path) -> None:
-    """Set variables from a .tracking.env file into os.environ.
-
-    Each non-empty, non-comment line must contain exactly one ``=``:
-        KEY=value
-    Existing environment variables are **not** overwritten (standard dotenv
-    behaviour); however, later files in the cascade *can* override values
-    that were set by earlier files because we process them sequentially.
-    """
-    with open(path, encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" not in line:
-                continue
-            key, val = line.split("=", 1)
-            key = key.strip()
-            val = val.strip().strip('"').strip("'")
-            if key:
-                os.environ[key] = val
-
-
-def _load_cascading_tracking_env(scenario_path: str) -> None:
-    """Load ``.tracking.env`` files from CWD down to the scenario directory.
-
-    For ``./experiments/validate_e2e/deepseekv3/scenario.yaml`` we load, in order:
-        ./.tracking.env
-        ./experiments/.tracking.env
-        ./experiments/validate_e2e/.tracking.env
-        ./experiments/validate_e2e/deepseekv3/.tracking.env
-    """
-    scenario = Path(scenario_path).resolve()
-    cwd = Path.cwd().resolve()
-
-    try:
-        rel = scenario.parent.relative_to(cwd)
-    except ValueError:
-        dirs = [scenario.parent]
-    else:
-        dirs = [cwd]
-        cur = cwd
-        for part in rel.parts:
-            cur = cur / part
-            dirs.append(cur)
-
-    for d in dirs:
-        env_file = d / ENV_FILE_NAME
-        if env_file.is_file():
-            _load_tracking_env_file(env_file)
-
 
 def simulate(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml"),
@@ -110,7 +56,7 @@ def simulate(
     """
     import tempfile
 
-    _load_cascading_tracking_env(scenario)
+    trackers = get_trackers(scenario)
 
     with open(scenario) as f:
         raw = yaml.safe_load(f)

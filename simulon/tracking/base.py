@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 
 class ExperimentTracker(ABC):
@@ -31,6 +32,14 @@ class ExperimentTracker(ABC):
     def end_run(self) -> None:
         """Finalize the run."""
         ...
+
+    def pull_metrics(self, workload_hash: str) -> dict[str, Any] | None:
+        """Pull metrics for a finished run matching *workload_hash*.
+
+        Returns ``None`` when the tracker backend does not support querying
+        or when no matching run is found.
+        """
+        return None
 
     def __enter__(self) -> ExperimentTracker:
         self.start_run()

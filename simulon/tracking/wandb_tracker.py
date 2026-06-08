@@ -66,3 +66,22 @@ class WandbTracker(ExperimentTracker):
             wandb.finish()
         except Exception:
             pass
+
+    def pull_metrics(self, workload_hash: str) -> dict[str, Any] | None:
+        try:
+            import wandb
+
+            entity = os.environ.get("WANDB_ENTITY")
+            project = os.environ.get("WANDB_PROJECT", "simulon")
+            run_name = os.environ.get("WANDB_RUN_NAME")
+            api = wandb.Api()
+            filters: dict[str, object] = {"state": "finished"}
+            if run_name:
+                filters["group"] = run_name
+            runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
+            for run in runs:
+                if run.config.get("workload_hash") == workload_hash:
+                    return dict(run.summary)
+        except Exception as exc:
+            logger.warning("Failed to pull metrics from W&B: %s", exc)
+        return None
