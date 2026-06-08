@@ -163,6 +163,12 @@ def compare(
         "--breakdown/--no-breakdown",
         help="Show compute/comm/bubble breakdown",
     ),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write results to a YAML file (simulated metrics + errors vs reference).",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable backend progress logging"),
 ):
     """Run one or more scenarios and compare results against reference measurements.
@@ -224,3 +230,20 @@ def compare(
             label += f"  (ref: {ref_path})"
 
         _print_comparison(label, simulated, reference, bd)
+
+        if output is not None:
+            out_records: dict = {"scenario": scenario_path, "simulated": simulated}
+            if reference:
+                errors = {}
+                for key, sim_val in simulated.items():
+                    ref_val = reference.get(key)
+                    if ref_val is not None:
+                        errors[key] = round((sim_val - ref_val) / ref_val * 100, 4)
+                out_records["reference"] = reference
+                out_records["error_pct"] = errors
+            if bd:
+                out_records["breakdown"] = bd
+            output.parent.mkdir(parents=True, exist_ok=True)
+            with open(output, "w") as f:
+                yaml.dump(out_records, f, default_flow_style=False, sort_keys=False)
+            typer.echo(f"Results saved to {output}")

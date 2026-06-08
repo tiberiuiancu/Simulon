@@ -1,8 +1,9 @@
 # Practical measurements from wandb — Qwen3-32B on Jupiter (16n×4g, TP=4, DP=16)
-# GBS=256, MBS=1, seq_len=4096, sequence-parallel=false
-# Average of iterations 2-10 from slurm-582486.log (iteration 1 excluded as JIT warmup)
-iter_time_ms: 11654.0
-throughput_tps: 90010.0       # 1406.4 t/s/GPU × 64 GPUs
-per_gpu_tps: 1406.4
-per_gpu_tflops: 292.76
-mfu_pct: 29.60                # 292.76 / 989 TFLOPs BF16
+# GBS=256, MBS=1, seq_len=4096, sequence-parallel=true
+# Over 10 iterations, the fastest iteration is taken of slurm-581898.log
+
+iter_time_ms: 11840.1
+throughput_tps: 88563.2
+per_gpu_tps: 1383.8
+per_gpu_tflops: 288.1
+mfu_pct: 29.13
