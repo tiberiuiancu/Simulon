@@ -7,7 +7,7 @@ import yaml
 
 from simulon.backend.analytical import simulate as run_simulation
 from simulon.backend.dag.chrome_trace import to_chrome_trace
-from simulon.config.resolve import resolve_datacenter, resolve_node_spec, resolve_workload
+from simulon.config.resolve import resolve_datacenter, resolve_node_spec, resolve_workload, workload_hash
 from simulon.config.scenario import ScenarioConfig
 from simulon.config.workload import MegatronWorkload
 from simulon.tracking import get_trackers
@@ -150,6 +150,10 @@ def simulate(
 
         if trackers:
             params = extract_params(sc)
+
+            if isinstance(sc.workload, MegatronWorkload):
+                params["workload_hash"] = workload_hash(sc.workload)
+
             metrics = extract_metrics(result)
 
             if isinstance(sc.workload, MegatronWorkload):
