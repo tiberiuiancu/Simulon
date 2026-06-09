@@ -33,8 +33,18 @@ class ExperimentTracker(ABC):
         """Finalize the run."""
         ...
 
-    def pull_metrics(self, workload_hash: str) -> dict[str, Any] | None:
+    def pull_metrics(
+        self,
+        workload_hash: str,
+        config_filters: dict[str, str | int | float | bool] | None = None,
+    ) -> dict[str, Any] | None:
         """Pull metrics for a finished run matching *workload_hash*.
+
+        Optionally also match on *config_filters* — a flat dict of wandb
+        config keys (e.g. ``{"datacenter.node.scale_out.nic.speed": "10Gbps"}``)
+        that must all equal the run's logged config.  This is needed when
+        the same workload is simulated against different datacenter configs
+        (e.g. varying network bandwidth).
 
         Returns ``None`` when the tracker backend does not support querying
         or when no matching run is found.

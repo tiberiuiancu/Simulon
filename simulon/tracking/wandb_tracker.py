@@ -67,7 +67,11 @@ class WandbTracker(ExperimentTracker):
         except Exception:
             pass
 
-    def pull_metrics(self, workload_hash: str) -> dict[str, Any] | None:
+    def pull_metrics(
+        self,
+        workload_hash: str,
+        config_filters: dict[str, str | int | float | bool] | None = None,
+    ) -> dict[str, Any] | None:
         try:
             import wandb
 
@@ -81,6 +85,9 @@ class WandbTracker(ExperimentTracker):
             runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
             for run in runs:
                 if run.config.get("workload_hash") == workload_hash:
+                    if config_filters:
+                        if not all(run.config.get(k) == v for k, v in config_filters.items()):
+                            continue
                     return dict(run.summary)
         except Exception as exc:
             logger.warning("Failed to pull metrics from W&B: %s", exc)
