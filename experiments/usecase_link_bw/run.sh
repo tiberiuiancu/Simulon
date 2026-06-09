@@ -9,7 +9,7 @@ BWS=(10 100 200 400 800)
 
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
-    bash scripts/apptainer-trace.sh "$SCRIPT_DIR/$model/workload.yaml" \
+    bash scripts/apptainer-trace.sh "$SCRIPT_DIR/../usecase_node_size/$model/workload.yaml" \
         --gpu h100
 done
 
