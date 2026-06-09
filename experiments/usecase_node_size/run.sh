@@ -9,8 +9,7 @@ MODELS=(deepseekv3 gptoss-120b llama3-70b)
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
     bash scripts/apptainer-trace.sh "$SCRIPT_DIR/$model/workload.yaml" \
-        --gpu h100 \
-        --output-dir "$SCRIPT_DIR/$model/traces"
+        --gpu h100
 done
 
 for model in "${MODELS[@]}"; do
@@ -18,9 +17,7 @@ for model in "${MODELS[@]}"; do
         scenario="$SCRIPT_DIR/$model/scenario${size}.yaml"
         name="${model}-node${size}"
         echo "  SIMULATE: $name"
-        uv run python -m simulon.cli simulate "$scenario" \
-            --chrome "$SCRIPT_DIR/$name-trace.json" \
-            --trace &
+        uv run simulon simulate "$scenario" &
     done
 done
 
@@ -28,3 +25,4 @@ wait $(jobs -p)
 
 echo "=== Plotting ==="
 python "$SCRIPT_DIR/plot.py"
+
