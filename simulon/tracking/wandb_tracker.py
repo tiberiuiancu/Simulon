@@ -81,7 +81,7 @@ class WandbTracker(ExperimentTracker):
             api = wandb.Api()
             filters: dict[str, object] = {"state": "finished"}
             if run_name:
-                filters["group"] = run_name
+                filters["display_name"] = run_name
             runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
             for run in runs:
                 if run.config.get("workload_hash") == workload_hash:
