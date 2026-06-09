@@ -30,6 +30,9 @@ def _flatten_dict(prefix: str, data: dict[str, object]) -> dict[str, str | int |
     return out
 
 
+from simulon.config.resolve import resolve_node_spec
+
+
 def extract_params(scenario: ScenarioConfig) -> dict[str, str | int | float | bool]:
     params: dict[str, str | int | float | bool] = {}
 
@@ -46,10 +49,14 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, str | int | float | bo
         params["workload.collective_type"] = wl.collective_type.value
         params["workload.message_size_bytes"] = wl.message_size_bytes
 
-    # Flatten datacenter config
+    # Flatten datacenter config (with resolved node so template refs are expanded)
     dc = scenario.datacenter
     if isinstance(dc, DatacenterConfig):
-        params.update(_flatten_dict("datacenter", dc.model_dump(mode="json")))
+        dc_dict = dc.model_dump(mode="json")
+        if dc_dict.get("node") is not None:
+            resolved_node = resolve_node_spec(dc)
+            dc_dict["node"] = resolved_node.model_dump(mode="json")
+        params.update(_flatten_dict("datacenter", dc_dict))
 
     return params
 
