@@ -77,18 +77,14 @@ class WandbTracker(ExperimentTracker):
 
             entity = os.environ.get("WANDB_ENTITY")
             project = os.environ.get("WANDB_PROJECT", "simulon")
-            run_name = os.environ.get("WANDB_RUN_NAME")
             api = wandb.Api()
-            filters: dict[str, object] = {"state": "finished"}
-            if run_name:
-                filters["display_name"] = run_name
+            filters: dict[str, object] = {"state": "finished", "config.workload_hash": workload_hash}
+            if config_filters:
+                for k, v in config_filters.items():
+                    filters[f"config.{k}"] = v
             runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
             for run in runs:
-                if run.config.get("workload_hash") == workload_hash:
-                    if config_filters:
-                        if not all(run.config.get(k) == v for k, v in config_filters.items()):
-                            continue
-                    return dict(run.summary)
+                return dict(run.summary)
         except Exception as exc:
             logger.warning("Failed to pull metrics from W&B: %s", exc)
         return None
