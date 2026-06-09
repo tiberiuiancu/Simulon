@@ -18,7 +18,7 @@ for model in "${MODELS[@]}"; do
         scenario="$SCRIPT_DIR/$model/scenario${size}.yaml"
         name="${model}-node${size}"
         echo "  SIMULATE: $name"
-        python -m simulon.cli simulate "$scenario" \
+        uv run python -m simulon.cli simulate "$scenario" \
             --chrome "$SCRIPT_DIR/$name-trace.json" \
             --trace &
     done

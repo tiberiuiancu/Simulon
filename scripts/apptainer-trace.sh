@@ -6,5 +6,5 @@ apptainer run --nv \
     --bind $(pwd)/templates:/opt/simulon/templates \
     --bind $(pwd)/output:/opt/simulon/output \
     simulon-nemo.sif \
-    bash -c "NVTE_DEBUG=1 NVTE_DEBUG_LEVEL=2 CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate $1 --memory-snapshot output/mem.pickle"
+    bash -c "CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate --force-regenerate --memory-snapshot output/mem.pickle $@"
 
