@@ -25,4 +25,5 @@ done
 wait $(jobs -p)
 
 echo "=== Plotting ==="
-python "$SCRIPT_DIR/plot.py"
+uv run python "$SCRIPT_DIR/plot.py" --output output/link_bw.png
+
