@@ -16,40 +16,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from simulon.config.resolve import resolve_workload, workload_hash
-from simulon.config.scenario import ScenarioConfig
 from simulon.tracking import get_trackers
-
-
-def _find_scenarios(base_dir: Path) -> list[Path]:
-    return sorted(base_dir.rglob("scenario*.yaml"))
-
-
-def _model_from_scenario(path: Path) -> str:
-    return path.parent.name
-
-
-def _bw_from_scenario(path: Path) -> int:
-    return int(path.stem.replace("scenario", ""))
-
-
-def _config_filter_from_scenario(path: Path) -> dict[str, str | int | float | bool]:
-    bw = _bw_from_scenario(path)
-    return {"datacenter.node.scale_out.nic.speed": f"{bw}Gbps"}
-
-
-def _compute_workload_hash(scenario: Path) -> str:
-    import yaml
-
-    with open(scenario) as f:
-        raw: dict[str, object] = yaml.safe_load(f)
-    sc = ScenarioConfig.model_validate(raw)
-    if isinstance(sc.workload, Path):
-        sc.workload = resolve_workload(sc.workload)
-    from simulon.config.workload import MegatronWorkload
-    if not isinstance(sc.workload, MegatronWorkload):
-        raise ValueError("Expected MegatronWorkload")
-    return workload_hash(sc.workload)
 
 
 def plot_mfu_from_wandb(
@@ -57,35 +24,31 @@ def plot_mfu_from_wandb(
     base_dir: Path,
     chart: str = "both",
 ) -> None:
-    scenarios = _find_scenarios(base_dir)
-    if not scenarios:
-        print("No scenario files found.", file=sys.stderr)
-        sys.exit(1)
-
-    trackers = get_trackers(scenarios[0])
+    env_file = base_dir / ".tracking.env"
+    trackers = get_trackers(env_file if env_file.exists() else base_dir)
     if not trackers:
         print("No active trackers found.", file=sys.stderr)
         sys.exit(1)
 
+    # Fetch all runs for this experiment via prefix (e.g. "link-bw-")
+    prefix = "link-bw-"
     records: list[dict[str, float | str]] = []
-
-    for sc_path in scenarios:
-        model = _model_from_scenario(sc_path)
-        bw = _bw_from_scenario(sc_path)
-        wl_hash = _compute_workload_hash(sc_path)
-        cfg_filter = _config_filter_from_scenario(sc_path)
-
-        for tracker in trackers:
-            metrics = tracker.pull_metrics(wl_hash, config_filters=cfg_filter)
-            if metrics is None:
+    for tracker in trackers:
+        runs = tracker.fetch_runs(prefix=prefix)
+        for run in runs:
+            name = run["display_name"]
+            parts = name.split("-")
+            if len(parts) < 3:
                 continue
-            mfu = metrics.get("mfu_pct")
+            model = "-".join(parts[2:])
+            summary = run["summary"]
+            mfu = summary.get("mfu_pct")
             if mfu is None:
                 continue
             records.append({
                 "model": model,
-                "bw_gbps": bw,
-                "bw_label": f"{bw} Gbps",
+                "bw_gbps": 0,  # placeholder, will be filled from config
+                "bw_label": "unknown",
                 "mfu_pct": float(mfu),
             })
 
@@ -108,7 +71,7 @@ def plot_mfu_from_wandb(
     if show_bar:
         ax = axes[0, ax_idx]
         ax_idx += 1
-        order = sorted(df["bw_label"].unique(), key=lambda s: int(s.split()[0]))
+        order = sorted(df["bw_label"].unique(), key=lambda s: int(s.split()[0]) if s.split()[0].isdigit() else 0)
         sns.barplot(
             data=df,
             x="model",

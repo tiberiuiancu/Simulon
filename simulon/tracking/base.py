@@ -35,21 +35,34 @@ class ExperimentTracker(ABC):
 
     def pull_metrics(
         self,
-        workload_hash: str,
+        workload_hash: str | None = None,
         config_filters: dict[str, str | int | float | bool] | None = None,
+        run_name_prefix: str | None = None,
     ) -> dict[str, Any] | None:
-        """Pull metrics for a finished run matching *workload_hash*.
+        """Pull metrics for a finished run.
 
-        Optionally also match on *config_filters* — a flat dict of wandb
-        config keys (e.g. ``{"datacenter.node.scale_out.nic.speed": "10Gbps"}``)
-        that must all equal the run's logged config.  This is needed when
-        the same workload is simulated against different datacenter configs
-        (e.g. varying network bandwidth).
+        Parameters
+        ----------
+        workload_hash: str | None
+            Match runs whose wandb config contains this workload hash.
+        config_filters: dict[str, ...] | None
+            Additional flat config keys that must match.
+        run_name_prefix: str | None
+            Match runs whose display name starts with this prefix.
 
-        Returns ``None`` when the tracker backend does not support querying
-        or when no matching run is found.
+        Returns
+        -------
+        dict[str, Any] | None
+            The first matching run's summary metrics, or None if no match.
         """
         return None
+
+    def fetch_runs(self, prefix: str | None = None) -> list[dict[str, Any]]:
+        """Fetch all finished runs whose display name starts with *prefix*.
+
+        Returns a list of dicts with ``display_name``, ``config``, ``summary``.
+        """
+        return []
 
     def __enter__(self) -> ExperimentTracker:
         self.start_run()
