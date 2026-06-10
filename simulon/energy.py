@@ -4,6 +4,7 @@ import logging
 import math
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Literal
 
 from simulon.config.common import ConstantPowerModel, LinearPowerModel, PowerModel
 from simulon.config.resolve import resolve_gpu_spec, resolve_node_spec
@@ -29,6 +30,8 @@ class EnergyResult:
     avg_power_kw: float
     run_duration_hours: float  # used by compute_cost
     breakdown: list[ComponentEnergy]
+    co2eq_g: float | None = None
+    source: Literal["measured", "estimated"] = "estimated"
 
 
 def _power_w(model: PowerModel, utilisation: float) -> float:
@@ -54,18 +57,7 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
     Returns:
         EnergyResult, or None (with a warning) if the GPU has no power_model set.
     """
-    dc = scenario.datacenter
-    gpu_spec = resolve_gpu_spec(dc)
-
-    if gpu_spec.power_model is None:
-        logger.warning(
-            "Energy modeling requested but GPU %r has no power_model set. "
-            "Skipping energy calculation.",
-            gpu_spec.name or "unknown",
-        )
-        return None
-
-    # --- Derive total iteration time from the replayed DAG ---
+    # --- Derive total iteration time from the replayed DAG (common to both paths) ---
     finish_times = [
         n.finish_ms
         for n in (list(dag.compute_nodes) + list(dag.comm_nodes))
@@ -77,6 +69,36 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
 
     total_time_ms = max(finish_times)
     run_duration_hours = total_time_ms * _MS_TO_HOURS
+
+    # --- Dual mode: CodeCarbon-first ---
+    if dag.energy_kwh is not None and dag.co2eq_kg is not None:
+        total_wh = dag.energy_kwh * 1000.0
+        co2eq_g = dag.co2eq_kg * 1000.0
+        avg_power_kw = (total_wh / run_duration_hours / 1000) if run_duration_hours > 0 else 0.0
+        return EnergyResult(
+            total_wh=total_wh,
+            hardware_subtotal_wh=total_wh,
+            pue_overhead_wh=0.0,
+            avg_power_kw=avg_power_kw,
+            run_duration_hours=run_duration_hours,
+            breakdown=[
+                ComponentEnergy(component="measured_energy", wh=total_wh, pct=100.0)
+            ],
+            co2eq_g=co2eq_g,
+            source="measured",
+        )
+
+    # --- Fallback: analytical interpolation between idle and TDP ---
+    dc = scenario.datacenter
+    gpu_spec = resolve_gpu_spec(dc)
+
+    if gpu_spec.power_model is None:
+        logger.warning(
+            "Energy modeling requested but GPU %r has no power_model set. "
+            "Skipping energy calculation.",
+            gpu_spec.name or "unknown",
+        )
+        return None
 
     # --- Cluster scale ---
     num_nodes = dc.num_nodes
@@ -216,4 +238,5 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
         avg_power_kw=avg_power_kw,
         run_duration_hours=run_duration_hours,
         breakdown=breakdown,
+        source="estimated",
     )
