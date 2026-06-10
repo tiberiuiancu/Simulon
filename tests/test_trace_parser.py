@@ -5,11 +5,15 @@ from typing import cast
 
 import pytest
 
-from simulon.backend.dag.trace_parser import TraceFileParser  # pyright: ignore[reportMissingTypeStubs]
+from simulon.backend.dag.trace_parser import (
+    TraceFileParser,  # pyright: ignore[reportMissingTypeStubs]
+)
 
 
 def _write_trace(data: dict[str, object]) -> Path:
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as fp:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
+    ) as fp:
         json.dump(data, fp)
         return Path(fp.name)
 
@@ -24,22 +28,10 @@ def _base_trace() -> dict[str, object]:
             {
                 "type": "collective",
                 "timestamp_ms": 1.5,
-                "metadata": {
-                    "collective_type": "AllReduce",
-                    "bytes": 1024,
-                    "group_ranks": [0, 1],
-                },
+                "metadata": {"collective_type": "AllReduce", "bytes": 1024, "group_ranks": [0, 1]},
             },
-            {
-                "type": "slot_begin",
-                "timestamp_ms": 2,
-                "metadata": {"slot": "fwd"},
-            },
-            {
-                "type": "slot_end",
-                "timestamp_ms": 3,
-                "metadata": {"slot": "fwd"},
-            },
+            {"type": "slot_begin", "timestamp_ms": 2, "metadata": {"slot": "fwd"}},
+            {"type": "slot_end", "timestamp_ms": 3, "metadata": {"slot": "fwd"}},
         ],
     }
 

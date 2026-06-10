@@ -1,0 +1,47 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:26.04-py3
+
+%files
+    . /opt/simulon
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=UTC
+
+    export CUDA_HOME=/usr/local/cuda
+
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        curl \
+        git \
+        libssl-dev \
+        ninja-build \
+        wget \
+        && rm -rf /var/lib/apt/lists/*
+
+    unset PIP_CONSTRAINT
+
+    cd /opt/simulon
+
+    rm -rf .venv output build "**/__pycache__" "**/*.egg-info" .pytest_cache
+
+    git submodule update --init --recursive
+
+    python3 -m pip install -e ".[dev]" \
+        && python3 setup.py build_ext --inplace
+
+    make -C vendor/Megatron-LM-traced/megatron/core/datasets
+
+    simulon install deepgemm
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export CUDA_HOME=/usr/local/cuda
+    export PATH="/usr/local/bin:$CUDA_HOME/bin:$PATH"
+    export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+    export PYTHONPATH="/opt/simulon:$PYTHONPATH"
+
+%runscript
+    exec "$@"

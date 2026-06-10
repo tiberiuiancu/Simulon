@@ -1,0 +1,69 @@
+datacenter:
+  num_nodes: 4
+  node: snellius-h100-4g
+
+workload:
+  framework: megatron
+  config:
+    attention-backend: flash
+
+    # Parallelism
+    tensor-model-parallel-size: 1
+    pipeline-model-parallel-size: 4
+    expert-model-parallel-size: 4
+    num-layers-per-virtual-pipeline-stage: 3
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+
+    # Model architecture
+    num-layers: 24
+    hidden-size: 2880
+    ffn-hidden-size: 2880
+    num-attention-heads: 64
+    num-query-groups: 8
+    vocab-size: 128256
+    swiglu: true
+
+    # Position / attention
+    position-embedding-type: rope
+    rotary-base: 150000
+    group-query-attention: true
+    kv-channels: 64
+    attention-softmax-in-fp32: false
+    window-size: "127,0"
+    window-attn-skip-freq: "[1,0]*12"
+
+    # MoE
+    num-experts: 32
+    moe-router-topk: 4
+    moe-token-dispatcher-type: alltoall
+    moe-grouped-gemm: true
+    moe-permute-fusion: true
+    moe-ffn-hidden-size: 2880
+    moe-layer-freq: 1
+    moe-aux-loss-coeff: 0.01
+
+    # Precision
+    bf16: true
+    fp16: false
+
+    # Fusion / kernels
+    disable-bias-linear: true
+    no-bias-dropout-fusion: true
+    no-rope-fusion: true
+    gradient-accumulation-fusion: false
+    multi-latent-attention: false
+
+    # Dropout (disabled)
+    hidden-dropout: 0.0
+    attention-dropout: 0.0
+
+    # Training shape
+    micro-batch-size: 1
+    global-batch-size: 16
+    seq-length: 8192
+    max-position-embeddings: 131072
+    num-gpus: 16
+    distributed-optimizer: true
+
+    mock-data: true

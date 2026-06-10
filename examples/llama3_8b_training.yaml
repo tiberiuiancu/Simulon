@@ -1,0 +1,60 @@
+datacenter:
+  num_nodes: 4
+  node: snellius-h100-4g
+
+collective:
+  library: nccl
+  algorithm: auto
+
+workload:
+  framework: megatron
+  config:
+    attention-backend: flash
+
+    # Parallelism
+    tensor-model-parallel-size: 4
+    pipeline-model-parallel-size: 4
+    num-layers-per-virtual-pipeline-stage: 8
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+
+    # Model architecture
+    num-layers: 32
+    hidden-size: 4096
+    ffn-hidden-size: 14336
+    num-attention-heads: 32
+    num-query-groups: 8
+    vocab-size: 128256
+    swiglu: true
+
+    # Position / attention
+    position-embedding-type: rope
+    rotary-base: 500000
+    group-query-attention: true
+    kv-channels: 128
+    attention-softmax-in-fp32: false
+
+    # Precision
+    bf16: true
+    fp16: false
+
+    # Fusion / kernels
+    disable-bias-linear: true
+    no-bias-dropout-fusion: true
+    no-rope-fusion: true
+    gradient-accumulation-fusion: false
+    multi-latent-attention: false
+
+    # Dropout (disabled)
+    hidden-dropout: 0.0
+    attention-dropout: 0.0
+
+    # Training shape
+    micro-batch-size: 1
+    global-batch-size: 16
+    seq-length: 8192
+    max-position-embeddings: 8192
+    num-gpus: 16
+    distributed-optimizer: true
+
+    mock-data: true

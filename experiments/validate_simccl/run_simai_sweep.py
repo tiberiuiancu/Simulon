@@ -18,6 +18,7 @@ Requires SimAI binaries (build from ~/uni/t/simai-original):
     Analytical:  cd ~/uni/t/simai-original && ./scripts/build.sh -c analytical
     NS3:         cd ~/uni/t/simai-original && ./scripts/build.sh -c ns3
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,10 +40,10 @@ COLLECTIVES = ["AllReduce", "AllGather", "ReduceScatter", "AllToAll"]
 
 # SimAI workload token for each collective
 _SIMAI_COLL = {
-    "AllReduce":     "ALLREDUCE",
-    "AllGather":     "ALLGATHER",
+    "AllReduce": "ALLREDUCE",
+    "AllGather": "ALLGATHER",
     "ReduceScatter": "REDUCESCATTER",
-    "AllToAll":      "ALLTOALL",
+    "AllToAll": "ALLTOALL",
 }
 
 CONFIGS = [
@@ -65,19 +66,20 @@ MESSAGE_SIZES_BYTES = [8 * 1024 * 1024 * (2**i) for i in range(11)]
 _NV_BW_GBps = 370.8
 
 # IB HDR100: 100 Gbps = 12.5 GB/s per port
-_NIC_BW_GBps = 12.5
-_NICS_PER_NODE = 1
+_NIC_BW_GBps = 25
+_NICS_PER_NODE = 4
 _GPU_TYPE = "H100"
 
 # NS3 topology link speeds (what gets written into the topo file)
-_NS3_NVLINK_BW = "2554Gbps"   # 319.25 GB/s × 8 = 2554 Gbps, effective rate
-_NS3_NIC_BW    = "100Gbps"    # IB HDR100
-_NS3_NIC_LAT   = "0.005ms"    # 5 µs
+_NS3_NVLINK_BW = "2554Gbps"  # 319.25 GB/s × 8 = 2554 Gbps, effective rate
+_NS3_NIC_BW = "200Gbps"  # IB HDR100
+_NS3_NIC_LAT = "0.005ms"  # 5 µs
 
 
 # ---------------------------------------------------------------------------
 # Workload file generation
 # ---------------------------------------------------------------------------
+
 
 def _make_workload(collective: str, num_gpus: int) -> str:
     """Return a HYBRID_TRANSFORMER workload with one layer per message size.
@@ -106,9 +108,7 @@ def _make_workload(collective: str, num_gpus: int) -> str:
     for i, size in enumerate(MESSAGE_SIZES_BYTES):
         # fwd_comp=1 fwd_comm=COLL fwd_size=SIZE  ig_comp=1 ig_comm=NONE ig_size=0
         # wg_comp=1 wg_comm=NONE wg_size=0  repeat=1
-        lines.append(
-            f"layer_{i:03d} -1 1 {coll} {size} 1 NONE 0 1 NONE 0 1"
-        )
+        lines.append(f"layer_{i:03d} -1 1 {coll} {size} 1 NONE 0 1 NONE 0 1")
     return "\n".join(lines) + "\n"
 
 
@@ -154,10 +154,10 @@ def _parse_endtoend_csv(csv_path: Path) -> list[dict]:
             try:
                 rows.append(
                     {
-                        "name":          parts[0],
-                        "comm_us":       float(parts[8]),
-                        "algbw_GBps":    float(parts[9]),
-                        "busbw_GBps":    float(parts[10]),
+                        "name": parts[0],
+                        "comm_us": float(parts[8]),
+                        "algbw_GBps": float(parts[9]),
+                        "busbw_GBps": float(parts[10]),
                     }
                 )
             except (ValueError, IndexError):
@@ -169,22 +169,20 @@ def _parse_endtoend_csv(csv_path: Path) -> list[dict]:
 # Subprocess helpers
 # ---------------------------------------------------------------------------
 
+
 def _find_binary(simai_root: Path, name: str) -> Path | None:
-    candidates = [
-        simai_root / "bin" / name,
-        simai_root / "astra-sim-alibabacloud/build/simai_analytical/build/simai_analytical/SimAI_analytical",
-        simai_root / "astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/scratch/ns3.36.1-AstraSimNetwork-debug",
-    ]
     # Pick the right candidates per binary
     if name == "SimAI_analytical":
         check = [
             simai_root / "bin/SimAI_analytical",
-            simai_root / "astra-sim-alibabacloud/build/simai_analytical/build/simai_analytical/SimAI_analytical",
+            simai_root
+            / "astra-sim-alibabacloud/build/simai_analytical/build/simai_analytical/SimAI_analytical",
         ]
     else:
         check = [
             simai_root / "bin/SimAI_simulator",
-            simai_root / "astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/scratch/ns3.36.1-AstraSimNetwork-debug",
+            simai_root
+            / "astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/scratch/ns3.36.1-AstraSimNetwork-debug",
         ]
     for p in check:
         resolved = p.resolve() if p.is_symlink() else p
@@ -213,6 +211,7 @@ def _nccl_plateau_busbw(nccl_dir: Path, collective: str, label: str) -> float | 
     if not path.exists():
         return None
     import json
+
     with open(path) as f:
         d = json.load(f)
     results = d.get("results", [])
@@ -238,6 +237,7 @@ def _calibrated_nv(plateau_busbw: float) -> float:
 # Analytical mode
 # ---------------------------------------------------------------------------
 
+
 def run_analytical(
     simai_root: Path,
     collective: str,
@@ -258,14 +258,13 @@ def run_analytical(
     binary = _find_binary(simai_root, "SimAI_analytical")
     if binary is None:
         logger.error(
-            "SimAI_analytical not found. Build with:\n"
-            "  cd %s && ./scripts/build.sh -c analytical",
+            "SimAI_analytical not found. Build with:\n  cd %s && ./scripts/build.sh -c analytical",
             simai_root,
         )
         return None
 
     label = f"{num_nodes}n{gpus_per_node}g"
-    nv_bw  = _NV_BW_GBps
+    nv_bw = _NV_BW_GBps
     nic_bw = _NIC_BW_GBps
 
     if nccl_dir is not None:
@@ -275,20 +274,17 @@ def run_analytical(
                 # Single-node: NVLink is the bottleneck; calibrate -nv
                 nv_bw = _calibrated_nv(plateau)
                 logger.debug(
-                    "%s %s: nccl plateau=%.1f GB/s → -nv=%.1f",
-                    collective, label, plateau, nv_bw,
+                    "%s %s: nccl plateau=%.1f GB/s → -nv=%.1f", collective, label, plateau, nv_bw
                 )
             else:
                 # Multi-node: NIC is the bottleneck; calibrate -nic
                 nic_bw = plateau / _SIMAI_INFLATION
                 logger.debug(
-                    "%s %s: nccl plateau=%.1f GB/s → -nic=%.1f",
-                    collective, label, plateau, nic_bw,
+                    "%s %s: nccl plateau=%.1f GB/s → -nic=%.1f", collective, label, plateau, nic_bw
                 )
         else:
             logger.debug(
-                "%s %s: no nccl data in %s, using hardware defaults",
-                collective, label, nccl_dir,
+                "%s %s: no nccl data in %s, using hardware defaults", collective, label, nccl_dir
             )
 
     num_gpus = num_nodes * gpus_per_node
@@ -297,23 +293,29 @@ def run_analytical(
     results_dir = simai_root / "results"
     results_dir.mkdir(exist_ok=True)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", dir=simai_root, delete=False
-    ) as wf:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", dir=simai_root, delete=False) as wf:
         wf.write(workload_text)
         workload_path = Path(wf.name)
 
     try:
         cmd = [
             str(binary),
-            "-w", str(workload_path),
-            "-g",     str(num_gpus),
-            "-g_p_s", str(gpus_per_node),
-            "-r",     result_prefix,
-            "-g_type", _GPU_TYPE,
-            "-nv",    str(nv_bw),
-            "-nic",   str(nic_bw),
-            "-n_p_s", str(_NICS_PER_NODE),
+            "-w",
+            str(workload_path),
+            "-g",
+            str(num_gpus),
+            "-g_p_s",
+            str(gpus_per_node),
+            "-r",
+            result_prefix,
+            "-g_type",
+            _GPU_TYPE,
+            "-nv",
+            str(nv_bw),
+            "-nic",
+            str(nic_bw),
+            "-n_p_s",
+            str(_NICS_PER_NODE),
         ]
         logger.debug("cmd: %s", " ".join(cmd))
         proc = subprocess.run(
@@ -326,8 +328,7 @@ def run_analytical(
         )
         if proc.returncode != 0:
             logger.error(
-                "SimAI_analytical failed (rc=%d)\nstderr:\n%s",
-                proc.returncode, proc.stderr[-2000:],
+                "SimAI_analytical failed (rc=%d)\nstderr:\n%s", proc.returncode, proc.stderr[-2000:]
             )
             return None
     except subprocess.TimeoutExpired:
@@ -365,30 +366,36 @@ def run_analytical(
 # NS3 mode
 # ---------------------------------------------------------------------------
 
+
 def _gen_topology(
     simai_root: Path, num_nodes: int, gpus_per_node: int, work_dir: Path
 ) -> Path | None:
     """Generate a Spectrum-X NS3 topology file; return path (without extension)."""
     import subprocess
 
-    gen = (
-        simai_root
-        / "astra-sim-alibabacloud/inputs/topo/gen_Topo_Template.py"
-    )
+    gen = simai_root / "astra-sim-alibabacloud/inputs/topo/gen_Topo_Template.py"
     if not gen.exists():
         logger.error("gen_Topo_Template.py not found at %s", gen)
         return None
 
     num_gpus = num_nodes * gpus_per_node
     cmd = [
-        sys.executable, str(gen),
-        "-topo", "Spectrum-X",
-        "-g",    str(num_gpus),
-        "-gps",  str(gpus_per_node),
-        "-gt",   _GPU_TYPE,
-        "-bw",   _NS3_NIC_BW,
-        "-nvbw", _NS3_NVLINK_BW,
-        "-l",    _NS3_NIC_LAT,
+        sys.executable,
+        str(gen),
+        "-topo",
+        "Spectrum-X",
+        "-g",
+        str(num_gpus),
+        "-gps",
+        str(gpus_per_node),
+        "-gt",
+        _GPU_TYPE,
+        "-bw",
+        _NS3_NIC_BW,
+        "-nvbw",
+        _NS3_NVLINK_BW,
+        "-l",
+        _NS3_NIC_LAT,
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(work_dir))
     if proc.returncode != 0:
@@ -396,10 +403,7 @@ def _gen_topology(
         return None
 
     # Find the generated file (no extension, name starts with Spectrum-X)
-    candidates = [
-        p for p in work_dir.iterdir()
-        if p.name.startswith("Spectrum-X") and not p.suffix
-    ]
+    candidates = [p for p in work_dir.iterdir() if p.name.startswith("Spectrum-X") and not p.suffix]
     if not candidates:
         logger.error("No topology file found in %s after generation", work_dir)
         return None
@@ -407,11 +411,7 @@ def _gen_topology(
 
 
 def run_ns3(
-    simai_root: Path,
-    collective: str,
-    num_nodes: int,
-    gpus_per_node: int,
-    as_send_lat: int = 3,
+    simai_root: Path, collective: str, num_nodes: int, gpus_per_node: int, as_send_lat: int = 3
 ) -> list[dict] | None:
     """Run SimAI_simulator (NS3); return per-size rows or None on failure."""
     import subprocess
@@ -419,8 +419,7 @@ def run_ns3(
     binary = _find_binary(simai_root, "SimAI_simulator")
     if binary is None:
         logger.error(
-            "SimAI_simulator not found. Build with:\n"
-            "  cd %s && ./scripts/build.sh -c ns3",
+            "SimAI_simulator not found. Build with:\n  cd %s && ./scripts/build.sh -c ns3",
             simai_root,
         )
         return None
@@ -443,30 +442,29 @@ def run_ns3(
             return None
 
         import os
+
         num_threads = os.cpu_count() or 1
         cmd = [
             str(binary),
-            "-t", str(num_threads),
-            "-w", str(workload_file),
-            "-n", str(topo),       # gen_Topo_Template writes no extension
-            "-c", str(conf),
+            "-t",
+            str(num_threads),
+            "-w",
+            str(workload_file),
+            "-n",
+            str(topo),  # gen_Topo_Template writes no extension
+            "-c",
+            str(conf),
         ]
         env = os.environ.copy()
         env["AS_SEND_LAT"] = str(as_send_lat)
         logger.debug("NS3 cmd: %s", " ".join(cmd))
         try:
             proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=7200,
-                cwd=str(tmpdir),
-                env=env,
+                cmd, capture_output=True, text=True, timeout=7200, cwd=str(tmpdir), env=env
             )
             if proc.returncode != 0:
                 logger.error(
-                    "SimAI NS3 failed (rc=%d)\nstderr:\n%s",
-                    proc.returncode, proc.stderr[-2000:],
+                    "SimAI NS3 failed (rc=%d)\nstderr:\n%s", proc.returncode, proc.stderr[-2000:]
                 )
                 return None
         except subprocess.TimeoutExpired:
@@ -488,19 +486,15 @@ def run_ns3(
 # ---------------------------------------------------------------------------
 
 _BUS_BW_FACTOR = {
-    "AllReduce":     lambda n: 2 * (n - 1) / n,
-    "AllGather":     lambda n: (n - 1) / n,
+    "AllReduce": lambda n: 2 * (n - 1) / n,
+    "AllGather": lambda n: (n - 1) / n,
     "ReduceScatter": lambda n: (n - 1) / n,
-    "AllToAll":      lambda n: (n - 1) / n,
+    "AllToAll": lambda n: (n - 1) / n,
 }
 
 
 def _to_json(
-    mode: str,
-    collective: str,
-    num_nodes: int,
-    gpus_per_node: int,
-    rows: list[dict],
+    mode: str, collective: str, num_nodes: int, gpus_per_node: int, rows: list[dict]
 ) -> dict:
     num_gpus = num_nodes * gpus_per_node
     factor = _BUS_BW_FACTOR[collective](num_gpus)
@@ -516,23 +510,16 @@ def _to_json(
         alg_bw = (size / 1e9) / (time_us / 1e6) if time_us > 0 else float("inf")
         bus_bw = alg_bw * factor
         results.append(
-            {
-                "size": size,
-                "out_of_place": {
-                    "time":    time_us,
-                    "alg_bw": alg_bw,
-                    "bus_bw": bus_bw,
-                },
-            }
+            {"size": size, "out_of_place": {"time": time_us, "alg_bw": alg_bw, "bus_bw": bus_bw}}
         )
     return {
         "version": 1,
         "mode": mode,
         "config": {
-            "collective":   collective,
-            "num_nodes":    num_nodes,
+            "collective": collective,
+            "num_nodes": num_nodes,
             "gpus_per_node": gpus_per_node,
-            "ngpus":        num_gpus,
+            "ngpus": num_gpus,
         },
         "results": results,
     }
@@ -541,6 +528,7 @@ def _to_json(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
@@ -594,11 +582,7 @@ def main() -> None:
         default=3,
         help="AS_SEND_LAT value for NS3 mode (default: 3, per SimAI README)",
     )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable debug logging",
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     if args.verbose:
@@ -608,11 +592,13 @@ def main() -> None:
     nccl_dir = args.nccl_dir if args.nccl_dir is not None else args.output_dir
     modes = ["analytical", "ns3"] if args.mode == "both" else [args.mode]
     collectives = (
-        COLLECTIVES if args.collective == "all"
+        COLLECTIVES
+        if args.collective == "all"
         else [c for c in COLLECTIVES if c.lower() == args.collective]
     )
     configs = (
-        CONFIGS if args.nodes is None
+        CONFIGS
+        if args.nodes is None
         else [cfg for cfg in CONFIGS if cfg["num_nodes"] == args.nodes]
     )
 
@@ -620,39 +606,41 @@ def main() -> None:
         for collective in collectives:
             for mode in modes:
                 label = cfg["label"]
-                print(f"[simai-{mode}] {collective:15s}  {label} ...", flush=True)
+                print(f"[simai-{mode}] {collective:15s}  {label} ...", flush=True)  # noqa: T201
 
                 if mode == "analytical":
                     rows = run_analytical(
-                        args.simai_root, collective,
-                        cfg["num_nodes"], cfg["gpus_per_node"],
+                        args.simai_root,
+                        collective,
+                        cfg["num_nodes"],
+                        cfg["gpus_per_node"],
                         nccl_dir=nccl_dir,
                     )
                 else:
                     rows = run_ns3(
-                        args.simai_root, collective,
-                        cfg["num_nodes"], cfg["gpus_per_node"],
+                        args.simai_root,
+                        collective,
+                        cfg["num_nodes"],
+                        cfg["gpus_per_node"],
                         as_send_lat=args.lat,
                     )
 
                 if rows is None:
-                    print("      -> FAILED")
+                    print("      -> FAILED")  # noqa: T201
                     continue
 
                 n_expected = len(MESSAGE_SIZES_BYTES)
                 if len(rows) != n_expected:
                     logger.warning(
                         "Got %d rows, expected %d — some sizes may be missing",
-                        len(rows), n_expected,
+                        len(rows),
+                        n_expected,
                     )
 
                 data = _to_json(mode, collective, cfg["num_nodes"], cfg["gpus_per_node"], rows)
-                out = (
-                    args.output_dir
-                    / f"simai_{mode}_{collective.lower()}_{label}.json"
-                )
+                out = args.output_dir / f"simai_{mode}_{collective.lower()}_{label}.json"
                 out.write_text(json.dumps(data, indent=2))
-                print(f"      -> {out}")
+                print(f"      -> {out}")  # noqa: T201
 
 
 if __name__ == "__main__":

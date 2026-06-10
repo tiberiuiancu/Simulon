@@ -4,20 +4,12 @@ resolve_node_spec, resolve_nccl_profile, and resolve_scale_out.
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import pytest
 import yaml
-from simulon.config.dc import (
-    ClusterSpec,
-    DatacenterConfig,
-    DatacenterMeta,
-    NodeSpec,
-    ScaleOutSpec,
-    ScaleUpSpec,
-    SwitchSpec,
-)
+
+from simulon.config.dc import DatacenterConfig, DatacenterMeta, NodeSpec, ScaleOutSpec, SwitchSpec
 from simulon.config.nccl_profile import NcclProfile
 from simulon.config.resolve import (
     load_node_template,
@@ -71,16 +63,8 @@ def node_templates_dir(tmp_path: Path, monkeypatch) -> Path:
     return tdir
 
 
-def _make_dc(
-    node: NodeSpec, scale_out: ScaleOutSpec | None = None, network=None
-) -> DatacenterConfig:
-    return DatacenterConfig(
-        datacenter=DatacenterMeta(name="test"),
-        cluster=ClusterSpec(num_nodes=1),
-        node=node,
-        scale_out=scale_out,
-        network=network,
-    )
+def _make_dc(node: NodeSpec) -> DatacenterConfig:
+    return DatacenterConfig(datacenter=DatacenterMeta(name="test"), num_nodes=1, node=node)
 
 
 # ---------------------------------------------------------------------------
@@ -108,9 +92,7 @@ class TestLoadNodeTemplate:
         spec = load_node_template("test-node")
         assert spec.gpus_per_node == 4
 
-    def test_raises_when_templates_dir_missing(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_raises_when_templates_dir_missing(self, tmp_path: Path, monkeypatch) -> None:
         """load_node_template raises FileNotFoundError when templates/node/ dir is absent."""
         monkeypatch.chdir(tmp_path)
         with pytest.raises(FileNotFoundError):
@@ -134,9 +116,7 @@ class TestResolveNodeSpec:
     def test_from_with_shallow_override(self, node_templates_dir: Path) -> None:
         """resolve_node_spec applies top-level field overrides from the inline spec."""
         (node_templates_dir / "test-node.yaml").write_text(_MINIMAL_NODE_YAML)
-        dc = _make_dc(
-            NodeSpec.model_validate({"from": "test-node", "gpus_per_node": 8})
-        )
+        dc = _make_dc(NodeSpec.model_validate({"from": "test-node", "gpus_per_node": 8}))
         spec = resolve_node_spec(dc)
         assert spec.gpus_per_node == 8  # override applied
         assert spec.gpu == "h100"  # from base template
@@ -145,10 +125,7 @@ class TestResolveNodeSpec:
         """resolve_node_spec deep-merges nested scale_up.switch overrides without clobbering sibling fields."""
         (node_templates_dir / "test-node.yaml").write_text(_MINIMAL_NODE_YAML)
         # Override only latency; port_speed from base template must survive.
-        override_data = {
-            "from": "test-node",
-            "scale_up": {"switch": {"latency": "0.0001ms"}},
-        }
+        override_data = {"from": "test-node", "scale_up": {"switch": {"latency": "0.0001ms"}}}
         dc = _make_dc(NodeSpec.model_validate(override_data))
         spec = resolve_node_spec(dc)
         assert spec.scale_up is not None
@@ -157,15 +134,10 @@ class TestResolveNodeSpec:
         assert switch.latency == "0.0001ms"
         assert switch.port_speed == "2554Gbps"  # sibling field preserved from base
 
-    def test_deep_merge_does_not_clobber_siblings(
-        self, node_templates_dir: Path
-    ) -> None:
+    def test_deep_merge_does_not_clobber_siblings(self, node_templates_dir: Path) -> None:
         """Partial nested override of scale_up.switch does not wipe port_speed from the base."""
         (node_templates_dir / "test-node.yaml").write_text(_MINIMAL_NODE_YAML)
-        override_data = {
-            "from": "test-node",
-            "scale_up": {"switch": {"port_speed": "7200Gbps"}},
-        }
+        override_data = {"from": "test-node", "scale_up": {"switch": {"port_speed": "7200Gbps"}}}
         dc = _make_dc(NodeSpec.model_validate(override_data))
         spec = resolve_node_spec(dc)
         switch = spec.scale_up.switch
@@ -220,9 +192,7 @@ class TestResolveNcclProfile:
         assert profile is not None
         assert profile.AllReduce.ring[0].bus_bw_GBps == pytest.approx(199.0)
 
-    def test_returns_none_when_no_profile(
-        self, node_templates_dir: Path, tmp_path: Path
-    ) -> None:
+    def test_returns_none_when_no_profile(self, node_templates_dir: Path, tmp_path: Path) -> None:
         """resolve_nccl_profile returns None when neither embedded nor companion profile exists."""
         # Node template with a gpu string but no nccl profile.
         (node_templates_dir / "bare-node.yaml").write_text(_MINIMAL_NODE_YAML)
@@ -250,45 +220,13 @@ class TestResolveNcclProfile:
 
 
 class TestResolveScaleOut:
-    def test_returns_top_level_scale_out(self) -> None:
-        """resolve_scale_out returns dc.scale_out when it is set."""
+    def test_returns_node_scale_out(self) -> None:
         so = ScaleOutSpec()
-        dc = _make_dc(NodeSpec(gpus_per_node=4), scale_out=so)
+        node = NodeSpec(gpus_per_node=4, scale_out=so)
+        dc = _make_dc(node)
         result = resolve_scale_out(dc)
         assert result is so
 
-    def test_fallback_to_network_scale_out_with_warning(self) -> None:
-        """resolve_scale_out falls back to dc.network.scale_out with a DeprecationWarning."""
-        from simulon.config.dc import NetworkSpec
-
-        so = ScaleOutSpec()
-        network = NetworkSpec(scale_out=so)
-        dc = _make_dc(NodeSpec(gpus_per_node=4), network=network)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = resolve_scale_out(dc)
-        assert result is so
-        assert len(w) == 1
-        assert issubclass(w[0].category, DeprecationWarning)
-        assert "deprecated" in str(w[0].message).lower()
-
-    def test_returns_none_when_neither_set(self) -> None:
-        """resolve_scale_out returns None when neither dc.scale_out nor dc.network.scale_out is set."""
+    def test_returns_none_when_node_has_no_scale_out(self) -> None:
         dc = _make_dc(NodeSpec(gpus_per_node=4))
         assert resolve_scale_out(dc) is None
-
-    def test_top_level_takes_priority_over_network(self) -> None:
-        """resolve_scale_out prefers top-level dc.scale_out over dc.network.scale_out."""
-        from simulon.config.dc import NetworkSpec
-
-        so_top = ScaleOutSpec()
-        so_net = ScaleOutSpec()
-        network = NetworkSpec(scale_out=so_net)
-        dc = _make_dc(NodeSpec(gpus_per_node=4), scale_out=so_top, network=network)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = resolve_scale_out(dc)
-        assert result is so_top
-        assert len(w) == 0  # no deprecation warning when top-level is used
-
-

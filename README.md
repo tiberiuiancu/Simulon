@@ -35,7 +35,7 @@ by injecting profiling data.
 
 ```
 simulon/
-├── src/simulon/
+├── simulon/
 │   ├── config/
 │   │   ├── common.py        # DType, Cost
 │   │   ├── dc.py            # DatacenterConfig, GPUSpec, KernelRun, ...
@@ -107,179 +107,73 @@ simulon/
 
 ## Installation
 
-Requires Python 3.11+. Uses [uv](https://github.com/astral-sh/uv). Pure Python — no
-build step required.
+Requires Python 3.11+. Uses [uv](https://github.com/astral-sh/uv).
+
+### Standard (core simulation only)
 
 ```bash
 uv sync
+```
+
+This installs the pure-Python simulator. The C++ extension (`simulon._mocknccl`) is optional and only needed for advanced topology queries.
+
+### With C++ extension
+
+```bash
+uv sync
+python setup.py build_ext --inplace
+```
+
+### Development (CUDA required)
+
+For running the instrumented Megatron-LM fork and the test suite, install the extra dependencies:
+
+```bash
+uv sync --extra dev
+```
+
+The `dev` extra pulls in PyTorch, pytest, the Hugging Face stack (`datasets`, `transformers`), and `transformer_engine[pytorch]`. A CUDA-capable environment is required.
+
+> **Note:** `transformer_engine[pytorch]` may require `--no-build-isolation` because it compiles against your local PyTorch headers. If `uv sync --extra dev` fails on this package, install it manually:
+> ```bash
+> uv pip install --no-build-isolation transformer_engine[pytorch]
+> ```
+
+### Additional GPU-dependent components (optional)
+
+These cannot be declared in `pyproject.toml` because they must be built against your local CUDA / PyTorch toolchain. Install them manually when needed:
+
+```bash
+# NVIDIA Apex (layer-norm fusion, gradient scaling, etc.)
+simulon install apex
+
+# Flash Attention 3 (Hopper-optimized)
+simulon install flash-attn-hopper
+
+# DeepGEMM (DeepSeek MoE kernels — optional)
+simulon install deepgemm
 ```
 
 ---
 
 ## Quick start
 
-### 1. Write a scenario YAML
-
-```yaml
-# scenario.yaml
-datacenter:
-  datacenter:
-    name: my-cluster
-  cluster:
-    num_nodes: 1
-  node:
-    gpus_per_node: 4
-    gpu:
-      name: H100
-      memory_capacity_gb: 80.0
-  network:
-    scale_up:
-      switch:
-        port_speed: 2880Gbps
-        latency: 0.000025ms
-    scale_out:
-      nic:
-        speed: 400Gbps
-        latency: 0.005ms
-
-collective:
-  library: nccl
-  algorithm: ring
-  num_channels: 1
-
-workload:
-  framework: megatron
-  config:
-    num-layers: 32
-    hidden-size: 4096
-    num-attention-heads: 32
-    ffn-hidden-size: 11008
-    vocab-size: 32000
-    tensor-model-parallel-size: 2
-    pipeline-model-parallel-size: 2
-    micro-batch-size: 1
-    global-batch-size: 4
-    seq-length: 2048
-    num_gpus: 4
-    dtype: bf16
-```
-
-### 2. Generate a trace and simulate
+The repository ships with pre-generated GPU execution traces. You can run a complete simulation using a bundled example:
 
 ```bash
-# 2a. Run the instrumented Megatron-LM fork to produce execution traces
-simulon trace generate scenario.yaml -o traces/
-
-# 2b. Simulate using the generated traces
-simulon simulate scenario.yaml -o trace.json
+# Simulate Llama-3 8B (16 GPUs, TP=4, PP=4)
+simulon simulate examples/llama3_8b_training.yaml -o trace.json
 ```
 
 Output:
 ```
 Trace written to trace.json
-  GPUs: 4  |  Total: 612.4 ms
+  GPUs: 16  |  Total: 612.4 ms
   Load in https://ui.perfetto.dev or chrome://tracing
 ```
 
-Add `-v` to also print per-GPU timing breakdown:
+Add `-v` to print per-GPU timing breakdown:
 
 ```bash
-simulon simulate scenario.yaml -v
-```
-
-### 3. Use the Python API directly
-
-```python
-from simulon.backend.analytical import AnalyticalBackend
-from simulon.config.scenario import ScenarioConfig
-import yaml, json
-
-with open("scenario.yaml") as f:
-    sc = ScenarioConfig.model_validate(yaml.safe_load(f))
-
-backend = AnalyticalBackend()
-dag, result = backend.simulate(sc)
-
-print(f"Total: {result.total_time_ms:.1f} ms")
-print(f"compute_nodes: {len(dag.compute_nodes)}")
-print(f"comm_nodes:    {len(dag.comm_nodes)}")
-```
-
----
-
-## DAG node types
-
-**`ComputeNode`** — a single kernel invocation on one GPU:
-
-| Field | Description |
-|---|---|
-| `node_id` | Unique node ID across the DAG |
-| `gpu_rank` | Global GPU rank |
-| `kernel` | `layernorm` \| `attn_qkv` \| `attn_flash` \| `attn_proj` \| `mlp_linear1` \| `mlp_act` \| `mlp_linear2` \| `moe_norm` \| `moe_route` \| `moe_expert` |
-| `layer_id` | Transformer layer index |
-| `microbatch_id` | Pipeline micro-batch index |
-| `pipeline_stage` | PP stage |
-| `phase` | `fwd` \| `bwd_ig` \| `bwd_wg` |
-
-**`CommNode`** — one P2P flow from a collective decomposition:
-
-| Field | Description |
-|---|---|
-| `node_id` | Unique node ID |
-| `src_gpu`, `dst_gpu` | Sender and receiver global ranks |
-| `bytes` | Transfer size in bytes |
-| `collective_type` | `AllGather` \| `ReduceScatter` \| `AllReduce` \| `AllToAll` \| `PP_Send` |
-| `flow_id` | Unique flow ID within the DAG |
-| `parent_flow_ids` | Flow IDs that must complete before this flow starts |
-
-**`DAGEdge`** — dependency between any two nodes:
-
-```json
-{ "src_node_id": 5, "dst_node_id": 6 }
-```
-
----
-
-## Collective decomposition
-
-The `simulon.collective` package decomposes collectives into P2P flows independently
-of the DAG tracer. The algorithm is taken from the scenario's `collective` block.
-
-```python
-from simulon.collective import decompose_collective
-
-result, next_flow_id = decompose_collective(
-    collective_type="AllReduce",   # AllGather | ReduceScatter | AllReduce | AllToAll
-    group_ranks=[0, 1, 2, 3],
-    data_size=1024 * 1024,         # bytes
-    num_channels=2,
-    algorithm="ring",              # ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
-)
-
-print(f"{len(result.flows)} flows")
-for flow in result.flows[:3]:
-    print(f"  flow {flow.flow_id}: {flow.src} → {flow.dst}, parents={flow.parent_flow_ids}")
-```
-
----
-
-## Workload config
-
-See [`docs/spec/config-workload.md`](docs/spec/config-workload.md) for the full
-specification. See the `_new.yaml` examples in `examples/` for trace-driven configs:
-
-- [`examples/llama3_8b_training_new.yaml`](examples/llama3_8b_training_new.yaml)
-- [`examples/gpt_oss_20b_training_new.yaml`](examples/gpt_oss_20b_training_new.yaml)
-- [`examples/gpt_oss_20b_training_single_node.yaml`](examples/gpt_oss_20b_training_single_node.yaml)
-
-All new workloads use `framework: megatron` with a flat `config` dictionary. The
-deprecated `megatron-deprecated` framework (nested `model`/`parallelism`/`training`
-blocks) exists only in older example files.
-
----
-
-## Running tests
-
-```bash
-uv run pytest
+simulon simulate examples/llama3_8b_training.yaml -v
 ```

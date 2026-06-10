@@ -2,32 +2,24 @@
 
 import pytest
 
-from simulon.backend.dag.nodes import CommNode, ComputeNode, DAGEdge, ExecutionDAG
 from simulon.backend.dag.network_populate import (
     _get_link_params,
     _parse_latency,
     _parse_speed,
     populate_network,
 )
-from simulon.backend.dag.replayer import (
-    SimulationResult,
-    _intersection_duration,
-    _merge_intervals,
-    replay,
-)
+from simulon.backend.dag.nodes import CommNode, ComputeNode, DAGEdge, ExecutionDAG
+from simulon.backend.dag.replayer import _intersection_duration, _merge_intervals, replay
 from simulon.config.dc import (
     DatacenterConfig,
     DatacenterMeta,
-    ClusterSpec,
-    NetworkSpec,
+    GPUSpec,
     NICSpec,
     NodeSpec,
     ScaleOutSpec,
     ScaleUpSpec,
     SwitchSpec,
-    GPUSpec,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,17 +36,17 @@ def _dc(
 ) -> DatacenterConfig:
     return DatacenterConfig(
         datacenter=DatacenterMeta(name="test"),
-        cluster=ClusterSpec(num_nodes=4),
+        num_nodes=4,
         node=NodeSpec(
             gpus_per_node=gpus_per_node,
             gpu=GPUSpec(name="test-gpu"),
-        ),
-        network=NetworkSpec(
             scale_up=ScaleUpSpec(
                 switch=SwitchSpec(port_speed=nvswitch_speed, latency=nvswitch_latency)
             ),
             scale_out=ScaleOutSpec(
-                nic=NICSpec(speed=nic_speed, latency=nic_latency, bandwidth_efficiency=nic_efficiency)
+                nic=NICSpec(
+                    speed=nic_speed, latency=nic_latency, bandwidth_efficiency=nic_efficiency
+                )
             ),
         ),
     )
@@ -104,14 +96,17 @@ def _comm(node_id, src_gpu, dst_gpu, bytes=1000, flow_id=None, parent_flow_ids=N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("s, expected_bytes_per_ms", [
-    ("1Gbps",    1e9 / 8 / 1000),
-    ("400Gbps",  400e9 / 8 / 1000),
-    ("1GBps",    1e9 / 1000),
-    ("100Mbps",  100e6 / 8 / 1000),
-    ("100MBps",  100e6 / 1000),
-    ("2880Gbps", 2880e9 / 8 / 1000),
-])
+@pytest.mark.parametrize(
+    "s, expected_bytes_per_ms",
+    [
+        ("1Gbps", 1e9 / 8 / 1000),
+        ("400Gbps", 400e9 / 8 / 1000),
+        ("1GBps", 1e9 / 1000),
+        ("100Mbps", 100e6 / 8 / 1000),
+        ("100MBps", 100e6 / 1000),
+        ("2880Gbps", 2880e9 / 8 / 1000),
+    ],
+)
 def test_parse_speed(s, expected_bytes_per_ms):
     assert abs(_parse_speed(s) - expected_bytes_per_ms) < 1e-3
 
@@ -126,15 +121,18 @@ def test_parse_speed_invalid():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("s, expected_ms", [
-    ("1ms",    1.0),
-    ("0.5ms",  0.5),
-    ("1us",    0.001),
-    ("500us",  0.5),
-    ("1ns",    1e-6),
-    ("100ns",  1e-4),
-    ("2.5e-5ms", 2.5e-5),
-])
+@pytest.mark.parametrize(
+    "s, expected_ms",
+    [
+        ("1ms", 1.0),
+        ("0.5ms", 0.5),
+        ("1us", 0.001),
+        ("500us", 0.5),
+        ("1ns", 1e-6),
+        ("100ns", 1e-4),
+        ("2.5e-5ms", 2.5e-5),
+    ],
+)
 def test_parse_latency(s, expected_ms):
     assert abs(_parse_latency(s) - expected_ms) < 1e-12
 
@@ -172,8 +170,8 @@ def test_get_link_params_nic_efficiency():
 def test_get_link_params_boundary_gpus():
     """GPU 3 and GPU 4 are on different nodes when gpus_per_node=4."""
     dc = _dc(gpus_per_node=4, nvswitch_speed="400Gbps", nic_speed="100Gbps", nic_efficiency=1.0)
-    bw_intra, _ = _get_link_params(0, 3, dc)   # same node
-    bw_inter, _ = _get_link_params(3, 4, dc)   # different nodes
+    bw_intra, _ = _get_link_params(0, 3, dc)  # same node
+    bw_inter, _ = _get_link_params(3, 4, dc)  # different nodes
     assert abs(bw_intra - _parse_speed("400Gbps")) < 1
     assert abs(bw_inter - _parse_speed("100Gbps")) < 1
 
@@ -187,7 +185,7 @@ def test_single_comm_node_duration():
     """Duration = latency + bytes / bandwidth; both src and dst get that finish time."""
     dc = _dc(gpus_per_node=4, nvswitch_speed="1GBps", nvswitch_latency="0ms")
     bytes_ = 1_000_000  # 1 MB
-    bw = _parse_speed("1GBps")   # 1e6 bytes/ms
+    bw = _parse_speed("1GBps")  # 1e6 bytes/ms
     expected_duration = bytes_ / bw  # 1 ms
 
     dag = _dag(_comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_))
@@ -224,8 +222,7 @@ def test_independent_flows_run_in_parallel():
     bytes_ = 1_000_000  # 1 ms each
 
     dag = _dag(
-        _comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_),
-        _comm(1, src_gpu=2, dst_gpu=3, bytes=bytes_),
+        _comm(0, src_gpu=0, dst_gpu=1, bytes=bytes_), _comm(1, src_gpu=2, dst_gpu=3, bytes=bytes_)
     )
     populate_network(dag, dc)
     result = replay(dag)
@@ -293,14 +290,26 @@ def test_parent_flow_ids_ordering():
     bytes_ = 1_000_000  # 1 ms each
 
     parent = CommNode(
-        node_id=0, src_gpu=0, dst_gpu=1, bytes=bytes_,
-        collective_type="AllGather", layer_id=0, phase="fwd",
-        flow_id=10, parent_flow_ids=[],
+        node_id=0,
+        src_gpu=0,
+        dst_gpu=1,
+        bytes=bytes_,
+        collective_type="AllGather",
+        layer_id=0,
+        phase="fwd",
+        flow_id=10,
+        parent_flow_ids=[],
     )
     child = CommNode(
-        node_id=1, src_gpu=1, dst_gpu=2, bytes=bytes_,
-        collective_type="AllGather", layer_id=0, phase="fwd",
-        flow_id=11, parent_flow_ids=[10],  # depends on flow_id=10
+        node_id=1,
+        src_gpu=1,
+        dst_gpu=2,
+        bytes=bytes_,
+        collective_type="AllGather",
+        layer_id=0,
+        phase="fwd",
+        flow_id=11,
+        parent_flow_ids=[10],  # depends on flow_id=10
     )
     dag = ExecutionDAG(comm_nodes=[parent, child])
     populate_network(dag, dc)
@@ -329,8 +338,8 @@ def test_comm_time_counted_for_both_endpoints():
     populate_network(dag, dc)
     result = replay(dag)
 
-    assert abs(result.exposed_comm_ms - 0.5) < 1e-9   # avg: 0 (src) + 1.0 (dst) / 2
-    assert abs(result.bubble_ms - 0.5) < 1e-9          # avg: 1.0 (src) + 0 (dst) / 2
+    assert abs(result.exposed_comm_ms - 0.5) < 1e-9  # avg: 0 (src) + 1.0 (dst) / 2
+    assert abs(result.bubble_ms - 0.5) < 1e-9  # avg: 1.0 (src) + 0 (dst) / 2
 
 
 # ---------------------------------------------------------------------------
@@ -361,7 +370,7 @@ def test_inter_node_uses_nic_bandwidth():
     dc = _dc(
         gpus_per_node=2,
         nvswitch_speed="100GBps",  # very fast intra-node
-        nic_speed="1GBps",         # slow inter-node
+        nic_speed="1GBps",  # slow inter-node
         nic_latency="0ms",
         nic_efficiency=1.0,
     )
@@ -515,7 +524,6 @@ def _comm_preset(node_id, src_gpu, dst_gpu, duration_ms, collective_type="AllRed
 
 
 class TestSummarize:
-
     # ------------------------------------------------------------------
     # Pure compute
     # ------------------------------------------------------------------
@@ -542,8 +550,8 @@ class TestSummarize:
         result = replay(dag)
 
         assert result.total_time_ms == pytest.approx(4.0)
-        assert result.compute_ms == pytest.approx(3.0)   # avg(4, 2)
-        assert result.bubble_ms == pytest.approx(1.0)    # avg(0, 2)
+        assert result.compute_ms == pytest.approx(3.0)  # avg(4, 2)
+        assert result.bubble_ms == pytest.approx(1.0)  # avg(0, 2)
         assert result.exposed_comm_ms == pytest.approx(0.0)
 
     def test_three_gpus_compute_avg(self):
@@ -555,8 +563,8 @@ class TestSummarize:
         result = replay(dag)
 
         assert result.total_time_ms == pytest.approx(6.0)
-        assert result.compute_ms == pytest.approx(4.0)   # avg(4, 2, 6)
-        assert result.bubble_ms == pytest.approx(2.0)    # avg(2, 4, 0)
+        assert result.compute_ms == pytest.approx(4.0)  # avg(4, 2, 6)
+        assert result.bubble_ms == pytest.approx(2.0)  # avg(2, 4, 0)
 
     # ------------------------------------------------------------------
     # Pure recv (no compute on dst GPU)
@@ -579,7 +587,7 @@ class TestSummarize:
         assert result.exposed_comm_ms == pytest.approx(1.0)
         assert result.compute_ms == pytest.approx(0.0)
         # src GPU has 2ms where it is neither computing nor receiving → bubble
-        assert result.bubble_ms == pytest.approx(1.0)   # avg(2, 0) / 2
+        assert result.bubble_ms == pytest.approx(1.0)  # avg(2, 0) / 2
 
     # ------------------------------------------------------------------
     # Sequential compute then recv (no overlap)
@@ -604,9 +612,9 @@ class TestSummarize:
         result = replay(dag)
 
         assert result.total_time_ms == pytest.approx(4.0)
-        assert result.compute_ms == pytest.approx(1.5)        # avg(3, 0)
-        assert result.exposed_comm_ms == pytest.approx(0.5)   # avg(1, 0)
-        assert result.bubble_ms == pytest.approx(2.0)         # avg(0, 4)
+        assert result.compute_ms == pytest.approx(1.5)  # avg(3, 0)
+        assert result.exposed_comm_ms == pytest.approx(0.5)  # avg(1, 0)
+        assert result.bubble_ms == pytest.approx(2.0)  # avg(0, 4)
 
     # ------------------------------------------------------------------
     # Compute overlapping recv (comm hidden)
@@ -622,10 +630,15 @@ class TestSummarize:
         m = _comm_preset(1, src_gpu=1, dst_gpu=0, duration_ms=2.0)
         # delay comm start to t=1 via a 1ms pre-compute on GPU0
         c_pre = _compute(2, gpu_rank=0, duration_ms=1.0)
-        dag = _dag(c_pre, c, m, edges=[
-            DAGEdge(src_node_id=2, dst_node_id=0),  # c starts after c_pre
-            DAGEdge(src_node_id=2, dst_node_id=1),  # comm starts after c_pre
-        ])
+        dag = _dag(
+            c_pre,
+            c,
+            m,
+            edges=[
+                DAGEdge(src_node_id=2, dst_node_id=0),  # c starts after c_pre
+                DAGEdge(src_node_id=2, dst_node_id=1),  # comm starts after c_pre
+            ],
+        )
         result = replay(dag)
 
         # c_pre [0,1], c [1,6], comm [1,3]
@@ -647,17 +660,19 @@ class TestSummarize:
         c_pre = _compute(2, gpu_rank=0, duration_ms=1.0)
         c = _compute(0, gpu_rank=0, duration_ms=2.0)
         m = _comm_preset(1, src_gpu=1, dst_gpu=0, duration_ms=3.0)
-        dag = _dag(c_pre, c, m, edges=[
-            DAGEdge(src_node_id=2, dst_node_id=0),
-            DAGEdge(src_node_id=2, dst_node_id=1),
-        ])
+        dag = _dag(
+            c_pre,
+            c,
+            m,
+            edges=[DAGEdge(src_node_id=2, dst_node_id=0), DAGEdge(src_node_id=2, dst_node_id=1)],
+        )
         result = replay(dag)
 
         # c_pre [0,1], c [1,3], comm [1,4]
         assert result.total_time_ms == pytest.approx(4.0)
-        assert result.compute_ms == pytest.approx(1.5)        # avg(3, 0)
-        assert result.exposed_comm_ms == pytest.approx(0.5)   # avg(1, 0)
-        assert result.bubble_ms == pytest.approx(2.0)         # avg(0, 4)
+        assert result.compute_ms == pytest.approx(1.5)  # avg(3, 0)
+        assert result.exposed_comm_ms == pytest.approx(0.5)  # avg(1, 0)
+        assert result.bubble_ms == pytest.approx(2.0)  # avg(0, 4)
 
     # ------------------------------------------------------------------
     # exposed_comm_by_type bucketing
@@ -686,10 +701,12 @@ class TestSummarize:
         c = _compute(0, gpu_rank=0, duration_ms=5.0)
         m = _comm_preset(1, src_gpu=1, dst_gpu=0, duration_ms=2.0, collective_type="AllGather")
         c_pre = _compute(2, gpu_rank=0, duration_ms=1.0)
-        dag = _dag(c_pre, c, m, edges=[
-            DAGEdge(src_node_id=2, dst_node_id=0),
-            DAGEdge(src_node_id=2, dst_node_id=1),
-        ])
+        dag = _dag(
+            c_pre,
+            c,
+            m,
+            edges=[DAGEdge(src_node_id=2, dst_node_id=0), DAGEdge(src_node_id=2, dst_node_id=1)],
+        )
         result = replay(dag)
 
         assert result.exposed_comm_by_type.get("AllGather", 0.0) == pytest.approx(0.0)
@@ -800,8 +817,7 @@ class TestSummarize:
 
         # Invariant 3: per-type sum exceeds the de-duplicated total,
         # confirming the union-based computation removed the overlap
-        per_type_sum = (
-            result.exposed_comm_by_type.get("AllReduce", 0.0)
-            + result.exposed_comm_by_type.get("AllGather", 0.0)
-        )
+        per_type_sum = result.exposed_comm_by_type.get(
+            "AllReduce", 0.0
+        ) + result.exposed_comm_by_type.get("AllGather", 0.0)
         assert result.exposed_comm_ms < per_type_sum
