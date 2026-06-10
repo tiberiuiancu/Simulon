@@ -20,29 +20,30 @@ import seaborn as sns
 from simulon.tracking import get_trackers
 
 
+import re
+
+
 def _extract_bw(run: dict[str, Any]) -> int:
     cfg = run.get("config", {})
-    for flat_key in (
-        "datacenter.node.scale_out.nic.speed",
-        "datacenter.node.from_",
-    ):
-        parts = flat_key.split(".")
-        val: Any = cfg
-        for p in parts:
-            if isinstance(val, dict):
-                val = val.get(p)
-            else:
-                val = None
-                break
-        if val and isinstance(val, str):
-            if "Gbps" in val:
-                return int(val.replace("Gbps", ""))
-            if "node_bw" in val:
-                import re
-                m = re.search(r"node_bw(\d+)", val)
-                if m:
-                    return int(m.group(1))
+    for key, val in cfg.items():
+        if key.endswith(".scale_out.nic.speed") and isinstance(val, str) and "Gbps" in val:
+            return int(val.replace("Gbps", ""))
+        if key == "datacenter.node.from_" and isinstance(val, str):
+            m = re.search(r"node_bw(\d+)", val)
+            if m:
+                return int(m.group(1))
     return 0
+
+
+def _model_bw_from_run(run: dict[str, Any]) -> tuple[str, int]:
+    name = run["display_name"]
+    m = re.match(r"link-bw-(.+)-bw(\d+)", name)
+    if m:
+        return m.group(1), int(m.group(2))
+    parts = name.split("-")
+    if len(parts) >= 3:
+        return "-".join(parts[2:]), _extract_bw(run)
+    return name, _extract_bw(run)
 
 
 def plot_mfu_from_wandb(
@@ -60,10 +61,7 @@ def plot_mfu_from_wandb(
     for tracker in trackers:
         runs = tracker.fetch_runs(prefix="link-bw-")
         for run in runs:
-            name = run["display_name"]
-            parts = name.split("-")
-            model = "-".join(parts[2:]) if len(parts) >= 3 else name
-            bw = _extract_bw(run)
+            model, bw = _model_bw_from_run(run)
             mfu = run["summary"].get("mfu_pct")
             if mfu is None:
                 continue
