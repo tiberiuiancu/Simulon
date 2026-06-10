@@ -28,8 +28,6 @@ def _flatten_dict(prefix: str, data: dict[str, object]) -> dict[str, str | int |
     return out
 
 
-
-
 def extract_params(scenario: ScenarioConfig) -> dict[str, str | int | float | bool]:
     params: dict[str, str | int | float | bool] = {}
 

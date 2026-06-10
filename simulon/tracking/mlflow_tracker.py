@@ -68,8 +68,6 @@ class MLflowTracker(ExperimentTracker):
             mlflow.end_run()
 
     def pull_metrics(
-        self,
-        workload_hash: str,
-        config_filters: dict[str, str | int | float | bool] | None = None,
+        self, workload_hash: str, config_filters: dict[str, str | int | float | bool] | None = None
     ) -> None:
         raise NotImplementedError("pull_metrics is not supported for MLflow")

@@ -128,7 +128,11 @@ class WandbTracker(ExperimentTracker):
                 filters["display_name"] = {"$regex": f"^{prefix}"}
             runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
             return [
-                {"display_name": run.display_name, "config": dict(run.config), "summary": dict(run.summary)}
+                {
+                    "display_name": run.display_name,
+                    "config": dict(run.config),
+                    "summary": dict(run.summary),
+                }
                 for run in runs
             ]
         except Exception as exc:

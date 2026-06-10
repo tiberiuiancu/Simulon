@@ -286,12 +286,14 @@ class DatacenterConfig(BaseModel):
     def _resolve_node(self) -> DatacenterConfig:
         if self.node and self.node.from_:
             from simulon.config.resolve import resolve_node_spec
+
             self.node = resolve_node_spec(self)
         return self
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> DatacenterConfig:
         import yaml
+
         with open(path) as f:
             raw = yaml.safe_load(f)
         return cls.model_validate(raw)
