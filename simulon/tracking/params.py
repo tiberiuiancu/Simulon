@@ -21,16 +21,13 @@ def _flatten_dict(prefix: str, data: dict[str, object]) -> dict[str, str | int |
         elif isinstance(val, list):
             # Serialize lists to JSON strings for logging
             out[full_key] = json.dumps(val)
-        elif isinstance(val, bool):
-            out[full_key] = val
-        elif isinstance(val, (int, float)):
+        elif isinstance(val, bool | int | float):
             out[full_key] = val
         elif val is not None:
             out[full_key] = str(val)
     return out
 
 
-from simulon.config.resolve import resolve_node_spec
 
 
 def extract_params(scenario: ScenarioConfig) -> dict[str, str | int | float | bool]:

@@ -8,6 +8,7 @@ Usage (from repo root):
 
 from __future__ import annotations
 
+import re
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
@@ -18,9 +19,6 @@ import pandas as pd
 import seaborn as sns
 
 from simulon.tracking import get_trackers
-
-
-import re
 
 
 def _extract_bw(run: dict[str, Any]) -> int:

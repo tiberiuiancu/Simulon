@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, model_validator
 from .dc import DatacenterConfig
 from .workload import WorkloadConfig
 
-
 # ---------------------------------------------------------------------------
 # Collective communication library config
 # ---------------------------------------------------------------------------
