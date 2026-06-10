@@ -18,7 +18,7 @@ for model in "${MODELS[@]}"; do
         scenario="$SCRIPT_DIR/$model/scenario${bw}.yaml"
         name="${model}-bw${bw}"
         echo "  SIMULATE: $name"
-        WANDB_RUN_NAME="link-bw-${name}" uv run simulon simulate "$scenario" "--chrome output/link-nw-${name}-${bw}.json" --chrome-compact &
+        WANDB_RUN_NAME="link-bw-${name}" uv run simulon simulate "$scenario" "--chrome output/link-nw-${name}.json" --chrome-compact &
     done
 done
 
