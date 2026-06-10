@@ -453,6 +453,24 @@ def _add_compute_node(
     node_id[0] += 1
 
 
+def _localize_to_global_ranks(local_group: list[int], rank: int) -> list[int] | None:
+    """Translate 0-indexed local communicator ranks to global ranks for *rank*.
+
+    Traces sometimes record intra-communicator local ranks (0, 1, 2, 3) rather
+    than global GPU ranks.  When *rank* is not in *local_group* and the group
+    looks like {0..n-1}, find the matching process-group for *rank* by size and
+    return its global ranks in the same relative order.
+    """
+    n = len(local_group)
+    if rank in local_group or set(local_group) != set(range(n)):
+        return None
+    for global_group in _COLLECTIVE_GROUPS.get(rank, []):
+        if len(global_group) == n:
+            sorted_global = sorted(global_group)
+            return [sorted_global[i] for i in local_group]
+    return None
+
+
 def _add_non_pp_collective(
     dag: ExecutionDAG,
     event,
@@ -474,6 +492,13 @@ def _add_non_pp_collective(
 
     if len(group_ranks) < 2:
         return
+
+    # Traces may record local (0-indexed) communicator ranks instead of global
+    # ranks.  Translate to global ranks so collectives from different PP stages
+    # that happen to share the same local ranks don't collapse into one node.
+    global_ranks = _localize_to_global_ranks(group_ranks, rank)
+    if global_ranks is not None:
+        group_ranks = global_ranks
 
     match_key = (collective_type, frozenset(group_ranks), name, round(timestamp_ms, 3), data_size)
 

@@ -15,3 +15,7 @@ app.add_typer(
 from simulon.cli.simulate import simulate  # noqa: E402
 
 app.command()(simulate)
+
+from simulon.cli.compare import compare  # noqa: E402
+
+app.command()(compare)

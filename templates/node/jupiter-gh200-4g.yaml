@@ -1,0 +1,79 @@
+# Jupiter GH200 node (real NCCL measurements from nccl-tests on jpbo-048-38)
+# Hardware: GH200 120GB, NVLink 4.0, quad-rail InfiniBand
+# Source: experiments/validate_simccl/results/nccl_*.json.0 (1-node run, job 537473)
+name: jupiter-gh200-4g
+gpus_per_node: 4
+gpu: gh200_jupiter
+scale_out:
+  nic:
+    speed: 200Gbps
+    latency: 0.005ms
+  topology:
+    type: fat_tree
+    params:
+      k: 8
+
+scale_up:
+  switch:
+    port_speed: 2554Gbps # taken from snellius yaml
+    latency: 0.000025ms # taken from snellius yaml
+
+nccl:
+  name: jupiter-gh200-4g
+  gpus_per_node: 4
+  # Per-call overhead beyond nccl-tests tight-loop bandwidth.
+  # Derived from: (SP=True gap − SP=False gap) / (8226 − 2066 calls) = 686ms / 6160 = 0.111ms.
+  # Accounts for Python/PyTorch dispatch + CUDA launch overhead not captured in nccl-tests.
+  launch_latency_ms: 0.111
+  AllReduce:
+    ring:
+      - {size_bytes:       8388608, bus_bw_GBps: 204.795}
+      - {size_bytes:      16777216, bus_bw_GBps: 248.022}
+      - {size_bytes:      33554432, bus_bw_GBps: 279.992}
+      - {size_bytes:      67108864, bus_bw_GBps: 298.825}
+      - {size_bytes:     134217728, bus_bw_GBps: 318.330}
+      - {size_bytes:     268435456, bus_bw_GBps: 329.218}
+      - {size_bytes:     536870912, bus_bw_GBps: 334.574}
+      - {size_bytes:    1073741824, bus_bw_GBps: 338.836}
+      - {size_bytes:    2147483648, bus_bw_GBps: 339.932}
+      - {size_bytes:    4294967296, bus_bw_GBps: 339.974}
+      - {size_bytes:    8589934592, bus_bw_GBps: 340.266}
+  AllGather:
+    ring:
+      - {size_bytes:       8388608, bus_bw_GBps: 140.224}
+      - {size_bytes:      16777216, bus_bw_GBps: 191.301}
+      - {size_bytes:      33554432, bus_bw_GBps: 234.041}
+      - {size_bytes:      67108864, bus_bw_GBps: 261.323}
+      - {size_bytes:     134217728, bus_bw_GBps: 282.133}
+      - {size_bytes:     268435456, bus_bw_GBps: 297.232}
+      - {size_bytes:     536870912, bus_bw_GBps: 305.806}
+      - {size_bytes:    1073741824, bus_bw_GBps: 310.562}
+      - {size_bytes:    2147483648, bus_bw_GBps: 316.337}
+      - {size_bytes:    4294967296, bus_bw_GBps: 320.552}
+      - {size_bytes:    8589934592, bus_bw_GBps: 322.335}
+  ReduceScatter:
+    ring:
+      - {size_bytes:       8388608, bus_bw_GBps: 153.590}
+      - {size_bytes:      16777216, bus_bw_GBps: 202.390}
+      - {size_bytes:      33554432, bus_bw_GBps: 238.386}
+      - {size_bytes:      67108864, bus_bw_GBps: 261.419}
+      - {size_bytes:     134217728, bus_bw_GBps: 282.992}
+      - {size_bytes:     268435456, bus_bw_GBps: 296.892}
+      - {size_bytes:     536870912, bus_bw_GBps: 305.692}
+      - {size_bytes:    1073741824, bus_bw_GBps: 311.185}
+      - {size_bytes:    2147483648, bus_bw_GBps: 316.022}
+      - {size_bytes:    4294967296, bus_bw_GBps: 319.951}
+      - {size_bytes:    8589934592, bus_bw_GBps: 321.747}
+  AllToAll:
+    ring:
+      - {size_bytes:       8388608, bus_bw_GBps: 126.090}
+      - {size_bytes:      16777216, bus_bw_GBps: 206.760}
+      - {size_bytes:      33554432, bus_bw_GBps: 244.830}
+      - {size_bytes:      67108864, bus_bw_GBps: 281.723}
+      - {size_bytes:     134217728, bus_bw_GBps: 305.672}
+      - {size_bytes:     268435456, bus_bw_GBps: 320.441}
+      - {size_bytes:     536870912, bus_bw_GBps: 333.433}
+      - {size_bytes:    1073741824, bus_bw_GBps: 300.499}
+      - {size_bytes:    2147483648, bus_bw_GBps: 304.640}
+      - {size_bytes:    4294967296, bus_bw_GBps: 304.065}
+      - {size_bytes:    8589934592, bus_bw_GBps: 304.158}

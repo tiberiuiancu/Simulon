@@ -28,3 +28,7 @@ class NcclProfile(BaseModel):
     AllGather: NcclAlgoMeasurements = NcclAlgoMeasurements()
     ReduceScatter: NcclAlgoMeasurements = NcclAlgoMeasurements()
     AllToAll: NcclAlgoMeasurements = NcclAlgoMeasurements()
+    # Optional per-call latency added on top of the bandwidth-limited collective time.
+    # Default 0.0 — only set if you have a reliable direct measurement of NCCL launch
+    # overhead for this cluster (not a calibration residual).
+    launch_latency_ms: float = 0.0

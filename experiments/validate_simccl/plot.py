@@ -2,8 +2,8 @@
 """Plot simulon vs nccl-tests bus bandwidth: 3×3 grid (rows=GPU count, cols=collective).
 
 Loads JSON files from a results directory:
-  sim_<collective>_<config>.json                — simulon predictions (from sim_ccl.py)
-  nccl_<collective>_<config>.json               — measured nccl-tests output (from run_nccl.sh)
+  sim_<collective>_<config>_<cluster>.json      — simulon predictions (from sim_ccl.py)
+  nccl_<collective>_<config>_<cluster>.json     — measured nccl-tests output (from run_nccl*.sh)
   simai_analytical_<collective>_<config>.json   — SimAI analytical mode
   simai_ns3_<collective>_<config>.json          — SimAI NS3 mode
 
@@ -11,6 +11,7 @@ All files are optional; missing ones are silently skipped.
 
 Usage (from repo root):
     uv run python experiments/validate_simccl/plot.py
+    uv run python experiments/validate_simccl/plot.py --cluster jupiter
     uv run python experiments/validate_simccl/plot.py --results-dir /path/to/results --output plot.pdf
 """
 
@@ -52,7 +53,7 @@ def _load(path: Path) -> tuple[list[float], list[float]] | None:
 # ── Plotting ───────────────────────────────────────────────────────────────
 
 
-def plot(results_dir: Path, output: Path | None) -> None:
+def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> None:
     fig, axes = plt.subplots(
         nrows=len(CONFIGS), ncols=len(COLLECTIVES), figsize=(18, 10), sharex=True
     )
@@ -67,8 +68,8 @@ def plot(results_dir: Path, output: Path | None) -> None:
             cname_lower = collective.lower()
 
             series = [
-                ("nccl-tests", f"nccl_{cname_lower}_{label}.json", "#ff7f0e", "s", "--"),
-                ("simulon", f"sim_{cname_lower}_{label}.json", "#1f77b4", "o", "-"),
+                ("nccl-tests", f"nccl_{cname_lower}_{label}_{cluster}.json", "#ff7f0e", "s", "--"),
+                ("simulon", f"sim_{cname_lower}_{label}_{cluster}.json", "#1f77b4", "o", "-"),
                 (
                     "SimAI analytical",
                     f"simai_analytical_{cname_lower}_{label}.json",
@@ -117,8 +118,13 @@ def plot(results_dir: Path, output: Path | None) -> None:
             if row == len(CONFIGS) - 1:
                 ax.set_xlabel("Message size", fontsize=9)
 
+    cluster_labels = {
+        "snellius": "H100 · NVSwitch 4 · quad-rail NDR200",
+        "jupiter": "GH200 · NVLink 4 · quad-rail HDR",
+    }
+    cluster_desc = cluster_labels.get(cluster, cluster)
     fig.suptitle(
-        "Collective Bus Bandwidth: simulon vs nccl-tests vs SimAI\n(H100 · NVSwitch 4 · IB HDR100)",
+        f"Collective Bus Bandwidth: simulon vs nccl-tests vs SimAI\n({cluster_desc})",
         fontsize=13,
         y=1.01,
     )
@@ -149,6 +155,11 @@ def plot(results_dir: Path, output: Path | None) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
+        "--cluster",
+        default="snellius",
+        help="Cluster name used as filename suffix (default: snellius)",
+    )
+    parser.add_argument(
         "--results-dir",
         type=Path,
         default=Path("experiments/validate_simccl/results"),
@@ -161,7 +172,7 @@ def main() -> None:
         help="Save figure to file (PDF/PNG/SVG). If omitted, show interactively.",
     )
     args = parser.parse_args()
-    plot(args.results_dir, args.output)
+    plot(args.results_dir, args.output, args.cluster)
 
 
 if __name__ == "__main__":
