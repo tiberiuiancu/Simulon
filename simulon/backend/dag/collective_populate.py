@@ -107,7 +107,7 @@ def _multi_node_duration_ms(
     # Count unique nodes from actual rank-to-node mapping rather than assuming
     # all gpus_per_node GPUs on each node participate. This matters for DP
     # groups where only 1 GPU per node is in the collective (e.g. TP=4, DP=16).
-    node_count = len(set(r // gpus_per_node for r in collective_node.group_ranks))
+    node_count = len({r // gpus_per_node for r in collective_node.group_ranks})
     effective_gpus_per_node = nranks // node_count
     # Scale nics proportionally: on quad-rail nodes each GPU has its own NIC,
     # so a collective using k GPUs per node uses k NICs per node.
@@ -208,8 +208,7 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
         "  populating collective durations", len(dag.collective_nodes), logger
     ) as advance:
         for node in dag.collective_nodes.values():
-            nranks = len(node.group_ranks)
-            node_count = len(set(r // gpus_per_node for r in node.group_ranks))
+            node_count = len({r // gpus_per_node for r in node.group_ranks})
 
             if node_count == 1:
                 node.duration_ms = _single_node_duration_ms(node, nccl_profile)

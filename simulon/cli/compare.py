@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 import yaml
@@ -145,7 +144,7 @@ def _print_comparison(
 
 def compare(
     scenarios: list[str] = typer.Argument(..., help="One or more scenario.yaml paths"),
-    ref: Optional[list[Path]] = typer.Option(
+    ref: list[Path] | None = typer.Option(
         None,
         "--ref",
         help=(
@@ -159,11 +158,9 @@ def compare(
         help="Network simulation backend: 'flow' or 'collective'",
     ),
     breakdown: bool = typer.Option(
-        True,
-        "--breakdown/--no-breakdown",
-        help="Show compute/comm/bubble breakdown",
+        True, "--breakdown/--no-breakdown", help="Show compute/comm/bubble breakdown"
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
@@ -176,8 +173,8 @@ def compare(
     Reference files use a simple YAML format::
 
         iter_time_ms: 11654
-        throughput_tps: 89314   # optional
-        mfu_pct: 35.2           # optional
+        throughput_tps: 89314  # optional
+        mfu_pct: 35.2  # optional
 
     If --ref is omitted, simulon looks for reference.yaml next to each scenario.
     """
@@ -202,7 +199,7 @@ def compare(
     else:
         refs = [_find_default_ref(s) for s in scenarios]
 
-    for scenario_path, ref_path in zip(scenarios, refs):
+    for scenario_path, ref_path in zip(scenarios, refs, strict=True):
         sc = _load_scenario(scenario_path)
 
         try:
