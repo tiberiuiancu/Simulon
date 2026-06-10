@@ -87,6 +87,34 @@ def test_parse_collective_metadata_preserved():
     assert collective.metadata["bytes"] == 1024
 
 
+def test_parse_with_energy_fields():
+    data = _base_trace()
+    data["total_flops"] = 1234567890
+    data["energy_kwh"] = 0.42
+    data["co2eq_kg"] = 0.05
+    path = _write_trace(data)
+    try:
+        parsed = TraceFileParser.parse(path)
+    finally:
+        path.unlink(missing_ok=True)
+
+    assert parsed.total_flops == 1234567890.0
+    assert parsed.energy_kwh == 0.42
+    assert parsed.co2eq_kg == 0.05
+
+
+def test_parse_legacy_without_energy_fields():
+    data = _base_trace()
+    path = _write_trace(data)
+    try:
+        parsed = TraceFileParser.parse(path)
+    finally:
+        path.unlink(missing_ok=True)
+
+    assert parsed.energy_kwh is None
+    assert parsed.co2eq_kg is None
+
+
 def test_parse_rejects_unsupported_event_type():
     data = _base_trace()
     events = cast(list[dict[str, object]], data["events"])
