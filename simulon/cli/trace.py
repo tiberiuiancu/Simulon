@@ -75,29 +75,15 @@ def generate_trace(
     ),
 ):
     """Generate per-PP-stage execution traces by running Megatron-LM with fake process groups."""
-    from simulon.config.resolve import (
-        resolve_datacenter,
-        resolve_gpu_spec,
-        resolve_workload,
-        workload_hash,
-    )
+    from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
     from simulon.config.scenario import ScenarioConfig
     from simulon.config.workload import MegatronWorkload
 
-    with open(scenario) as f:
-        raw = yaml.safe_load(f)
-
-    # Try scenario first; fall back to pure workload YAML.
+    sc: ScenarioConfig | None = None
     try:
-        sc = ScenarioConfig.model_validate(raw)
+        sc = ScenarioConfig.from_yaml(scenario)
         is_scenario = True
-        # If datacenter was given as a file path, resolve it to a DatacenterConfig.
-        if isinstance(sc.datacenter, Path):
-            sc.datacenter = resolve_datacenter(sc.datacenter)
         workload = sc.workload
-        # If workload was given as a file path, resolve it to a MegatronWorkload.
-        if isinstance(workload, Path):
-            workload = resolve_workload(workload)
     except Exception:
         workload = resolve_workload(scenario)
         is_scenario = False
@@ -110,12 +96,16 @@ def generate_trace(
     # Determine GPU name and compute default trace path if no --output-dir
     if output_dir is None:
         if is_scenario:
+            assert sc is not None
+            dc = sc.datacenter
+            assert not isinstance(dc, Path)
             try:
-                gpu_spec = resolve_gpu_spec(sc.datacenter)
+                gpu_spec = resolve_gpu_spec(dc)
                 gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
             except Exception:
                 gpu_name = "default"
         else:
+            assert gpu is not None
             gpu_name = gpu.lower().replace(" ", "-")
 
         h = workload_hash(workload)

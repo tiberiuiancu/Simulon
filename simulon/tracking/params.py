@@ -49,14 +49,9 @@ def extract_params(scenario: ScenarioConfig) -> dict[str, str | int | float | bo
         params["workload.collective_type"] = wl.collective_type.value
         params["workload.message_size_bytes"] = wl.message_size_bytes
 
-    # Flatten datacenter config (with resolved node so template refs are expanded)
-    dc = scenario.datacenter
-    if isinstance(dc, DatacenterConfig):
-        dc_dict = dc.model_dump(mode="json")
-        if dc_dict.get("node") is not None:
-            resolved_node = resolve_node_spec(dc)
-            dc_dict["node"] = resolved_node.model_dump(mode="json")
-        params.update(_flatten_dict("datacenter", dc_dict))
+    # Flatten datacenter config (already resolved during ScenarioConfig validation)
+    if isinstance(scenario.datacenter, DatacenterConfig):
+        params.update(_flatten_dict("datacenter", scenario.datacenter.model_dump(mode="json")))
 
     return params
 
