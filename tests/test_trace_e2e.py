@@ -4,8 +4,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from simulon.backend.analytical import AnalyticalBackend
 from simulon.backend.dag.replayer import replay
 from simulon.config.dc import (

@@ -2,7 +2,6 @@
 
 import pytest
 
-from simulon.collective.common import P2PFlow
 from simulon.collective.ring import (
     ring_all_gather,
     ring_all_reduce,

@@ -12,10 +12,8 @@ Covers:
 """
 from __future__ import annotations
 
-import os
 import pytest
 
-from simulon.collective.common import P2PFlow
 from simulon.collective.tree import tree_all_reduce
 from simulon.collective.nvls import nvls_all_reduce, nvls_tree_all_reduce
 from simulon.config.nccl_profile import NcclDataPoint, NcclAlgoMeasurements, NcclProfile
@@ -515,7 +513,6 @@ class TestCalBusbw:
 
     def test_smaller_message_clamps_to_min_profile_bw(self):
         """Message size below the first profile point clamps to the first measured bw."""
-        size = 1 << 30  # our single profile point
         small_size = 1  # far below
         profile = _make_profile(allreduce_ring_bw=166.0)
         _, intra_bw_small, _ = cal_busbw(

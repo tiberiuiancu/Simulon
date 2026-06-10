@@ -15,7 +15,6 @@ from simulon.config.dc import (
     DatacenterMeta,
     NodeSpec,
     ScaleOutSpec,
-    ScaleUpSpec,
     SwitchSpec,
 )
 from simulon.config.nccl_profile import NcclProfile

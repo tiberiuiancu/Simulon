@@ -10,7 +10,6 @@ from simulon.backend.dag.network_populate import (
     populate_network,
 )
 from simulon.backend.dag.replayer import (
-    SimulationResult,
     _intersection_duration,
     _merge_intervals,
     replay,
