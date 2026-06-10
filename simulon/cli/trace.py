@@ -68,7 +68,7 @@ def generate_trace(
         help="Dump a PyTorch CUDA memory snapshot to the given path (for OOM debugging)",
     ),
     warmup: int = typer.Option(
-        5, "--warmup", help="Number of warmup iterations to run before tracing (default: 5)"
+        3, "--warmup", help="Number of warmup iterations to run before tracing (default: 3)"
     ),
     force_regenerate: bool = typer.Option(
         False, "--force-regenerate", help="Re-generate traces even if they already exist"
