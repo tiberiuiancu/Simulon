@@ -81,9 +81,7 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
             pue_overhead_wh=0.0,
             avg_power_kw=avg_power_kw,
             run_duration_hours=run_duration_hours,
-            breakdown=[
-                ComponentEnergy(component="measured_energy", wh=total_wh, pct=100.0)
-            ],
+            breakdown=[ComponentEnergy(component="measured_energy", wh=total_wh, pct=100.0)],
             co2eq_g=co2eq_g,
             source="measured",
         )
@@ -124,7 +122,7 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
         raise ValueError("node.nics_per_node must be set after resolution")
 
     # nodes_per_rack for rack count derivation
-    rack = dc.datacenter.rack
+    rack = dc.datacenter.rack if dc.datacenter is not None else None
     if rack is not None and rack.nodes_per_rack is not None and rack.nodes_per_rack > 0:
         num_racks = math.ceil(num_nodes / rack.nodes_per_rack)
     else:
@@ -211,12 +209,12 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
         )
 
     # Datacenter cooling
-    dc_cooling = dc.datacenter.cooling
+    dc_cooling = dc.datacenter.cooling if dc.datacenter is not None else None
     if dc_cooling is not None and dc_cooling.tdp_w is not None:
         components.append(("datacenter_cooling", _component_wh(dc_cooling.tdp_w, 1, total_time_ms)))
 
     hardware_subtotal_wh = sum(wh for _, wh in components)
-    pue = dc.datacenter.pue
+    pue = dc.datacenter.pue if dc.datacenter is not None else 1.0
     total_wh = hardware_subtotal_wh * pue
     pue_overhead_wh = total_wh - hardware_subtotal_wh
 

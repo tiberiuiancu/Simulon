@@ -85,7 +85,7 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
     if nics_per_node is None:
         raise ValueError("node.nics_per_node must be set after resolution")
 
-    rack = dc.datacenter.rack
+    rack = dc.datacenter.rack if dc.datacenter is not None else None
     if rack is not None and rack.nodes_per_rack is not None and rack.nodes_per_rack > 0:
         num_racks = math.ceil(num_nodes / rack.nodes_per_rack)
     else:
@@ -154,7 +154,7 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
             raw.append(("rack_cooling", _scale_cost(rack.cooling.cost, num_racks)))
 
     # Datacenter cooling
-    dc_cooling = dc.datacenter.cooling
+    dc_cooling = dc.datacenter.cooling if dc.datacenter is not None else None
     if dc_cooling is not None:
         raw.append(("datacenter_cooling", _scale_cost(dc_cooling.cost, 1)))
 
@@ -183,15 +183,15 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
     capex = CapexResult(total=capex_total, min=total_min, max=total_max, breakdown=breakdown)
 
     # --- OPEX per run ---
-    electricity_cost = dc.datacenter.electricity_cost_per_kwh or 0.0
+    electricity_cost = dc.datacenter.electricity_cost_per_kwh if dc.datacenter is not None else 0.0
     energy_kwh = energy_result.total_wh / 1000
     opex_per_run = energy_kwh * electricity_cost
 
     # --- Combined cost per run (only if datacenter_lifetime_years set) ---
     cost_per_run: CostPerRun | None = None
-    lifetime_years = dc.datacenter.datacenter_lifetime_years
+    lifetime_years = dc.datacenter.datacenter_lifetime_years if dc.datacenter is not None else None
     if lifetime_years is not None and energy_result.run_duration_hours > 0:
-        idle_fraction = dc.datacenter.idle_fraction
+        idle_fraction = dc.datacenter.idle_fraction if dc.datacenter is not None else 0.0
         runs_per_lifetime = math.floor(
             lifetime_years * 8760 * (1 - idle_fraction) / energy_result.run_duration_hours
         )
