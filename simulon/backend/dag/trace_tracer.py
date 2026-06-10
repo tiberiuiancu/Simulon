@@ -899,6 +899,10 @@ class MegatronDagTracer(DAGTracer):
                     dag.profiled_ranks.add(rank)
                 if dag.total_flops is None and trace.total_flops is not None:
                     dag.total_flops = trace.total_flops
+                if dag.energy_kwh is None and trace.energy_kwh is not None:
+                    dag.energy_kwh = trace.energy_kwh
+                if dag.co2eq_kg is None and trace.co2eq_kg is not None:
+                    dag.co2eq_kg = trace.co2eq_kg
                 _add_trace_to_dag(
                     dag,
                     trace,
