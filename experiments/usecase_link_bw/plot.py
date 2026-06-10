@@ -11,12 +11,38 @@ from __future__ import annotations
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
 from simulon.tracking import get_trackers
+
+
+def _extract_bw(run: dict[str, Any]) -> int:
+    cfg = run.get("config", {})
+    for flat_key in (
+        "datacenter.node.scale_out.nic.speed",
+        "datacenter.node.from_",
+    ):
+        parts = flat_key.split(".")
+        val: Any = cfg
+        for p in parts:
+            if isinstance(val, dict):
+                val = val.get(p)
+            else:
+                val = None
+                break
+        if val and isinstance(val, str):
+            if "Gbps" in val:
+                return int(val.replace("Gbps", ""))
+            if "node_bw" in val:
+                import re
+                m = re.search(r"node_bw(\d+)", val)
+                if m:
+                    return int(m.group(1))
+    return 0
 
 
 def plot_mfu_from_wandb(
@@ -30,25 +56,21 @@ def plot_mfu_from_wandb(
         print("No active trackers found.", file=sys.stderr)
         sys.exit(1)
 
-    # Fetch all runs for this experiment via prefix (e.g. "link-bw-")
-    prefix = "link-bw-"
     records: list[dict[str, float | str]] = []
     for tracker in trackers:
-        runs = tracker.fetch_runs(prefix=prefix)
+        runs = tracker.fetch_runs(prefix="link-bw-")
         for run in runs:
             name = run["display_name"]
             parts = name.split("-")
-            if len(parts) < 3:
-                continue
-            model = "-".join(parts[2:])
-            summary = run["summary"]
-            mfu = summary.get("mfu_pct")
+            model = "-".join(parts[2:]) if len(parts) >= 3 else name
+            bw = _extract_bw(run)
+            mfu = run["summary"].get("mfu_pct")
             if mfu is None:
                 continue
             records.append({
                 "model": model,
-                "bw_gbps": 0,  # placeholder, will be filled from config
-                "bw_label": "unknown",
+                "bw_gbps": bw,
+                "bw_label": f"{bw} Gbps",
                 "mfu_pct": float(mfu),
             })
 
