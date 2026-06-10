@@ -57,6 +57,8 @@ def simulate(
     import tempfile
 
     trackers = get_trackers(scenario)
+    with open(scenario) as f:
+        raw = yaml.safe_load(f)
     sc = ScenarioConfig.from_yaml(scenario)
 
     if trace and isinstance(sc.workload, MegatronWorkload):
