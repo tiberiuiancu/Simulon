@@ -46,8 +46,8 @@ for model in "${MODELS[@]}"; do
     done
 done
 
-for pid in "${PIDS[@]}"; do
-    wait "$pid"
+while [ $COMPLETED -lt $TOTAL ]; do
+    wait -n 2>/dev/null || true
     ((COMPLETED++))
     echo "Progress: $COMPLETED/$TOTAL simulations completed"
 done
