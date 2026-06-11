@@ -17,7 +17,7 @@ for model in "${MODELS[@]}"; do
         scenario="$SCRIPT_DIR/$model/scenario${size}.yaml"
         name="${model}-node${size}"
         echo "  SIMULATE: $name"
-        WAND_RUN_NAME="node-size-${name}" uv run simulon simulate "$scenario" --chrome-compact "--chrome output/trace-node-size-${name}" &
+        WAND_RUN_NAME="node-size-${name}" uv run simulon simulate "$scenario" --chrome-compact --chrome "output/trace-node-size-${name}" &
     done
 done
 
