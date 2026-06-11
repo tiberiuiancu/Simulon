@@ -357,6 +357,8 @@ def _remap_collectives(source_trace, from_rank: int, to_rank: int, config: Paral
         pipeline_stage=_stage_of(to_rank, config),
         events=new_events,
         total_flops=source_trace.total_flops,
+        energy_kwh=source_trace.energy_kwh,
+        co2eq_kg=source_trace.co2eq_kg,
     )
 
 
@@ -890,6 +892,9 @@ class MegatronDagTracer(DAGTracer):
         node_id = [0]
         flow_id = [0]
 
+        total_energy_kwh = 0.0
+        total_co2eq_kg = 0.0
+
         with log_progress("  building DAG", config.world_size, logger) as advance:
             _collective_registry: dict = {}
             for rank in range(config.world_size):
@@ -899,6 +904,11 @@ class MegatronDagTracer(DAGTracer):
                     dag.profiled_ranks.add(rank)
                 if dag.total_flops is None and trace.total_flops is not None:
                     dag.total_flops = trace.total_flops
+                if trace.energy_kwh is not None:
+                    total_energy_kwh += trace.energy_kwh
+                if trace.co2eq_kg is not None:
+                    total_co2eq_kg += trace.co2eq_kg
+
                 _add_trace_to_dag(
                     dag,
                     trace,
@@ -918,6 +928,11 @@ class MegatronDagTracer(DAGTracer):
                     _collective_registry,
                 )
                 advance()
+
+        if total_energy_kwh > 0:
+            dag.energy_kwh = total_energy_kwh
+        if total_co2eq_kg > 0:
+            dag.co2eq_kg = total_co2eq_kg
 
         _wire_slot_edges(dag, slot_nodes)
         node_id[0], flow_id[0] = _wire_pp_transfers(

@@ -16,8 +16,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from simulon.config.resolve import resolve_workload, workload_hash
-from simulon.config.scenario import ScenarioConfig
 from simulon.tracking import get_trackers
 
 
@@ -31,17 +29,6 @@ def _model_from_scenario(path: Path) -> str:
 
 def _node_size_from_scenario(path: Path) -> int:
     return int(path.stem.replace("scenario", ""))
-
-
-def _compute_workload_hash(scenario: Path) -> str:
-    import yaml
-
-    with open(scenario) as f:
-        raw: dict = yaml.safe_load(f)
-    sc = ScenarioConfig.model_validate(raw)
-    if isinstance(sc.workload, Path):
-        sc.workload = resolve_workload(sc.workload)
-    return workload_hash(sc.workload)
 
 
 def plot_mfu_from_wandb(output: Path | None, base_dir: Path) -> None:
@@ -61,20 +48,19 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path) -> None:
     for sc_path in scenarios:
         model = _model_from_scenario(sc_path)
         node_size = _node_size_from_scenario(sc_path)
-        wl_hash = _compute_workload_hash(sc_path)
+        # The run script sets WANDB_RUN_NAME="node-size-{model}-node{size}"
+        run_prefix = f"node-size-{model}-node{node_size}"
 
         for tracker in trackers:
-            metrics = tracker.pull_metrics(wl_hash)
+            metrics = tracker.pull_metrics(run_name_prefix=run_prefix)
             if metrics is None:
                 continue
             mfu = metrics.get("mfu_pct")
             if mfu is None:
                 continue
-            records.append({
-                "model": model,
-                "node_size": f"{node_size} GPU/node",
-                "mfu_pct": float(mfu),
-            })
+            records.append(
+                {"model": model, "node_size": f"{node_size} GPU/node", "mfu_pct": float(mfu)}
+            )
 
     if not records:
         print("No wandb data found for any scenario. Exiting.", file=sys.stderr)
@@ -99,7 +85,7 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path) -> None:
     ax.set_ylabel("MFU (%)")
     ax.set_xlabel("")
     ax.set_title("MFU by Node Size", fontsize=14, fontweight="bold")
-    ax.legend(title="Node config", loc="upper right")
+    ax.legend(title="Node config", loc="upper left")
     sns.despine(fig=fig, top=True, right=True)
     fig.tight_layout()
 

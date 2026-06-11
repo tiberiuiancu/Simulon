@@ -12,8 +12,8 @@ def load_tracking_env_file(path: Path) -> None:
     Each non-empty, non-comment line must contain exactly one ``=``:
         KEY=value
     Existing environment variables are **not** overwritten (standard dotenv
-    behaviour); however, later files in the cascade *can* override values
-    that were set by earlier files because we process them sequentially.
+    behaviour).  Later files in the cascade also cannot override values
+    that were set by earlier files or by the shell.
     """
     with open(path, encoding="utf-8") as f:
         for raw in f:
@@ -25,7 +25,7 @@ def load_tracking_env_file(path: Path) -> None:
             key, val = line.split("=", 1)
             key = key.strip()
             val = val.strip().strip('"').strip("'")
-            if key:
+            if key and key not in os.environ:
                 os.environ[key] = val
 
 

@@ -134,6 +134,16 @@ def simulate(
                 cost_result = compute_cost(sc, energy_result)
                 _print_cost_summary(cost_result)
 
+            if energy_result is not None and trackers:
+                for tracker in trackers:
+                    tracker.log_metrics(
+                        {
+                            "energy_wh": energy_result.total_wh,
+                            "co2eq_g": energy_result.co2eq_g or 0.0,
+                            "energy_source": energy_result.source,
+                        }
+                    )
+
         if chrome is not None:
             if isinstance(sc.workload, MegatronWorkload):
                 from simulon.backend.dag.trace_tracer import ParallelConfig
@@ -275,15 +285,19 @@ def _print_collective_summary(workload, result, datacenter) -> None:
 
 def _print_energy_summary(result) -> None:
     """Print a human-readable energy summary to stdout."""
+    source_label = f"({result.source})"
     typer.echo(
         f"Energy per iteration:  {result.total_wh:.4f} Wh"
-        f"   (avg cluster power: {result.avg_power_kw:.2f} kW)"
+        f"   (avg cluster power: {result.avg_power_kw:.2f} kW)   {source_label}"
     )
-    typer.echo(f"  Hardware subtotal:   {result.hardware_subtotal_wh:.4f} Wh")
-    for comp in result.breakdown:
-        label = comp.component + ":"
-        typer.echo(f"    {label:26s} {comp.wh:10.4f} Wh  ({comp.pct:5.1f}%)")
-    typer.echo(f"  PUE overhead:        {result.pue_overhead_wh:.4f} Wh")
+    if result.co2eq_g is not None:
+        typer.echo(f"  CO2eq:               {result.co2eq_g:.4f} g")
+    if result.source == "estimated":
+        typer.echo(f"  Hardware subtotal:   {result.hardware_subtotal_wh:.4f} Wh")
+        for comp in result.breakdown:
+            label = comp.component + ":"
+            typer.echo(f"    {label:26s} {comp.wh:10.4f} Wh  ({comp.pct:5.1f}%)")
+        typer.echo(f"  PUE overhead:        {result.pue_overhead_wh:.4f} Wh")
     typer.echo("")
 
 

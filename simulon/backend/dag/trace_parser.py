@@ -21,6 +21,8 @@ class TraceFile:
     pipeline_stage: int
     events: list[TraceEvent]
     total_flops: float | None = None
+    energy_kwh: float | None = None
+    co2eq_kg: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -33,6 +35,8 @@ class TraceFile:
                 for e in self.events
             ],
             "total_flops": self.total_flops,
+            "energy_kwh": self.energy_kwh,
+            "co2eq_kg": self.co2eq_kg,
         }
 
     def to_json(self, indent: int | None = None) -> str:
@@ -84,6 +88,18 @@ class TraceFileParser:
             if isinstance(tf, int | float):
                 total_flops = float(tf)
 
+        energy_kwh = None
+        if "energy_kwh" in data:
+            ek = data["energy_kwh"]
+            if isinstance(ek, int | float):
+                energy_kwh = float(ek)
+
+        co2eq_kg = None
+        if "co2eq_kg" in data:
+            ck = data["co2eq_kg"]
+            if isinstance(ck, int | float):
+                co2eq_kg = float(ck)
+
         events: list[TraceEvent] = []
         for event_data in events_data:
             event_type = event_data["type"]
@@ -110,4 +126,6 @@ class TraceFileParser:
             pipeline_stage=pipeline_stage_obj,
             events=events,
             total_flops=total_flops,
+            energy_kwh=energy_kwh,
+            co2eq_kg=co2eq_kg,
         )

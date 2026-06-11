@@ -74,6 +74,8 @@ class ExecutionDAG:
     edges: list[DAGEdge] = field(default_factory=list)
     total_flops: float | None = None
     profiled_ranks: set[int] = field(default_factory=set)
+    energy_kwh: float | None = None
+    co2eq_kg: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -83,6 +85,8 @@ class ExecutionDAG:
             "edges": [asdict(e) for e in self.edges],
             "total_flops": self.total_flops,
             "profiled_ranks": sorted(self.profiled_ranks),
+            "energy_kwh": self.energy_kwh,
+            "co2eq_kg": self.co2eq_kg,
         }
 
     def to_json(self) -> str:

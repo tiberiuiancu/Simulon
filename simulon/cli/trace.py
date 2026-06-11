@@ -205,6 +205,8 @@ def generate_trace(
             derived_args[flag] = value
     if "--train-iters" not in explicitly_set:
         derived_args["--train-iters"] = warmup + 1
+    if "--trace-warmup-iters" not in explicitly_set:
+        derived_args["--trace-warmup-iters"] = warmup
     stages_to_trace = stages if stages is not None else list(range(pp))
 
     output_dir = output_dir.resolve()
