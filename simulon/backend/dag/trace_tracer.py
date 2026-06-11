@@ -658,11 +658,14 @@ def _add_stream_trace_to_dag(
     rank: int,
     config: ParallelConfig,
     node_id: list,
+    flow_id: list,
+    activation_bytes: int,
     slot_nodes: dict,
     slot_entry_node: dict,
     slot_last_node: dict,
     slot_first_timestamp: dict,
     slot_last_timestamp: dict,
+    pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
 ) -> None:
     events = sorted(trace.events, key=lambda e: e.timestamp_ms)
@@ -761,41 +764,52 @@ def _add_stream_trace_to_dag(
             name = str(event.metadata.get("name", ""))
             timestamp_ms = float(event.timestamp_ms)
             if len(group_ranks) >= 2:
-                global_ranks = _localize_to_global_ranks(group_ranks, rank)
-                if global_ranks is not None:
-                    group_ranks = global_ranks
-                match_key = (
-                    collective_type,
-                    frozenset(group_ranks),
-                    name,
-                    round(timestamp_ms, 3),
-                    data_size,
-                )
-                collective = dag.collective_nodes.get(match_key)
-                if collective is None:
-                    collective = CollectiveNode(
-                        node_id=node_id[0],
-                        collective_type=collective_type,
-                        group_ranks=group_ranks,
-                        data_size=data_size,
-                        name=name,
-                        timestamp_ms=timestamp_ms,
-                        layer_id=-1,
-                        phase=active_direction,
-                        algorithm="ring",
-                        num_channels=1,
+                if collective_type in ("PP_Send", "PP_Recv"):
+                    _add_pp_transfer(
+                        event,
+                        rank,
+                        active_microbatch_id,
+                        active_direction,
+                        activation_bytes,
+                        pending_pp_transfers,
                     )
-                    dag.add_collective_node(collective)
-                    node_id[0] += 1
-                collective_id = collective.node_id
-                slot_node_ids.append(collective_id)
-                if rank in last_node_by_rank:
-                    dag.add_edge(
-                        DAGEdge(
-                            src_node_id=last_node_by_rank[rank].node_id, dst_node_id=collective_id
+                else:
+                    global_ranks = _localize_to_global_ranks(group_ranks, rank)
+                    if global_ranks is not None:
+                        group_ranks = global_ranks
+                    match_key = (
+                        collective_type,
+                        frozenset(group_ranks),
+                        name,
+                        round(timestamp_ms, 3),
+                        data_size,
+                    )
+                    collective = dag.collective_nodes.get(match_key)
+                    if collective is None:
+                        collective = CollectiveNode(
+                            node_id=node_id[0],
+                            collective_type=collective_type,
+                            group_ranks=group_ranks,
+                            data_size=data_size,
+                            name=name,
+                            timestamp_ms=timestamp_ms,
+                            layer_id=-1,
+                            phase=active_direction,
+                            algorithm="ring",
+                            num_channels=1,
                         )
-                    )
-                last_node_by_rank[rank] = collective
+                        dag.add_collective_node(collective)
+                        node_id[0] += 1
+                    collective_id = collective.node_id
+                    slot_node_ids.append(collective_id)
+                    if rank in last_node_by_rank:
+                        dag.add_edge(
+                            DAGEdge(
+                                src_node_id=last_node_by_rank[rank].node_id,
+                                dst_node_id=collective_id,
+                            )
+                        )
+                    last_node_by_rank[rank] = collective
 
 
 def _add_trace_to_dag(
@@ -826,11 +840,14 @@ def _add_trace_to_dag(
             rank,
             config,
             node_id,
+            flow_id,
+            activation_bytes,
             slot_nodes,
             slot_entry_node,
             slot_last_node,
             slot_first_timestamp,
             slot_last_timestamp,
+            pending_pp_transfers,
             last_node_by_rank,
         )
         return
