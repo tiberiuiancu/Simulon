@@ -33,6 +33,8 @@ for model in "${MODELS[@]}"; do
     done
 done
 
+echo "Starting $TOTAL simulations in parallel (logs: $SCRIPT_DIR/logs/) ..."
+
 COMPLETED=0
 for model in "${MODELS[@]}"; do
     for size in 4 8; do
