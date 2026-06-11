@@ -60,4 +60,5 @@ while [ $COMPLETED -lt $TOTAL ]; do
 done
 
 echo "=== Plotting ==="
-python "$SCRIPT_DIR/plot.py"
+uv run python "$SCRIPT_DIR/plot.py"
+
