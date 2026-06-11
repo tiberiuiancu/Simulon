@@ -3,7 +3,7 @@
 
 Usage (from repo root):
     uv run python experiments/usecase_link_bw/plot.py
-    uv run python experiments/usecase_link_bw/plot.py --chart line --output line.pdf
+    uv run python experiments/usecase_link_bw/plot.py --line --output line.pdf
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _model_bw_from_run(run: dict[str, Any]) -> tuple[str, int]:
     return name, _extract_bw(run)
 
 
-def plot_mfu_from_wandb(output: Path | None, base_dir: Path, chart: str = "both") -> None:
+def plot_mfu_from_wandb(output: Path | None, base_dir: Path, line: bool = False) -> None:
     env_file = base_dir / ".tracking.env"
     trackers = get_trackers(env_file if env_file.exists() else base_dir)
     if not trackers:
@@ -70,16 +70,9 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, chart: str = "both"
     df = pd.DataFrame(records)
     sns.set_theme(style="whitegrid")
 
-    show_bar = chart in ("both", "bar")
-    show_line = chart in ("both", "line")
+    fig, ax = plt.subplots(figsize=(8, 5))
 
-    n_plots = (1 if show_bar else 0) + (1 if show_line else 0)
-    fig, axes = plt.subplots(1, n_plots, figsize=(5 * n_plots, 5), squeeze=False)
-    ax_idx = 0
-
-    if show_bar:
-        ax = axes[0, ax_idx]
-        ax_idx += 1
+    if not line:
         order = sorted(
             df["bw_label"].unique(),
             key=lambda s: int(s.split()[0]) if s.split()[0].isdigit() else 0,
@@ -100,9 +93,7 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, chart: str = "both"
         ax.legend(title="NIC speed", loc="upper left")
         sns.despine(ax=ax, top=True, right=True)
 
-    if show_line:
-        ax = axes[0, ax_idx]
-        ax_idx += 1
+    else:
         for model_name in sorted(df["model"].unique()):
             sub = df[df["model"] == model_name].sort_values(["bw_gbps"])
             ax.plot(
@@ -143,13 +134,10 @@ def main() -> None:
         help="Directory containing model sub-folders with scenario YAMLs.",
     )
     parser.add_argument(
-        "--chart",
-        choices=["bar", "line", "both"],
-        default="both",
-        help="Which chart(s) to render (default: both).",
+        "--line", action="store_true", help="Render line plot instead of bar plot (default: bar)."
     )
     args = parser.parse_args()
-    plot_mfu_from_wandb(args.output, args.base_dir, chart=args.chart)
+    plot_mfu_from_wandb(args.output, args.base_dir, line=args.line)
 
 
 if __name__ == "__main__":
