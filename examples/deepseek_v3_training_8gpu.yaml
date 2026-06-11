@@ -1,0 +1,108 @@
+datacenter:
+  num_nodes: 1
+  node: dgx-h100
+
+collective:
+  library: nccl
+  algorithm: auto
+
+workload:
+  framework: megatron
+  config:
+    # Parallelism (8 GPUs, 1 node)
+    tensor-model-parallel-size: 2
+    pipeline-model-parallel-size: 1
+    sequence-parallel: true
+    expert-model-parallel-size: 4
+    expert-tensor-parallel-size: 1
+    num-gpus: 8
+
+    # Model architecture (DeepSeek-V3 proxy)
+    num-layers: 8
+    hidden-size: 2048
+    num-attention-heads: 32
+    num-query-groups: 32
+    ffn-hidden-size: 5632
+    vocab-size: 32000
+    position-embedding-type: rope
+    normalization: RMSNorm
+    multi-latent-attention: true
+    qk-layernorm: true
+    mtp-num-layers: 0
+
+    # MoE
+    num-experts: 64
+    moe-router-topk: 8
+    moe-router-num-groups: 8
+    moe-router-group-topk: 4
+    moe-router-pre-softmax: true
+    moe-router-topk-scaling-factor: 2.5
+    moe-router-score-function: sigmoid
+    moe-router-dtype: fp32
+    moe-router-enable-expert-bias: true
+    moe-grouped-gemm: true
+    moe-token-dispatcher-type: alltoall
+    moe-shared-expert-intermediate-size: 2048
+    moe-ffn-hidden-size: 2048
+    moe-layer-freq: '[0,0,0,1,1,1,1,1]'
+    moe-aux-loss-coeff: 0.0001
+    moe-permute-fusion: true
+    moe-router-fusion: true
+
+    # MoE communication overlap (NEW: enabled for stream-aware tracing)
+    overlap-moe-expert-parallel-comm: true
+    delay-wgrad-compute: true
+    moe-shared-expert-overlap: true
+
+    # Precision
+    bf16: true
+    fp8-format: hybrid
+    fp8-param-gather: true
+    fp8-recipe: tensorwise
+    grad-reduce-in-bf16: false
+
+    # Fusion / kernels
+    disable-bias-linear: true
+    no-bias-dropout-fusion: true
+    cross-entropy-loss-fusion: true
+    cross-entropy-fusion-impl: te
+    swiglu: true
+
+    # Dropout (disabled)
+    hidden-dropout: 0
+    attention-dropout: 0
+    norm-epsilon: 1.0e-06
+
+    # Recompute
+    recompute-granularity: selective
+    recompute-modules:
+      - mlp
+
+    # Optimizer
+    use-distributed-optimizer: true
+    use-precision-aware-optimizer: true
+    main-grads-dtype: bf16
+    exp-avg-dtype: bf16
+    exp-avg-sq-dtype: bf16
+    adam-beta2: 0.95
+    lr: 0.0003
+    min-lr: 3.0e-05
+
+    # Communication overlap
+    overlap-grad-reduce: true
+    overlap-param-gather: true
+
+    # Training shape
+    micro-batch-size: 1
+    global-batch-size: 8
+    seq-length: 4096
+    max-position-embeddings: 4096
+
+    # Data
+    mock-data: true
+    tokenizer-type: NullTokenizer
+    split: 1000,0,0
+    seed: 1234
+    num-workers: 8
+    manual-gc: true
+    manual-gc-interval: 5

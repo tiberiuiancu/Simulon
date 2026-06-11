@@ -652,6 +652,152 @@ def _handle_event_gap(
         )
 
 
+def _add_stream_trace_to_dag(
+    dag: ExecutionDAG,
+    trace,
+    rank: int,
+    config: ParallelConfig,
+    node_id: list,
+    slot_nodes: dict,
+    slot_entry_node: dict,
+    slot_last_node: dict,
+    slot_first_timestamp: dict,
+    slot_last_timestamp: dict,
+    last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
+) -> None:
+    events = sorted(trace.events, key=lambda e: e.timestamp_ms)
+    active_microbatch_id = -1
+    active_direction = ""
+    slot_node_ids: list[int] = []
+    last_node_by_stream: dict[str, int] = {}
+    last_node_by_event: dict[int, int] = {}
+    pending_begin_timestamp: dict[int, float] = {}
+    pending_stream_wait: dict[str, list[int]] = {}
+
+    def _apply_pending_stream_waits(stream_type: str, current_node_id: int):
+        for src_node_id in pending_stream_wait.get(stream_type, []):
+            dag.add_edge(DAGEdge(src_node_id=src_node_id, dst_node_id=current_node_id))
+        pending_stream_wait.pop(stream_type, None)
+
+    for event in events:
+        if event.type == "slot_begin":
+            active_microbatch_id = event.metadata.get("microbatch_id", -1)
+            active_direction = str(event.metadata.get("direction", ""))
+            slot_node_ids.clear()
+            key = (rank, active_microbatch_id, active_direction)
+            if key not in slot_first_timestamp:
+                slot_first_timestamp[key] = event.timestamp_ms
+        elif event.type == "slot_end":
+            if slot_node_ids:
+                key = (rank, active_microbatch_id, active_direction)
+                slot_nodes.setdefault(key, []).extend(slot_node_ids)
+                slot_entry_node[key] = slot_node_ids[0]
+                slot_last_node[key] = slot_node_ids[-1]
+                slot_last_timestamp[key] = event.timestamp_ms
+            slot_node_ids.clear()
+        elif event.type == "node_begin":
+            name = str(event.metadata.get("name", ""))
+            stream_type = str(event.metadata.get("stream_type", ""))
+            layer_id = int(event.metadata.get("layer_id", -1))
+            event_id = event.metadata.get("event_id")
+            cn = ComputeNode(
+                node_id=node_id[0],
+                gpu_rank=rank,
+                kernel=name,
+                layer_id=layer_id,
+                microbatch_id=active_microbatch_id,
+                pipeline_stage=_stage_of(rank, config),
+                phase=active_direction,
+                duration_ms=None,
+            )
+            dag.add_compute_node(cn)
+            slot_node_ids.append(node_id[0])
+            if stream_type in last_node_by_stream:
+                dag.add_edge(
+                    DAGEdge(src_node_id=last_node_by_stream[stream_type], dst_node_id=node_id[0])
+                )
+            if event_id is not None and event_id in last_node_by_event:
+                dag.add_edge(
+                    DAGEdge(src_node_id=last_node_by_event[event_id], dst_node_id=node_id[0])
+                )
+            if rank in last_node_by_rank:
+                dag.add_edge(
+                    DAGEdge(src_node_id=last_node_by_rank[rank].node_id, dst_node_id=node_id[0])
+                )
+            _apply_pending_stream_waits(stream_type, node_id[0])
+            last_node_by_stream[stream_type] = node_id[0]
+            last_node_by_rank[rank] = cn
+            pending_begin_timestamp[node_id[0]] = event.timestamp_ms
+            node_id[0] += 1
+        elif event.type == "node_end":
+            stream_type = str(event.metadata.get("stream_type", ""))
+            event_id = event.metadata.get("event_id")
+            node_id_val = last_node_by_stream.get(stream_type)
+            if node_id_val is not None and node_id_val in pending_begin_timestamp:
+                duration_ms = event.timestamp_ms - pending_begin_timestamp[node_id_val]
+                for cn in dag.compute_nodes:
+                    if cn.node_id == node_id_val:
+                        cn.duration_ms = duration_ms
+                        break
+                del pending_begin_timestamp[node_id_val]
+            if event_id is not None:
+                last_node_by_event[event_id] = node_id_val
+        elif event.type == "stream_wait":
+            from_stream = str(event.metadata.get("from_stream", ""))
+            to_stream = str(event.metadata.get("to_stream", ""))
+            if from_stream in last_node_by_stream:
+                src_node_id = last_node_by_stream[from_stream]
+                if to_stream in last_node_by_stream:
+                    dag.add_edge(
+                        DAGEdge(src_node_id=src_node_id, dst_node_id=last_node_by_stream[to_stream])
+                    )
+                else:
+                    pending_stream_wait.setdefault(to_stream, []).append(src_node_id)
+        elif event.type == "collective":
+            collective_type = str(event.metadata.get("collective_type", ""))
+            group_ranks_raw = event.metadata.get("group_ranks", [])
+            group_ranks = list(group_ranks_raw) if isinstance(group_ranks_raw, list | tuple) else []
+            data_size = int(event.metadata.get("bytes", 0))
+            name = str(event.metadata.get("name", ""))
+            timestamp_ms = float(event.timestamp_ms)
+            if len(group_ranks) >= 2:
+                global_ranks = _localize_to_global_ranks(group_ranks, rank)
+                if global_ranks is not None:
+                    group_ranks = global_ranks
+                match_key = (
+                    collective_type,
+                    frozenset(group_ranks),
+                    name,
+                    round(timestamp_ms, 3),
+                    data_size,
+                )
+                collective = dag.collective_nodes.get(match_key)
+                if collective is None:
+                    collective = CollectiveNode(
+                        node_id=node_id[0],
+                        collective_type=collective_type,
+                        group_ranks=group_ranks,
+                        data_size=data_size,
+                        name=name,
+                        timestamp_ms=timestamp_ms,
+                        layer_id=-1,
+                        phase=active_direction,
+                        algorithm="ring",
+                        num_channels=1,
+                    )
+                    dag.add_collective_node(collective)
+                    node_id[0] += 1
+                collective_id = collective.node_id
+                slot_node_ids.append(collective_id)
+                if rank in last_node_by_rank:
+                    dag.add_edge(
+                        DAGEdge(
+                            src_node_id=last_node_by_rank[rank].node_id, dst_node_id=collective_id
+                        )
+                    )
+                last_node_by_rank[rank] = collective
+
+
 def _add_trace_to_dag(
     dag: ExecutionDAG,
     trace,
@@ -670,6 +816,25 @@ def _add_trace_to_dag(
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
 ) -> None:
+    has_stream_events = any(
+        e.type in ("node_begin", "node_end", "stream_wait") for e in trace.events
+    )
+    if has_stream_events:
+        _add_stream_trace_to_dag(
+            dag,
+            trace,
+            rank,
+            config,
+            node_id,
+            slot_nodes,
+            slot_entry_node,
+            slot_last_node,
+            slot_first_timestamp,
+            slot_last_timestamp,
+            last_node_by_rank,
+        )
+        return
+
     events = sorted(trace.events, key=lambda e: e.timestamp_ms)
     active_microbatch_id: list = [-1]
     active_direction: list = [""]

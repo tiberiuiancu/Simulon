@@ -112,7 +112,14 @@ class TraceFileParser:
                 if bytes_value < 0:
                     raise ValueError("collective events must have metadata.bytes >= 0")
 
-            if event_type not in {"collective", "slot_begin", "slot_end"}:
+            if event_type not in {
+                "collective",
+                "slot_begin",
+                "slot_end",
+                "node_begin",
+                "node_end",
+                "stream_wait",
+            }:
                 raise ValueError(f"Unsupported event type: {event_type!r}")
 
             timestamp_ms = float(event_data["timestamp_ms"])
