@@ -48,7 +48,7 @@ for model in "${MODELS[@]}"; do
         name="${model}-node${size}"
         echo "  SIMULATE: $name"
         log_file="$SCRIPT_DIR/logs/${name}.log"
-        WANDB_RUN_NAME="node-size-${name}" uv run simulon simulate "$scenario" --chrome-compact --chrome "output/trace-node-size-${name}" > "$log_file" 2>&1 &
+        WANDB_RUN_NAME="node-size-${name}" uv run simulon simulate "$scenario" --energy --chrome-compact --chrome "output/trace-node-size-${name}" > "$log_file" 2>&1 &
         PIDS+=($!)
     done
 done
@@ -61,4 +61,3 @@ done
 
 echo "=== Plotting ==="
 uv run python "$SCRIPT_DIR/plot.py"
-

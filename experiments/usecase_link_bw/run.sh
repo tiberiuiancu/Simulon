@@ -49,7 +49,7 @@ for model in "${MODELS[@]}"; do
         name="${model}-bw${bw}"
         echo "  SIMULATE: $name"
         log_file="$SCRIPT_DIR/logs/${name}.log"
-        WANDB_RUN_NAME="link-bw-${name}" uv run simulon simulate "$scenario" --chrome "output/link-nw-${name}.json" --chrome-compact > "$log_file" 2>&1 &
+        WANDB_RUN_NAME="link-bw-${name}" uv run simulon simulate "$scenario" --energy --chrome "output/link-nw-${name}.json" --chrome-compact > "$log_file" 2>&1 &
         PIDS+=($!)
     done
 done
