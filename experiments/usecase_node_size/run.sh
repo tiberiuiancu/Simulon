@@ -20,11 +20,17 @@ trap cleanup INT TERM
 
 MODELS=(deepseekv3 gptoss-120b llama3-70b)
 
+set +e
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
     bash scripts/apptainer-trace.sh "$SCRIPT_DIR/$model/workload.yaml" \
         --gpu h100
+    trace_rc=$?
+    if [ $trace_rc -ne 0 ]; then
+        echo "    Warning: trace generation exited with code $trace_rc (continuing)"
+    fi
 done
+set -e
 
 TOTAL=0
 for model in "${MODELS[@]}"; do
