@@ -1,5 +1,5 @@
 datacenter:
-  num_nodes: 1
+  num_nodes: 2
   node: dgx-h100
 
 collective:
@@ -9,16 +9,16 @@ collective:
 workload:
   framework: megatron
   config:
-    # Parallelism (8 GPUs, 1 node)
+    # Parallelism (16 GPUs, 2 nodes)
     tensor-model-parallel-size: 2
-    pipeline-model-parallel-size: 1
+    pipeline-model-parallel-size: 2
     sequence-parallel: true
     expert-model-parallel-size: 4
     expert-tensor-parallel-size: 1
-    num-gpus: 8
+    num-gpus: 16
 
     # Model architecture (DeepSeek-V3 proxy)
-    num-layers: 8
+    num-layers: 16
     hidden-size: 2048
     num-attention-heads: 32
     num-query-groups: 32
@@ -44,7 +44,7 @@ workload:
     moe-token-dispatcher-type: alltoall
     moe-shared-expert-intermediate-size: 2048
     moe-ffn-hidden-size: 2048
-    moe-layer-freq: '[0,0,0,1,1,1,1,1]'
+    moe-layer-freq: '[0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1]'
     moe-aux-loss-coeff: 0.0001
     moe-permute-fusion: true
     moe-router-fusion: true
