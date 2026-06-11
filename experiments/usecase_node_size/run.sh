@@ -35,7 +35,7 @@ set -e
 TOTAL=0
 for model in "${MODELS[@]}"; do
     for size in 4 8; do
-        ((TOTAL++))
+        TOTAL=$((TOTAL + 1))
     done
 done
 
@@ -55,7 +55,7 @@ done
 
 while [ $COMPLETED -lt $TOTAL ]; do
     wait -n 2>/dev/null || true
-    ((COMPLETED++))
+    COMPLETED=$((COMPLETED + 1))
     echo "Progress: $COMPLETED/$TOTAL simulations completed"
 done
 
