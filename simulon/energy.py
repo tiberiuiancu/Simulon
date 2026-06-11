@@ -72,16 +72,74 @@ def compute_energy(dag, scenario) -> EnergyResult | None:
 
     # --- Dual mode: CodeCarbon-first ---
     if dag.energy_kwh is not None and dag.co2eq_kg is not None:
-        total_wh = dag.energy_kwh * 1000.0
+        # CodeCarbon measures energy during tracing where collectives are faked
+        # (instant). The GPU computes back-to-back, so the measurement covers
+        # only active compute time. After simulation we know the real schedule
+        # with comm delays and pipeline bubble; we must add idle energy for the
+        # time GPUs spend waiting.
+        dc = scenario.datacenter
+        resolved_node = resolve_node_spec(dc)
+        gpus_per_node = resolved_node.gpus_per_node
+        if gpus_per_node is None:
+            raise ValueError("node.gpus_per_node must be set after resolution")
+        num_gpus_total = dc.num_nodes * gpus_per_node
+
+        # Measured compute energy (already scaled to full cluster in trace_tracer).
+        measured_compute_wh = dag.energy_kwh * 1000.0
+
+        # Active compute time per rank from the replayed DAG.
+        active_ms_by_rank: dict[int, float] = defaultdict(float)
+        for compute_node in dag.compute_nodes:
+            if compute_node.start_ms is not None and compute_node.finish_ms is not None:
+                active_ms_by_rank[compute_node.gpu_rank] += (
+                    compute_node.finish_ms - compute_node.start_ms
+                )
+
+        # Idle power draw during bubble / comm wait.
+        gpu_spec = resolve_gpu_spec(dc)
+        idle_power_w = 0.0
+        if gpu_spec.power_model is not None:
+            if isinstance(gpu_spec.power_model, LinearPowerModel):
+                idle_power_w = gpu_spec.power_model.idle_power_w
+            elif isinstance(gpu_spec.power_model, ConstantPowerModel):
+                idle_power_w = gpu_spec.power_model.tdp_w
+
+        total_idle_wh = 0.0
+        for rank in range(num_gpus_total):
+            active_ms = active_ms_by_rank.get(rank, 0.0)
+            idle_ms = total_time_ms - active_ms
+            if idle_ms > 0:
+                total_idle_wh += idle_power_w * idle_ms * _MS_TO_HOURS
+
+        total_wh = measured_compute_wh + total_idle_wh
         co2eq_g = dag.co2eq_kg * 1000.0
         avg_power_kw = (total_wh / run_duration_hours / 1000) if run_duration_hours > 0 else 0.0
+
+        breakdown = []
+        if measured_compute_wh > 0:
+            breakdown.append(
+                ComponentEnergy(
+                    component="measured_compute",
+                    wh=measured_compute_wh,
+                    pct=(measured_compute_wh / total_wh * 100) if total_wh > 0 else 0.0,
+                )
+            )
+        if total_idle_wh > 0:
+            breakdown.append(
+                ComponentEnergy(
+                    component="idle_energy",
+                    wh=total_idle_wh,
+                    pct=(total_idle_wh / total_wh * 100) if total_wh > 0 else 0.0,
+                )
+            )
+
         return EnergyResult(
             total_wh=total_wh,
             hardware_subtotal_wh=total_wh,
             pue_overhead_wh=0.0,
             avg_power_kw=avg_power_kw,
             run_duration_hours=run_duration_hours,
-            breakdown=[ComponentEnergy(component="measured_energy", wh=total_wh, pct=100.0)],
+            breakdown=breakdown,
             co2eq_g=co2eq_g,
             source="measured",
         )

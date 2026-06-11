@@ -357,6 +357,8 @@ def _remap_collectives(source_trace, from_rank: int, to_rank: int, config: Paral
         pipeline_stage=_stage_of(to_rank, config),
         events=new_events,
         total_flops=source_trace.total_flops,
+        energy_kwh=source_trace.energy_kwh,
+        co2eq_kg=source_trace.co2eq_kg,
     )
 
 
@@ -890,6 +892,10 @@ class MegatronDagTracer(DAGTracer):
         node_id = [0]
         flow_id = [0]
 
+        # Accumulate per-stage energy / CO2 so the DAG stores total cluster values.
+        stage_energies: dict[int, float] = {}
+        stage_co2: dict[int, float] = {}
+
         with log_progress("  building DAG", config.world_size, logger) as advance:
             _collective_registry: dict = {}
             for rank in range(config.world_size):
@@ -899,10 +905,13 @@ class MegatronDagTracer(DAGTracer):
                     dag.profiled_ranks.add(rank)
                 if dag.total_flops is None and trace.total_flops is not None:
                     dag.total_flops = trace.total_flops
-                if dag.energy_kwh is None and trace.energy_kwh is not None:
-                    dag.energy_kwh = trace.energy_kwh
-                if dag.co2eq_kg is None and trace.co2eq_kg is not None:
-                    dag.co2eq_kg = trace.co2eq_kg
+
+                stage = _stage_of(rank, config)
+                if trace.energy_kwh is not None and stage not in stage_energies:
+                    stage_energies[stage] = trace.energy_kwh
+                if trace.co2eq_kg is not None and stage not in stage_co2:
+                    stage_co2[stage] = trace.co2eq_kg
+
                 _add_trace_to_dag(
                     dag,
                     trace,
@@ -922,6 +931,13 @@ class MegatronDagTracer(DAGTracer):
                     _collective_registry,
                 )
                 advance()
+
+        # Scale per-stage energy to full cluster (all ranks in a stage share the profile).
+        ranks_per_stage = config.ranks_per_stage
+        if stage_energies:
+            dag.energy_kwh = sum(stage_energies.values()) * ranks_per_stage
+        if stage_co2:
+            dag.co2eq_kg = sum(stage_co2.values()) * ranks_per_stage
 
         _wire_slot_edges(dag, slot_nodes)
         node_id[0], flow_id[0] = _wire_pp_transfers(
