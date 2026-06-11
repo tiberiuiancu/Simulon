@@ -724,13 +724,8 @@ def _add_stream_trace_to_dag(
                 dag.add_edge(
                     DAGEdge(src_node_id=last_node_by_event[event_id], dst_node_id=node_id[0])
                 )
-            if rank in last_node_by_rank:
-                dag.add_edge(
-                    DAGEdge(src_node_id=last_node_by_rank[rank].node_id, dst_node_id=node_id[0])
-                )
             _apply_pending_stream_waits(stream_type, node_id[0])
             last_node_by_stream[stream_type] = node_id[0]
-            last_node_by_rank[rank] = cn
             pending_begin_timestamp[node_id[0]] = event.timestamp_ms
             node_id[0] += 1
         elif event.type == "node_end":
@@ -805,13 +800,6 @@ def _add_stream_trace_to_dag(
                     collective_id = node_id[0]
                     node_id[0] += 1
                 slot_node_ids.append(collective_id)
-                if rank in last_node_by_rank:
-                    dag.add_edge(
-                        DAGEdge(
-                            src_node_id=last_node_by_rank[rank].node_id, dst_node_id=collective_id
-                        )
-                    )
-                last_node_by_rank[rank] = collective
 
 
 def _add_trace_to_dag(
@@ -1079,6 +1067,7 @@ class MegatronDagTracer(DAGTracer):
 
         total_energy_kwh = 0.0
         total_co2eq_kg = 0.0
+        has_stream_trace = False
 
         with log_progress("  building DAG", config.world_size, logger) as advance:
             _collective_registry: dict = {}
@@ -1093,6 +1082,8 @@ class MegatronDagTracer(DAGTracer):
                     total_energy_kwh += trace.energy_kwh
                 if trace.co2eq_kg is not None:
                     total_co2eq_kg += trace.co2eq_kg
+                if any(e.type in ("node_begin", "node_end", "stream_wait") for e in trace.events):
+                    has_stream_trace = True
 
                 _add_trace_to_dag(
                     dag,
@@ -1119,7 +1110,8 @@ class MegatronDagTracer(DAGTracer):
         if total_co2eq_kg > 0:
             dag.co2eq_kg = total_co2eq_kg
 
-        _wire_slot_edges(dag, slot_nodes)
+        if not has_stream_trace:
+            _wire_slot_edges(dag, slot_nodes)
         node_id[0], flow_id[0] = _wire_pp_transfers(
             dag, pending_pp_transfers, config, slot_entry_node, slot_last_node, node_id, flow_id
         )
