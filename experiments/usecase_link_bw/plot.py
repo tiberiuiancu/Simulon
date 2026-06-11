@@ -44,11 +44,7 @@ def _model_bw_from_run(run: dict[str, Any]) -> tuple[str, int]:
     return name, _extract_bw(run)
 
 
-def plot_mfu_from_wandb(
-    output: Path | None,
-    base_dir: Path,
-    chart: str = "both",
-) -> None:
+def plot_mfu_from_wandb(output: Path | None, base_dir: Path, chart: str = "both") -> None:
     env_file = base_dir / ".tracking.env"
     trackers = get_trackers(env_file if env_file.exists() else base_dir)
     if not trackers:
@@ -63,12 +59,9 @@ def plot_mfu_from_wandb(
             mfu = run["summary"].get("mfu_pct")
             if mfu is None:
                 continue
-            records.append({
-                "model": model,
-                "bw_gbps": bw,
-                "bw_label": f"{bw} Gbps",
-                "mfu_pct": float(mfu),
-            })
+            records.append(
+                {"model": model, "bw_gbps": bw, "bw_label": f"{bw} Gbps", "mfu_pct": float(mfu)}
+            )
 
     if not records:
         print("No wandb data found for any scenario. Exiting.", file=sys.stderr)
@@ -81,15 +74,16 @@ def plot_mfu_from_wandb(
     show_line = chart in ("both", "line")
 
     n_plots = (1 if show_bar else 0) + (1 if show_line else 0)
-    fig, axes = plt.subplots(
-        1, n_plots, figsize=(5 * n_plots, 5), squeeze=False
-    )
+    fig, axes = plt.subplots(1, n_plots, figsize=(5 * n_plots, 5), squeeze=False)
     ax_idx = 0
 
     if show_bar:
         ax = axes[0, ax_idx]
         ax_idx += 1
-        order = sorted(df["bw_label"].unique(), key=lambda s: int(s.split()[0]) if s.split()[0].isdigit() else 0)
+        order = sorted(
+            df["bw_label"].unique(),
+            key=lambda s: int(s.split()[0]) if s.split()[0].isdigit() else 0,
+        )
         sns.barplot(
             data=df,
             x="model",
@@ -103,7 +97,7 @@ def plot_mfu_from_wandb(
         ax.set_ylabel("MFU (%)")
         ax.set_xlabel("")
         ax.set_title("MFU by Link Bandwidth", fontsize=14, fontweight="bold")
-        ax.legend(title="NIC speed", loc="upper right")
+        ax.legend(title="NIC speed", loc="upper left")
         sns.despine(ax=ax, top=True, right=True)
 
     if show_line:
@@ -122,7 +116,7 @@ def plot_mfu_from_wandb(
         ax.set_xlabel("Link bandwidth (Gbps)")
         ax.set_ylabel("MFU (%)")
         ax.set_title("MFU vs Link Bandwidth", fontsize=14, fontweight="bold")
-        ax.legend(title="Model", loc="upper right")
+        ax.legend(title="Model", loc="upper left")
         sns.despine(ax=ax, top=True, right=True)
 
     fig.tight_layout()

@@ -85,7 +85,7 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path) -> None:
     ax.set_ylabel("MFU (%)")
     ax.set_xlabel("")
     ax.set_title("MFU by Node Size", fontsize=14, fontweight="bold")
-    ax.legend(title="Node config", loc="upper right")
+    ax.legend(title="Node config", loc="upper left")
     sns.despine(fig=fig, top=True, right=True)
     fig.tight_layout()
 

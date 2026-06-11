@@ -133,11 +133,10 @@ def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> N
         fig.legend(
             handles=list(legend_handles.values()),
             labels=list(legend_handles.keys()),
-            loc="lower center",
-            ncol=len(legend_handles),
+            loc="upper left",
+            ncol=1,
             fontsize=9,
             frameon=True,
-            bbox_to_anchor=(0.5, -0.02),
         )
 
     fig.tight_layout()
