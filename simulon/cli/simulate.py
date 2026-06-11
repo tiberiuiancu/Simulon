@@ -136,11 +136,13 @@ def simulate(
 
             if energy_result is not None and trackers:
                 for tracker in trackers:
-                    tracker.log_metrics({
-                        "energy_wh": energy_result.total_wh,
-                        "co2eq_g": energy_result.co2eq_g or 0.0,
-                        "energy_source": energy_result.source,
-                    })
+                    tracker.log_metrics(
+                        {
+                            "energy_wh": energy_result.total_wh,
+                            "co2eq_g": energy_result.co2eq_g or 0.0,
+                            "energy_source": energy_result.source,
+                        }
+                    )
 
         if chrome is not None:
             if isinstance(sc.workload, MegatronWorkload):

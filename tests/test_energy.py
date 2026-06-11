@@ -15,21 +15,14 @@ def _dc_with_power_model() -> DatacenterConfig:
         node=NodeSpec(
             gpus_per_node=2,
             gpu=GPUSpec(
-                name="test-gpu",
-                power_model=LinearPowerModel(tdp_w=700.0, idle_power_w=67.0),
+                name="test-gpu", power_model=LinearPowerModel(tdp_w=700.0, idle_power_w=67.0)
             ),
         ),
     )
 
 
 def _scenario(dc: DatacenterConfig) -> ScenarioConfig:
-    return ScenarioConfig(
-        datacenter=dc,
-        workload=MegatronWorkload(
-            framework="megatron",
-            config={},
-        ),
-    )
+    return ScenarioConfig(datacenter=dc, workload=MegatronWorkload(framework="megatron", config={}))
 
 
 def _dag_with_nodes() -> ExecutionDAG:
