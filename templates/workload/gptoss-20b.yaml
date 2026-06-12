@@ -12,6 +12,9 @@ config:
   expert-model-parallel-size: 8
   num-layers-per-virtual-pipeline-stage: 4
   context-parallel-size: 1
+  data-parallel-sharding-strategy: no_shard
+  
+  add_position_embedding: false
 
   micro-batch-size: 1
   global-batch-size: 16
@@ -24,7 +27,7 @@ config:
   init-method-std: 0.02
   seq-length: 4096
   kv-channels: 64
-  max-position-embeddings: 4096
+  max-position-embeddings: 131072
   swiglu: true
 
   num-attention-heads: 64
@@ -39,6 +42,7 @@ config:
   rotary-percent: 1.0
   untie-embeddings-and-output-weights: true
 
+  qk-layernorm: true
   normalization: RMSNorm
   norm-epsilon: 1.e-5
   bf16: true

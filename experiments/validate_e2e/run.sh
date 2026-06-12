@@ -37,7 +37,7 @@ set +e
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
     bash scripts/apptainer-trace.sh "$SCRIPT_DIR/$model/workload.yaml" \
-        --gpu h100
+        --gpu h100 --memory-snapshot oom.pickle
     trace_rc=$?
     if [ $trace_rc -ne 0 ]; then
         echo "    Warning: trace generation exited with code $trace_rc (continuing)"

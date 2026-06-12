@@ -1,0 +1,119 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: tiberiuiancu (tiberiuiancu-university-of-amsterdam) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run n50dgv07
+wandb: Tracking run with wandb version 0.27.1
+wandb: Run data is saved locally in /gpfs/home6/tiberiui/simulon_validate/wandb/run-20260612_171830-n50dgv07
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run validate-e2e-qwen3-32b
+wandb: ⭐️ View project at https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon
+wandb: 🚀 View run at https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon/runs/n50dgv07
+wandb: updating run metadata
+wandb: uploading summary
+wandb: uploading data
+wandb: 🚀 View run validate-e2e-qwen3-32b at: https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon/runs/n50dgv07
+wandb: ⭐️ View project at: https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon
+wandb: Synced 4 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260612_171830-n50dgv07/logs
+Traceback (most recent call last):
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/bin/simulon", line 10, in <module>
+    sys.exit(app())
+             ~~~^^
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/typer/main.py", line 1152, in __call__
+    raise e
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/typer/main.py", line 1135, in __call__
+    return get_command(self)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/typer/core.py", line 795, in main
+    return _main(
+        self,
+    ...<6 lines>...
+        **extra,
+    )
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/typer/core.py", line 188, in _main
+    rv = self.invoke(ctx)
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/click/core.py", line 1873, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+  File "/gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/typer/main.py", line 1514, in wrapper
+    return callback(**use_params)
+  File "/gpfs/home6/tiberiui/simulon_validate/simulon/cli/simulate.py", line 91, in simulate
+    dag, result = run_simulation(sc, network_simulation=network_simulation)
+                  ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs/home6/tiberiui/simulon_validate/simulon/backend/analytical.py", line 160, in simulate
+    dag = run_trace(scenario, _resolved_algorithm=resolved_algorithm)
+  File "/gpfs/home6/tiberiui/simulon_validate/simulon/backend/analytical.py", line 67, in run_trace
+    return tracer.trace(scenario.workload, scenario.datacenter)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs/home6/tiberiui/simulon_validate/simulon/backend/dag/trace_tracer.py", line 868, in trace
+    traces_dir = _resolve_traces_dir(datacenter, workload)
+  File "/gpfs/home6/tiberiui/simulon_validate/simulon/backend/dag/trace_tracer.py", line 266, in _resolve_traces_dir
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: Traces not found at templates/gpu/gh200_jupiter/traces/fd4ac10cb13c0ada. Either set traces_dir in datacenter.datacenter or ensure traces exist in the GPU-specific hashed path.
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/cli/simulate.py:91 in simulate │
+│                                                                              │
+│    88 │   │   except Exception:                                              │
+│    89 │   │   │   gpu_spec = None                                            │
+│    90 │   │                                                                  │
+│ ❱  91 │   │   dag, result = run_simulation(sc, network_simulation=network_si │
+│    92 │   │                                                                  │
+│    93 │   │   if trackers:                                                   │
+│    94 │   │   │   params = extract_params(sc)                                │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/backend/analytical.py:160 in   │
+│ simulate                                                                     │
+│                                                                              │
+│   157 │   │   │   resolved_algorithm,                                        │
+│   158 │   │   )                                                              │
+│   159 │                                                                      │
+│ ❱ 160 │   dag = run_trace(scenario, _resolved_algorithm=resolved_algorithm)  │
+│   161 │   logger.info(                                                       │
+│   162 │   │   "  DAG built: %d compute nodes, %d collective nodes, %d edges" │
+│   163 │   │   len(dag.compute_nodes),                                        │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/backend/analytical.py:67 in    │
+│ run_trace                                                                    │
+│                                                                              │
+│    64 │   │   if _resolved_algorithm is not None:                            │
+│    65 │   │   │   cfg.algorithm = _resolved_algorithm                        │
+│    66 │   │   tracer = MegatronDagTracer(cfg, ccl=_ccl_from_scenario(scenari │
+│ ❱  67 │   │   return tracer.trace(scenario.workload, scenario.datacenter)    │
+│    68 │                                                                      │
+│    69 │   elif isinstance(scenario.workload, CollectiveWorkload):            │
+│    70 │   │   from simulon.backend.dag.collective_tracer import build_collec │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/backend/dag/trace_tracer.py:86 │
+│ 8 in trace                                                                   │
+│                                                                              │
+│   865 │   │   dag = ExecutionDAG()                                           │
+│   866 │   │   config = ParallelConfig.from_workload(workload)                │
+│   867 │   │   _make_collective_groups(config)                                │
+│ ❱ 868 │   │   traces_dir = _resolve_traces_dir(datacenter, workload)         │
+│   869 │   │   activation_bytes = _compute_activation_bytes(workload)         │
+│   870 │   │                                                                  │
+│   871 │   │   # Validate first and last stage traces exist                   │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/backend/dag/trace_tracer.py:26 │
+│ 6 in _resolve_traces_dir                                                     │
+│                                                                              │
+│   263 │   h = workload_hash(workload)                                        │
+│   264 │   p = Path("templates/gpu") / gpu_name / "traces" / h                │
+│   265 │   if not p.exists():                                                 │
+│ ❱ 266 │   │   raise ValueError(                                              │
+│   267 │   │   │   f"Traces not found at {p}. "                               │
+│   268 │   │   │   "Either set traces_dir in datacenter.datacenter or ensure  │
+│   269 │   │   │   "in the GPU-specific hashed path."                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ValueError: Traces not found at 
+templates/gpu/gh200_jupiter/traces/fd4ac10cb13c0ada. Either set traces_dir in 
+datacenter.datacenter or ensure traces exist in the GPU-specific hashed path.
