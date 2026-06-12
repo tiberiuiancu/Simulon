@@ -17,7 +17,7 @@ config:
   lr: 0.0004
   seed: 1234
 
-  num-layers: 36
+  num-layers: 24
   hidden-size: 2880
   ffn-hidden-size: 2880
   init-method-std: 0.02
@@ -69,7 +69,7 @@ config:
   eval-interval: 999
   eval-iters: 0
 
-  num-experts: 128
+  num-experts: 32
   moe-router-topk: 4
   moe-token-dispatcher-type: alltoall
   moe-grouped-gemm: true
@@ -78,8 +78,8 @@ config:
   moe-layer-freq: 1
   moe-aux-loss-coeff: 0.0
 
-  window-size: "127,0"
-  window-attn-skip-freq: "[1,0]*18"
+  window-size: "128,0"
+  window-attn-skip-freq: "[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]"
 
   disable-bias-linear: true
   no-bias-dropout-fusion: true
