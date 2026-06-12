@@ -1,4 +1,4 @@
-I was unable to run this scenario due to OOM. 
+I was unable to run this scenario due to OOM.
 
 To produce the configuration I ran:
 
@@ -7,4 +7,3 @@ apptainer run --nv --bind vendor:/opt/simulon/vendor --bind ./scripts:/opt/simul
 ```
 
 and additionally set `num-gpus: 16` and `disable-bias-linear: true`, both being required.
-
