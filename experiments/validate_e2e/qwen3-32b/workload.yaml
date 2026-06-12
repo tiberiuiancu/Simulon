@@ -1,0 +1,86 @@
+framework: megatron
+config:
+  num-gpus: 64
+  tokenizer-type: NullTokenizer
+  mock-data: true
+  vocab-size: 262144
+  padded-vocab-size: 262144
+
+  add-bias-linear: False
+  add-qkv-bias: False
+  bias-gelu-fusion: False
+  data-parallel-sharding-strategy: no_shard
+
+  tensor-model-parallel-size: 4
+  pipeline-model-parallel-size: 1
+  sequence-parallel: true
+
+
+  micro-batch-size: 1
+  global-batch-size: 256
+  lr: 0.0006
+  seed: 1234
+
+  # MODEL
+  num-layers: 64
+  hidden-size: 5120
+  ffn-hidden-size: 25600
+  init-method-std: 0.02
+  seq-length: 4096
+  kv-channels: 128
+  max-position-embeddings: 4096
+  swiglu: true
+
+  # Attention
+  num-attention-heads: 64
+  num-query-groups: 8
+  group-query-attention: True
+  attention-softmax-in-fp32: True
+  use-flash-attn: True
+  attention-backend: "auto"
+
+  # Position Embedding
+  position-embedding-type: "rope"
+  rotary-base: 10000
+  rotary-percent: 1.0
+  untie-embeddings-and-output-weights: true
+
+  # Normalization
+  normalization: "RMSNorm"
+  norm-epsilon: 1.e-5
+  qk-layernorm: True
+  bf16: True
+
+  # Disable dropout
+  attention-dropout: 0.0
+  hidden-dropout: 0.0
+
+  # OPTIMIZER
+  optimizer: adam
+  adam-beta1: 0.9
+  adam-beta2: 0.95
+  adam-eps: 1.e-8
+  clip-grad: 1.0
+  weight-decay: 0.05
+
+  # SCHEDULER
+  min-lr: 0.0
+  lr-decay-style: WSD
+  lr-wsd-decay-style: linear
+  lr-warmup-iters: 0
+  lr-decay-iters: 1
+  lr-wsd-decay-iters: 1
+
+  # TRAINING, PARALLELISM
+  recompute-activations: False
+  use-torch-fsdp2: False
+  context-parallel-size: 1
+
+  # DISTRIBUTED OPTIM
+  use-distributed-optimizer: True
+
+  # COMM OPTIONS
+  distributed-backend: nccl
+  distributed-timeout-minutes: 30
+  eval-interval: 999
+  eval-iters: 0
