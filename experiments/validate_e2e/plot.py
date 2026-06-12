@@ -60,13 +60,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path) -> None:
             if sim_metrics is not None:
                 break
 
-        metrics = [
-            ("iter_time_ms", "Iteration Time (ms)"),
-            ("throughput_tps", "Throughput (t/s)"),
-            ("per_gpu_tps", "Per-GPU Throughput (t/s)"),
-            ("per_gpu_tflops", "Per-GPU TFLOPs/s"),
-            ("mfu_pct", "MFU (%)"),
-        ]
+        metrics = [("mfu_pct", "MFU (%)")]
 
         for key, label in metrics:
             real_val = ref.get(key)
