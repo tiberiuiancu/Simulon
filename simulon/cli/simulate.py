@@ -47,6 +47,9 @@ def simulate(
         "--network-simulation",
         help="Network simulation backend: 'flow' (per-flow BW) or 'collective' (analytical)",
     ),
+    no_tracking: bool = typer.Option(
+        False, "--no-tracking", help="Disable experiment tracking (W&B, MLflow)"
+    ),
 ):
     """Run simulation and print an iteration summary.
 
@@ -55,7 +58,7 @@ def simulate(
     """
     import tempfile
 
-    trackers = get_trackers(scenario)
+    trackers = [] if no_tracking else get_trackers(scenario)
     with open(scenario) as f:
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.from_yaml(scenario)
@@ -71,7 +74,8 @@ def simulate(
 
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
-    trackers = get_trackers()
+    if not trackers:
+        trackers = [] if no_tracking else get_trackers()
 
     try:
         for tracker in trackers:
