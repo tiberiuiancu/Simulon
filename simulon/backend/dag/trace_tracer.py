@@ -86,7 +86,7 @@ class ParallelConfig:
             )
         edp = num_gpus // expert_model_size
 
-        overlap_p2p_comm = cfg.get("overlap-p2p-comm", cfg.get("overlap-pp-comm", True))
+        overlap_p2p_comm = cfg.get("overlap-p2p-comm", True)
         if isinstance(overlap_p2p_comm, str):
             overlap_p2p_comm = overlap_p2p_comm.lower() in ("true", "1", "yes")
 
