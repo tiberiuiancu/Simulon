@@ -675,3 +675,230 @@ def test_collective_decomposition_edge_rewiring():
         assert _has_path(dag.edges, last_p2p.node_id, c_after.node_id), (
             f"Expected path from last P2P ({last_p2p.node_id}) to compute after ({c_after.node_id})"
         )
+
+
+def test_sync_pp_send_when_overlap_disabled():
+    events0 = [
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
+        {
+            "type": "collective",
+            "timestamp_ms": 0.5,
+            "metadata": {
+                "collective_type": "PP_Send",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+                "microbatch_id": 0,
+                "direction": "fwd",
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 2.0,
+            "metadata": {"microbatch_id": 0, "phase": "bwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 3.0, "metadata": {}},
+    ]
+    events1 = [
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 2.0,
+            "metadata": {"microbatch_id": 0, "phase": "bwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 3.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(
+            _make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events1, rank=1, world_size=2, pipeline_stage=1), traces_dir, rank=1
+        )
+        workload = MegatronWorkload(
+            framework="megatron",
+            config={
+                "tensor-model-parallel-size": 1,
+                "pipeline-model-parallel-size": 2,
+                "num-layers": 2,
+                "hidden-size": 512,
+                "num-attention-heads": 8,
+                "ffn-hidden-size": 11008,
+                "seq-length": 128,
+                "micro-batch-size": 1,
+                "global-batch-size": 2,
+                "num_gpus": 2,
+                "overlap-p2p-comm": False,
+            },
+        )
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+        pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
+        assert len(pp_sends) > 0, "Expected at least one PP_Send"
+
+        rank0_compute = sorted(
+            [n for n in dag.compute_nodes if n.gpu_rank == 0], key=lambda n: n.node_id
+        )
+        assert len(rank0_compute) == 2, (
+            f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        )
+        next_compute = rank0_compute[1]
+
+        for pp_send in pp_sends:
+            assert _has_path(dag.edges, pp_send.node_id, next_compute.node_id), (
+                f"Expected sync edge from PP_Send ({pp_send.node_id}) to next compute "
+                f"({next_compute.node_id}) when overlap-p2p-comm is False"
+            )
+
+
+def test_async_pp_send_when_overlap_enabled():
+    events0 = [
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
+        {
+            "type": "collective",
+            "timestamp_ms": 0.5,
+            "metadata": {
+                "collective_type": "PP_Send",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+                "microbatch_id": 0,
+                "direction": "fwd",
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 2.0,
+            "metadata": {"microbatch_id": 0, "phase": "bwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 3.0, "metadata": {}},
+    ]
+    events1 = [
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 2.0,
+            "metadata": {"microbatch_id": 0, "phase": "bwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 3.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(
+            _make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events1, rank=1, world_size=2, pipeline_stage=1), traces_dir, rank=1
+        )
+        workload = MegatronWorkload(
+            framework="megatron",
+            config={
+                "tensor-model-parallel-size": 1,
+                "pipeline-model-parallel-size": 2,
+                "num-layers": 2,
+                "hidden-size": 512,
+                "num-attention-heads": 8,
+                "ffn-hidden-size": 11008,
+                "seq-length": 128,
+                "micro-batch-size": 1,
+                "global-batch-size": 2,
+                "num_gpus": 2,
+                "overlap-p2p-comm": True,
+            },
+        )
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+        pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
+        assert len(pp_sends) > 0, "Expected at least one PP_Send"
+
+        rank0_compute = sorted(
+            [n for n in dag.compute_nodes if n.gpu_rank == 0], key=lambda n: n.node_id
+        )
+        assert len(rank0_compute) == 2, (
+            f"Expected 2 compute nodes on rank 0, got {len(rank0_compute)}"
+        )
+        next_compute = rank0_compute[1]
+
+        for pp_send in pp_sends:
+            assert not _has_path(dag.edges, pp_send.node_id, next_compute.node_id), (
+                f"Expected NO sync edge from PP_Send ({pp_send.node_id}) to next compute "
+                f"({next_compute.node_id}) when overlap-p2p-comm is True"
+            )
+
+
+def test_single_slot_no_sync_edge():
+    events0 = [
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
+        {
+            "type": "collective",
+            "timestamp_ms": 0.5,
+            "metadata": {
+                "collective_type": "PP_Send",
+                "bytes": 2048,
+                "group_ranks": [0, 1],
+                "microbatch_id": 0,
+                "direction": "fwd",
+            },
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    events1 = [
+        {
+            "type": "slot_begin",
+            "timestamp_ms": 0.0,
+            "metadata": {"microbatch_id": 0, "phase": "fwd"},
+        },
+        {"type": "slot_end", "timestamp_ms": 1.0, "metadata": {}},
+    ]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        traces_dir = Path(tmp_dir)
+        _write_trace(
+            _make_trace(events0, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
+        )
+        _write_trace(
+            _make_trace(events1, rank=1, world_size=2, pipeline_stage=1), traces_dir, rank=1
+        )
+        workload = MegatronWorkload(
+            framework="megatron",
+            config={
+                "tensor-model-parallel-size": 1,
+                "pipeline-model-parallel-size": 2,
+                "num-layers": 2,
+                "hidden-size": 512,
+                "num-attention-heads": 8,
+                "ffn-hidden-size": 11008,
+                "seq-length": 128,
+                "micro-batch-size": 1,
+                "global-batch-size": 2,
+                "num_gpus": 2,
+                "overlap-p2p-comm": False,
+            },
+        )
+        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dag = _run_tracer(workload, dc)
+        pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
+        assert len(pp_sends) > 0, "Expected at least one PP_Send"
+        assert len(dag.compute_nodes) > 0, "Expected at least one compute node"
