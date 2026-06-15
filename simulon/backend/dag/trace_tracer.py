@@ -51,6 +51,7 @@ class ParallelConfig:
     etp: int
     edp: int
     num_gpus: int
+    overlap_p2p_comm: bool = True
 
     @classmethod
     def from_workload(cls, workload: MegatronWorkload) -> ParallelConfig:
@@ -85,7 +86,21 @@ class ParallelConfig:
             )
         edp = num_gpus // expert_model_size
 
-        return cls(tp=tp, cp=cp, ep=ep, dp=dp, pp=pp, num_gpus=num_gpus, etp=etp, edp=edp)
+        overlap_p2p_comm = cfg.get("overlap-p2p-comm", True)
+        if isinstance(overlap_p2p_comm, str):
+            overlap_p2p_comm = overlap_p2p_comm.lower() in ("true", "1", "yes")
+
+        return cls(
+            tp=tp,
+            cp=cp,
+            ep=ep,
+            dp=dp,
+            pp=pp,
+            num_gpus=num_gpus,
+            etp=etp,
+            edp=edp,
+            overlap_p2p_comm=overlap_p2p_comm,
+        )
 
     @property
     def world_size(self) -> int:
@@ -731,6 +746,18 @@ def _should_skip_pp_pair(src_stage: int, dst_stage: int, direction: str) -> bool
     )
 
 
+def _compute_next_slot_by_key(slot_first_timestamp: dict) -> dict:
+    keys_by_rank: dict[int, list] = {}
+    for key in slot_first_timestamp:
+        keys_by_rank.setdefault(key[0], []).append(key)
+    next_slot: dict = {}
+    for rank_keys in keys_by_rank.values():
+        rank_keys.sort(key=lambda k: slot_first_timestamp[k])
+        for i in range(len(rank_keys) - 1):
+            next_slot[rank_keys[i]] = rank_keys[i + 1]
+    return next_slot
+
+
 def _create_pp_send(
     src: int,
     dst: int,
@@ -740,6 +767,9 @@ def _create_pp_send(
     node_id: list,
     flow_id: list,
     dag: ExecutionDAG,
+    slot_entry_node: dict,
+    next_slot_by_key: dict | None,
+    sync_send: bool,
 ) -> None:
     pp_send = CommNode(
         node_id=node_id[0],
@@ -754,6 +784,13 @@ def _create_pp_send(
     dag.add_comm_node(pp_send)
     dag.add_edge(DAGEdge(src_node_id=src_node, dst_node_id=pp_send.node_id))
     dag.add_edge(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node))
+    if sync_send and next_slot_by_key:
+        src_key = (src, record.microbatch_id, record.direction)
+        next_key = next_slot_by_key.get(src_key)
+        if next_key:
+            next_node = slot_entry_node.get(next_key)
+            if next_node is not None:
+                dag.add_edge(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=next_node))
     node_id[0] += 1
     flow_id[0] += 1
 
@@ -782,6 +819,8 @@ def _wire_pp_transfers(
     slot_last_node: dict,
     node_id: list,
     flow_id: list,
+    next_slot_by_key: dict | None,
+    sync_send: bool,
 ) -> tuple[int, int]:
     seen: set[tuple[int, int, int, str]] = set()
     with log_progress("  wiring PP transfers", len(pending), logger) as advance:
@@ -812,7 +851,19 @@ def _wire_pp_transfers(
                     continue
                 if _should_skip_pp_pair(src_stage, dst_stage, record.direction):
                     continue
-                _create_pp_send(src, dst, record, src_node, dst_node, node_id, flow_id, dag)
+                _create_pp_send(
+                    src,
+                    dst,
+                    record,
+                    src_node,
+                    dst_node,
+                    node_id,
+                    flow_id,
+                    dag,
+                    slot_entry_node,
+                    next_slot_by_key,
+                    sync_send,
+                )
             advance()
     return node_id[0], flow_id[0]
 
@@ -935,8 +986,17 @@ class MegatronDagTracer(DAGTracer):
             dag.co2eq_kg = total_co2eq_kg
 
         _wire_slot_edges(dag, slot_nodes)
+        next_slot_by_key = _compute_next_slot_by_key(slot_first_timestamp)
         node_id[0], flow_id[0] = _wire_pp_transfers(
-            dag, pending_pp_transfers, config, slot_entry_node, slot_last_node, node_id, flow_id
+            dag,
+            pending_pp_transfers,
+            config,
+            slot_entry_node,
+            slot_last_node,
+            node_id,
+            flow_id,
+            next_slot_by_key=next_slot_by_key,
+            sync_send=not config.overlap_p2p_comm,
         )
         _wire_cross_slot_edges(dag, slot_first_timestamp, slot_last_node, slot_entry_node)
         _wire_bwd_to_step(dag, slot_last_node, slot_entry_node, config)
