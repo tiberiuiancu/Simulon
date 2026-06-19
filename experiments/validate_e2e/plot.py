@@ -66,19 +66,15 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path) -> None:
             real_val = ref.get(key)
             sim_val = sim_metrics.get(key) if sim_metrics else None
 
-            if real_val is not None:
-                records.append(
-                    {"model": model, "metric": label, "source": "Real", "value": float(real_val)}
-                )
-            if sim_val is not None:
-                records.append(
-                    {
-                        "model": model,
-                        "metric": label,
-                        "source": "Simulated",
-                        "value": float(sim_val),
-                    }
-                )
+            if real_val is None or sim_val is None:
+                continue
+
+            records.append(
+                {"model": model, "metric": label, "source": "Real", "value": float(real_val)}
+            )
+            records.append(
+                {"model": model, "metric": label, "source": "Simulated", "value": float(sim_val)}
+            )
 
     if not records:
         print("No data found for any model. Exiting.", file=sys.stderr)
