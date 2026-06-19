@@ -13,6 +13,7 @@ from simulon.backend.dag.trace_parser import TraceFileParser
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
 from simulon.collective import CCLDecomposer
 from simulon.config.dc import DatacenterConfig
+from simulon.config.resolve import resolve_gpu_spec
 from simulon.config.workload import MegatronWorkload
 
 logger = logging.getLogger(__name__)
@@ -600,8 +601,9 @@ def _handle_event_gap(
     pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
+    flops_multiplier: float = 1.0,
 ) -> None:
-    duration_ms = next_event.timestamp_ms - event.timestamp_ms
+    duration_ms = (next_event.timestamp_ms - event.timestamp_ms) / flops_multiplier
     if duration_ms <= 0:
         return
     if event.type == "collective":
@@ -684,6 +686,7 @@ def _add_trace_to_dag(
     pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
+    flops_multiplier: float = 1.0,
 ) -> None:
     events = sorted(trace.events, key=lambda e: e.timestamp_ms)
     active_microbatch_id: list = [-1]
@@ -729,6 +732,7 @@ def _add_trace_to_dag(
                 pending_pp_transfers,
                 last_node_by_rank,
                 _collective_registry,
+                flops_multiplier,
             )
 
 
@@ -918,6 +922,7 @@ class MegatronDagTracer(DAGTracer):
         _make_collective_groups(config)
         traces_dir = _resolve_traces_dir(datacenter, workload)
         activation_bytes = _compute_activation_bytes(workload)
+        flops_multiplier = resolve_gpu_spec(datacenter).flops_multiplier
 
         # Validate first and last stage traces exist
         if not _stage_has_exact_trace(0, traces_dir, config):
@@ -977,6 +982,7 @@ class MegatronDagTracer(DAGTracer):
                     pending_pp_transfers,
                     last_node_by_rank,
                     _collective_registry,
+                    flops_multiplier,
                 )
                 advance()
 
