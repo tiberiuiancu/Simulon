@@ -50,6 +50,11 @@ def _single_node_duration_ms(collective_node: CollectiveNode, nccl_profile: Nccl
     size_bytes = collective_node.data_size
     algorithm = collective_node.algorithm
 
+    # NVLink busbw depends on how many GPUs are in the communicator (a TP=2 group
+    # over 2 GPUs reaches only ~1/3 of the 4-GPU busbw). Select the rank-matched
+    # sub-profile if one was measured; otherwise fall back to the full-node curve.
+    nccl_profile = nccl_profile.for_nranks(nranks)
+
     algo_measurements = getattr(nccl_profile, collective_type, None)
     if algo_measurements is None:
         raise ValueError(
@@ -112,6 +117,21 @@ def _multi_node_duration_ms(
     # Scale nics proportionally: on quad-rail nodes each GPU has its own NIC,
     # so a collective using k GPUs per node uses k NICs per node.
     effective_nics_per_node = nics_per_node * effective_gpus_per_node / gpus_per_node
+
+    # Prefer a DIRECT measurement when this exact topology was profiled with
+    # nccl-tests (e.g. "2n4g"). The measured busbw bakes in NIC bandwidth, rail
+    # count and the inter-node fabric, so it reproduces the real collective time
+    # via the same SimAI formula — no NIC-efficiency model needed. Fall back to
+    # cal_busbw for unmeasured topologies.
+    topo_profile = nccl_profile.for_topology(node_count, effective_gpus_per_node)
+    if topo_profile is not None:
+        algo = getattr(topo_profile, collective_type, None)
+        meas_busbw = _interp_profile(size_bytes, algo.ring) if algo is not None else None
+        if meas_busbw is not None and meas_busbw > 0:
+            base = size_bytes * 1e-6 / meas_busbw
+            if collective_type == "AllReduce":
+                return base * 2 * (nranks - 1) / nranks
+            return base * (nranks - 1) / nranks
 
     selected_algorithm, intra_bw_GBps, inter_bw_GBps = cal_busbw(
         collective_type=collective_type,
