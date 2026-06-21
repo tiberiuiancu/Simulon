@@ -271,6 +271,105 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
     return p
 
 
+def _load_trace_mbs(traces_dir: Path) -> int | None:
+    """Read micro-batch-size from the workload.yaml stored in the trace directory."""
+    wl_path = traces_dir / "workload.yaml"
+    if not wl_path.exists():
+        return None
+    import yaml
+    data = yaml.safe_load(wl_path.read_text())
+    cfg = data.get("config", {}) if isinstance(data, dict) else {}
+    v = cfg.get("micro-batch-size") or cfg.get("micro_batch_size")
+    return int(v) if v is not None else None
+
+
+def _extrapolate_trace_for_mbs(
+    trace,
+    trace_mbs: int,
+    new_mbs: int,
+    new_num_microbatches: int,
+):
+    """Return a scaled copy of *trace* simulating a different micro-batch size.
+
+    Two complementary transforms are applied:
+    - All timestamps are scaled by ``new_mbs / trace_mbs`` so that per-microbatch
+      compute and TP collective overlap stretch proportionally.
+    - Events belonging to microbatch_ids >= *new_num_microbatches* (and the
+      optimizer-step slot) are dropped, reducing the pipeline fill to match the
+      requested global-batch-size / (new_mbs * dp).
+
+    PP activation-transfer sizes are NOT scaled here; they are computed from the
+    workload config by ``_compute_activation_bytes``.  TP collective bytes ARE
+    scaled because their size is proportional to mbs.
+
+    The gaps left by filtered-out microbatches in the middle of 1F1B schedules
+    naturally model the exposed pipeline-drain bubble — no special treatment needed.
+    """
+    from simulon.backend.dag.trace_parser import TraceEvent, TraceFile
+
+    scale = new_mbs / trace_mbs
+
+    events_sorted = sorted(trace.events, key=lambda e: e.timestamp_ms)
+
+    in_slot = False
+    slot_kept = False
+    new_events = []
+
+    for ev in events_sorted:
+        if ev.type == "slot_begin":
+            mb_id = ev.metadata.get("microbatch_id", -1)
+            direction = ev.metadata.get("direction") or ev.metadata.get("phase", "")
+            in_slot = True
+            slot_kept = direction != "step" and isinstance(mb_id, int) and 0 <= mb_id < new_num_microbatches
+            if not slot_kept:
+                continue
+
+        elif ev.type == "slot_end":
+            was_kept = slot_kept
+            in_slot = False
+            slot_kept = False
+            if not was_kept:
+                continue
+
+        elif not in_slot:
+            # Inter-slot event: PP_Send / PP_Recv tagged with microbatch_id
+            mb_id = ev.metadata.get("microbatch_id", None)
+            if mb_id is not None:
+                try:
+                    if not (0 <= int(mb_id) < new_num_microbatches):
+                        continue
+                except (TypeError, ValueError):
+                    pass
+
+        elif not slot_kept:
+            continue  # inside a filtered-out slot
+
+        new_meta = dict(ev.metadata)
+        if ev.type == "collective":
+            ct = str(ev.metadata.get("collective_type", ""))
+            if ct not in ("PP_Send", "PP_Recv"):
+                raw_bytes = ev.metadata.get("bytes")
+                if raw_bytes is not None:
+                    new_meta["bytes"] = int(raw_bytes * scale)
+
+        new_events.append(TraceEvent(
+            type=ev.type,
+            timestamp_ms=ev.timestamp_ms * scale,
+            metadata=new_meta,
+        ))
+
+    return TraceFile(
+        trace_format_version=trace.trace_format_version,
+        rank=trace.rank,
+        world_size=trace.world_size,
+        pipeline_stage=trace.pipeline_stage,
+        events=new_events,
+        total_flops=trace.total_flops,  # unchanged: same gbs → same total FLOPs
+        energy_kwh=trace.energy_kwh,
+        co2eq_kg=trace.co2eq_kg,
+    )
+
+
 def _compute_activation_bytes(workload: MegatronWorkload) -> int:
     """Fallback activation bytes for PP transfers without explicit 'bytes'."""
     cfg = workload.config
@@ -868,6 +967,28 @@ class MegatronDagTracer(DAGTracer):
         traces_dir = _resolve_traces_dir(datacenter, workload)
         activation_bytes = _compute_activation_bytes(workload)
 
+        # MBS extrapolation: if the requested mbs differs from the traced mbs,
+        # scale compute timings and TP collective sizes, and trim to the correct
+        # number of microbatches.  PP transfer sizes are always recomputed from
+        # the workload config (via activation_bytes), so no adjustment is needed.
+        new_mbs = int(workload.config.get("micro-batch-size", 1))
+        gbs = int(workload.config.get("global-batch-size", 0))
+        new_num_microbatches = (gbs // (new_mbs * config.dp)) if gbs and new_mbs and config.dp else None
+        trace_mbs = _load_trace_mbs(traces_dir)
+        _mbs_scale_needed = (
+            trace_mbs is not None
+            and trace_mbs != new_mbs
+            and new_num_microbatches is not None
+            and new_num_microbatches > 0
+        )
+        if _mbs_scale_needed:
+            logger.info(
+                "MBS extrapolation: trace_mbs=%d → new_mbs=%d "
+                "(scale=%.2f, microbatches %d→%d)",
+                trace_mbs, new_mbs, new_mbs / trace_mbs,
+                gbs // (trace_mbs * config.dp), new_num_microbatches,
+            )
+
         # Validate first and last stage traces exist
         if not _stage_has_exact_trace(0, traces_dir, config):
             raise ValueError(
@@ -899,6 +1020,10 @@ class MegatronDagTracer(DAGTracer):
             _collective_registry: dict = {}
             for rank in range(config.world_size):
                 trace = _load_or_derive_trace(rank, traces_dir, config, stage_traces)
+                if _mbs_scale_needed:
+                    trace = _extrapolate_trace_for_mbs(
+                        trace, trace_mbs, new_mbs, new_num_microbatches
+                    )
                 exact_path = traces_dir / f"trace_rank_{rank}.json"
                 if exact_path.exists():
                     dag.profiled_ranks.add(rank)
