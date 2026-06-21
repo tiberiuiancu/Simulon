@@ -1,9 +1,7 @@
-# Jupiter GH200 node (real NCCL measurements from nccl-tests on jpbo-048-38)
-# Hardware: GH200 120GB, NVLink 4.0, quad-rail InfiniBand
-# Source: experiments/validate_simccl/results/nccl_*.json.0 (1-node run, job 537473)
-name: jupiter-gh200-4g
+# Jupiter GH200 node — same hardware as jupiter-gh200-4g but traces captured without sequence-parallel
+name: jupiter-gh200-4g-sp-false
 gpus_per_node: 4
-gpu: gh200_jupiter
+gpu: gh200_jupiter-sp-false
 scale_out:
   nic:
     speed: 200Gbps
@@ -15,8 +13,8 @@ scale_out:
 
 scale_up:
   switch:
-    port_speed: 2554Gbps # taken from snellius yaml
-    latency: 0.000025ms # taken from snellius yaml
+    port_speed: 2554Gbps
+    latency: 0.000025ms
 
 nccl:
   name: jupiter-gh200-4g
