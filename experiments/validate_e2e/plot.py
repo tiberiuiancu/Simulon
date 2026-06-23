@@ -167,9 +167,25 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             palette={"Real": "#4c72b0", "Simulated": "#dd8452"},
             ax=ax,
         )
+
+        for model_name in sub["model"].unique():
+            real_val = sub[(sub["model"] == model_name) & (sub["source"] == "Real")]["value"]
+            sim_val = sub[(sub["model"] == model_name) & (sub["source"] == "Simulated")]["value"]
+            if real_val.empty or sim_val.empty:
+                continue
+            real = float(real_val.iloc[0])
+            sim = float(sim_val.iloc[0])
+            if real == 0:
+                continue
+            pct = (sim - real) / real * 100
+            ax.text(
+                model_name, sim, f"{pct:+.1f}%", ha="center", va="bottom", fontsize=8, color="red"
+            )
+
         ax.set_ylabel(metric_label)
         ax.set_xlabel("")
         ax.set_title(metric_label, fontsize=12, fontweight="bold")
+        ax.tick_params(axis="x", rotation=45)
         ax.legend(title="", loc="upper right")
         sns.despine(ax=ax, top=True, right=True)
 
