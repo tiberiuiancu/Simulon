@@ -108,16 +108,17 @@ def plot_metric_panel(
     ax.set_ylabel(ylabel)
     ax.set_xlabel("")
     ax.tick_params(axis="x", rotation=0)
-    ax.legend(
-        title="",
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.32),
-        ncol=len(sub_df["source"].unique()),
-        frameon=False,
-        handlelength=1.2,
-        handletextpad=0.4,
-        columnspacing=1.0,
-    )
+    if not sub_df["source"].empty:
+        ax.legend(
+            title="",
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.32),
+            ncol=max(1, len(sub_df["source"].unique())),
+            frameon=False,
+            handlelength=1.2,
+            handletextpad=0.4,
+            columnspacing=1.0,
+        )
     sns.despine(ax=ax, top=True, right=True)
 
 
