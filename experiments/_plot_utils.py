@@ -34,13 +34,12 @@ def setup_latex_style() -> None:
 
 
 def label_for_model(raw_name: str) -> str:
-    """Return a presentation-friendly model label from a directory name."""
     labels: dict[str, str] = {
-        "gptoss-bf16": "GPT-OSS 5B",
-        "gptoss-bf16-3nic": "GPT-OSS 5B\n(3 NIC)",
-        "gptoss-bf16-pp4-ep4": "GPT-OSS 5B\n(PP4 EP4)",
-        "gptoss-fp8": "GPT-OSS\nFP8",
-        "gptoss-fp8-3nic": "GPT-OSS FP8\n(3 NIC)",
+        "gptoss-bf16": "BF16",
+        "gptoss-bf16-3nic": "BF16\n(3 NIC)",
+        "gptoss-bf16-pp4-ep4": "BF16\n(PP4 EP4)",
+        "gptoss-fp8": "FP8",
+        "gptoss-fp8-3nic": "FP8\n(3 NIC)",
         "llama3-70b": "Llama 3\n70B",
         "qwen3-32b": "Qwen3\n32B",
         "gptoss-120b": "GPT-OSS\n120B",

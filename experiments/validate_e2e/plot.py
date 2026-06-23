@@ -158,7 +158,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
 
     metric_labels = df["metric"].unique()
     fig, axes = make_figure(
-        "End-to-End Training Validation", width_in=3.5, n_panels=len(metric_labels)
+        "GPT-OSS End-to-End Training Validation", width_in=3.5, n_panels=len(metric_labels)
     )
 
     for ax in axes:
