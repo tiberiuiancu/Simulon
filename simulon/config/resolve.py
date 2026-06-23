@@ -291,10 +291,6 @@ def workload_hash(workload: MegatronWorkload) -> str:
     exclusion list to keep the hash stable.
     """
     filtered = {k: v for k, v in workload.config.items() if k not in _EXCLUDED_HASH_KEYS}
-    # Workload-level parameters that affect the simulated compute graph (but live
-    # outside of ``config``) must also change the hash, otherwise different
-    # workloads reuse the same cached trace directory.
-    filtered["__workload_params__"] = {"a2a_overlap_ratio": workload.a2a_overlap_ratio}
     return hashlib.sha256(json.dumps(filtered, sort_keys=True, default=str).encode()).hexdigest()[
         :16
     ]

@@ -123,7 +123,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             sim_metrics = None
             if trackers:
                 for tracker in trackers:
-                    sim_metrics = tracker.pull_metrics(run_name_prefix=f"validate-bridge-{model}")
+                    sim_metrics = tracker.pull_metrics(run_name=f"validate-bridge-{model}")
                     if sim_metrics is not None:
                         break
 
