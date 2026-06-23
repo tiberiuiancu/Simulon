@@ -56,24 +56,46 @@ def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
 
 
 def _records_to_long(
-    rows: list[dict[str, float | str | None]], metric_key: str, metric_label: str
+    rows: list[dict[str, float | str | None]],
+    metric_key: str,
+    metric_label: str,
+    model_label: str | None = None,
 ) -> list[dict[str, float | str]]:
     records: list[dict[str, float | str]] = []
     for row in rows:
         if row is None:
             continue
-        model = row["model"]
+        model = model_label if model_label is not None else row["model"]
         real_val = row.get("real")
         sim_val = row.get("simulated")
-        if real_val is None or sim_val is None:
-            continue
-        records.append(
-            {"model": model, "metric": metric_label, "source": "Real", "value": float(real_val)}
-        )
-        records.append(
-            {"model": model, "metric": metric_label, "source": "Simulated", "value": float(sim_val)}
-        )
+        overlap_val = row.get("simulated_overlap")
+        if real_val is not None:
+            records.append(
+                {"model": model, "metric": metric_label, "source": "Real", "value": float(real_val)}
+            )
+        if sim_val is not None:
+            records.append(
+                {
+                    "model": model,
+                    "metric": metric_label,
+                    "source": "Simulated",
+                    "value": float(sim_val),
+                }
+            )
+        if overlap_val is not None:
+            records.append(
+                {
+                    "model": model,
+                    "metric": metric_label,
+                    "source": "Simulated (overlap)",
+                    "value": float(overlap_val),
+                }
+            )
     return records
+
+
+def _group_key(model: str) -> str:
+    return "qwen3-30b" if model == "qwen3-30b-overlap" else model
 
 
 def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
@@ -93,7 +115,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
 
         trackers = get_trackers(models[0] / "scenario.yaml")
 
-        rows: list[dict[str, float | str | None]] = []
+        raw_rows: list[dict[str, float | str | None]] = []
         for model_dir in models:
             model = model_dir.name
             ref = _read_reference(model_dir / "reference.yaml")
@@ -109,35 +131,33 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             for key, _label, _unit in metrics:
                 row[f"real_{key}"] = ref.get(key)
                 row[f"sim_{key}"] = sim_metrics.get(key) if sim_metrics else None
-            rows.append(row)
+            raw_rows.append(row)
 
-        def _has_both_results(row: dict[str, float | str | None]) -> bool:
-            return all(
-                row.get(f"real_{key}") is not None and row.get(f"sim_{key}") is not None
+        grouped: dict[str, dict[str, float | str | None]] = {}
+        for row in raw_rows:
+            model = str(row["model"])
+            group = _group_key(model)
+            if group not in grouped:
+                grouped[group] = {"model": group}
+            for key, _label, _unit in metrics:
+                if model.endswith("-overlap"):
+                    grouped[group][f"simulated_overlap_{key}"] = row[f"sim_{key}"]
+                else:
+                    grouped[group][f"real_{key}"] = row.get(f"real_{key}")
+                    grouped[group][f"sim_{key}"] = row[f"sim_{key}"]
+
+        complete_rows: list[dict[str, float | str | None]] = []
+        for group, row in grouped.items():
+            has_data = any(
+                row.get(f"real_{key}") is not None
+                or row.get(f"sim_{key}") is not None
+                or row.get(f"simulated_overlap_{key}") is not None
                 for key, _label, _unit in metrics
             )
-
-        complete_rows = []
-        for row in rows:
-            if _has_both_results(row):
+            if has_data:
                 complete_rows.append(row)
             else:
-                missing = sorted(
-                    key
-                    for key, _label, _unit in metrics
-                    if row.get(f"real_{key}") is None or row.get(f"sim_{key}") is None
-                )
-                if row.get("sim_per_gpu_tps") is not None:
-                    print(
-                        f"Skipping {row['model']}: run found but missing metrics {missing}; "
-                        f"available summary keys: {sorted(sim_metrics.keys()) if sim_metrics else 'none'}.",
-                        file=sys.stderr,
-                    )
-                else:
-                    print(
-                        f"Skipping {row['model']}: no finished wandb run found for prefix validate-bridge-{row['model']}.",
-                        file=sys.stderr,
-                    )
+                print(f"Skipping {group}: no real or simulated results.", file=sys.stderr)
 
         records: list[dict[str, float | str]] = []
         for key, label, _unit in metrics:
@@ -146,8 +166,9 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
                     [
                         {
                             "model": r["model"],
-                            "real": r[f"real_{key}"],
-                            "simulated": r[f"sim_{key}"],
+                            "real": r.get(f"real_{key}"),
+                            "simulated": r.get(f"sim_{key}"),
+                            "simulated_overlap": r.get(f"simulated_overlap_{key}"),
                         }
                         for r in complete_rows
                     ],

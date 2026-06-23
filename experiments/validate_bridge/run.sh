@@ -18,7 +18,7 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-MODELS=(llama3-70b gptoss-120b qwen3-30b)
+MODELS=(llama3-70b gptoss-120b qwen3-30b qwen3-30b-overlap)
 echo "Selected models: ${MODELS[*]}"
 
 set +e

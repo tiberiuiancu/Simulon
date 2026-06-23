@@ -45,6 +45,7 @@ def label_for_model(raw_name: str) -> str:
         "qwen3-32b": "Qwen3\n32B",
         "gptoss-120b": "GPT-OSS\n120B",
         "qwen3-30b": "Qwen3 30B\nA3B",
+        "qwen3-30b-overlap": "Qwen3 30B\nA3B",
         "qwen3-235b": "Qwen3 235B\nA22B",
     }
     return labels.get(raw_name, raw_name.replace("-", " "))
@@ -53,45 +54,56 @@ def label_for_model(raw_name: str) -> str:
 def plot_metric_panel(
     ax, sub_df, metric_label: str, ylabel: str, palette: dict[str, str] | None = None
 ) -> None:
-    """Draw a single real-vs-simulated metric panel on *ax*.
+    """Draw a real-vs-simulated metric panel on *ax*.
 
-    Adds red percentage-difference labels above simulated bars and places
+    Adds percentage-difference labels above simulated bars and places
     the legend horizontally under the panel title.
     """
-    palette = palette or {"Real": "#4c72b0", "Simulated": "#dd8452"}
+    palette = palette or {
+        "Real": "#4c72b0",
+        "Simulated": "#dd8452",
+        "Simulated (overlap)": "#2ca02c",
+    }
 
     sns.barplot(
         data=sub_df,
         x="model",
         y="value",
         hue="source",
-        hue_order=["Real", "Simulated"],
+        hue_order=[s for s in palette if s in sub_df["source"].unique()],
         palette=palette,
         ax=ax,
     )
 
     y_max = sub_df["value"].max()
-    for model_name in sub_df["model"].unique():
-        real_val = sub_df[(sub_df["model"] == model_name) & (sub_df["source"] == "Real")]["value"]
-        sim_val = sub_df[(sub_df["model"] == model_name) & (sub_df["source"] == "Simulated")][
-            "value"
-        ]
-        if real_val.empty or sim_val.empty:
-            continue
-        real = float(real_val.iloc[0])
-        sim = float(sim_val.iloc[0])
-        if real == 0:
-            continue
-        pct = (sim - real) / real * 100
-        ax.text(
-            model_name,
-            sim + 0.02 * y_max,
-            f"{pct:+.1f}%",
-            ha="center",
-            va="bottom",
-            fontsize=7,
-            color="red",
+    real_by_model = {
+        model: float(
+            sub_df[(sub_df["model"] == model) & (sub_df["source"] == "Real")]["value"].iloc[0]
         )
+        for model in sub_df["model"].unique()
+        if not sub_df[(sub_df["model"] == model) & (sub_df["source"] == "Real")]["value"].empty
+    }
+    for model_name in sub_df["model"].unique():
+        real = real_by_model.get(model_name)
+        if real is None or real == 0:
+            continue
+        for source in ["Simulated", "Simulated (overlap)"]:
+            sim_val = sub_df[(sub_df["model"] == model_name) & (sub_df["source"] == source)][
+                "value"
+            ]
+            if sim_val.empty:
+                continue
+            sim = float(sim_val.iloc[0])
+            pct = (sim - real) / real * 100
+            ax.text(
+                model_name,
+                sim + 0.02 * y_max,
+                f"{pct:+.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=6,
+                color="red",
+            )
 
     ax.set_ylabel(ylabel)
     ax.set_xlabel("")
@@ -99,8 +111,8 @@ def plot_metric_panel(
     ax.legend(
         title="",
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.15),
-        ncol=2,
+        bbox_to_anchor=(0.5, 1.18),
+        ncol=len(sub_df["source"].unique()),
         frameon=False,
         handlelength=1.2,
         handletextpad=0.4,

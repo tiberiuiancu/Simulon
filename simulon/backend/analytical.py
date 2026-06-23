@@ -165,6 +165,10 @@ def simulate(
         len(dag.edges),
     )
 
+    a2a_overlap_ratio = 0.0
+    if isinstance(scenario.workload, MegatronWorkload):
+        a2a_overlap_ratio = scenario.workload.a2a_overlap_ratio
+
     if network_simulation == "flow":
         decompose_collectives_in_dag(dag)
         logger.info("  After decomposition: %d comm nodes", len(dag.comm_nodes))
@@ -177,6 +181,18 @@ def simulate(
             bw_override_bytes_per_ms=intra_override,
             inter_bw_override_bytes_per_ms=inter_override,
         )
+        if a2a_overlap_ratio > 0.0:
+            scale = 1.0 - a2a_overlap_ratio
+            n_scaled = 0
+            for comm_node in dag.comm_nodes:
+                if comm_node.collective_type == "AllToAll" and comm_node.duration_ms is not None:
+                    comm_node.duration_ms *= scale
+                    n_scaled += 1
+            logger.info(
+                "  Applied a2a_overlap_ratio=%.2f to %d AllToAll comm nodes",
+                a2a_overlap_ratio,
+                n_scaled,
+            )
         logger.info("  Network durations resolved")
     else:  # network_simulation == "collective"
         dc = scenario.datacenter
@@ -185,6 +201,18 @@ def simulate(
             len(dag.collective_nodes),
         )
         populate_collective_network(dag, dc)
+        if a2a_overlap_ratio > 0.0:
+            scale = 1.0 - a2a_overlap_ratio
+            n_scaled = 0
+            for node in dag.collective_nodes.values():
+                if node.collective_type == "AllToAll" and node.duration_ms is not None:
+                    node.duration_ms *= scale
+                    n_scaled += 1
+            logger.info(
+                "  Applied a2a_overlap_ratio=%.2f to %d AllToAll collective nodes",
+                a2a_overlap_ratio,
+                n_scaled,
+            )
         logger.info("  Collective durations resolved")
 
     total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes) + len(dag.collective_nodes)
