@@ -74,7 +74,7 @@ def _records_to_long(
 
 def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
     csv_path = base_dir / "results.csv"
-    metrics = [("throughput_tps", "Tokens / sec")]
+    metrics = [("per_gpu_tps", "Tokens / sec / GPU")]
 
     if use_csv:
         df = _load_csv(csv_path)
@@ -118,9 +118,12 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             if _has_both_results(row):
                 complete_rows.append(row)
             else:
-                print(
-                    f"Skipping {row['model']}: missing real or simulated results.", file=sys.stderr
+                missing = sorted(
+                    key
+                    for key, _ in metrics
+                    if row.get(f"real_{key}") is None or row.get(f"sim_{key}") is None
                 )
+                print(f"Skipping {row['model']}: missing metrics {missing}.", file=sys.stderr)
 
         records: list[dict[str, float | str]] = []
         for key, label in metrics:
