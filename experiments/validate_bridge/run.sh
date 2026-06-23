@@ -18,20 +18,8 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-MODELS=()
-for dir in "$SCRIPT_DIR"/*/; do
-    if [ -d "$dir" ]; then
-        model="$(basename "$dir")"
-        MODELS+=("$model")
-    fi
-done
-
-if [ ${#MODELS[@]} -eq 0 ]; then
-    echo "No model sub-folders found in $SCRIPT_DIR"
-    exit 1
-fi
-
-echo "Detected models: ${MODELS[*]}"
+MODELS=(llama3-70b gptoss-120b qwen3-30b qwen3-235b)
+echo "Selected models: ${MODELS[*]}"
 
 set +e
 for model in "${MODELS[@]}"; do
