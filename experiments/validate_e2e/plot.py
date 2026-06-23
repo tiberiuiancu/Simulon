@@ -37,50 +37,117 @@ def _read_reference(ref_path: Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def plot_real_vs_simulated(output: Path | None, base_dir: Path) -> None:
-    models = _find_models(base_dir)
-    if not models:
-        print("No model sub-folders found.", file=sys.stderr)
-        sys.exit(1)
+def _load_csv(csv_path: Path) -> pd.DataFrame | None:
+    if not csv_path.exists():
+        return None
+    try:
+        return pd.read_csv(csv_path)
+    except Exception as exc:
+        print(f"Warning: failed to read {csv_path}: {exc}", file=sys.stderr)
+        return None
 
-    trackers = get_trackers(models[0] / "scenario.yaml")
-    if not trackers:
-        print("No active trackers found.", file=sys.stderr)
-        sys.exit(1)
 
+def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+    print(f"Saved results to {csv_path}")
+
+
+def _records_to_long(
+    rows: list[dict[str, float | str]], metric_key: str, metric_label: str
+) -> list[dict[str, float | str]]:
     records: list[dict[str, float | str]] = []
+    for row in rows:
+        model = row["model"]
+        real_val = row.get("real")
+        sim_val = row.get("simulated")
+        if real_val is None or sim_val is None:
+            continue
+        records.append(
+            {"model": model, "metric": metric_label, "source": "Real", "value": float(real_val)}
+        )
+        records.append(
+            {"model": model, "metric": metric_label, "source": "Simulated", "value": float(sim_val)}
+        )
+    return records
 
-    for model_dir in models:
-        model = model_dir.name
-        ref = _read_reference(model_dir / "reference.yaml")
 
-        sim_metrics = None
-        for tracker in trackers:
-            sim_metrics = tracker.pull_metrics(run_name_prefix=f"validate-e2e-{model}")
-            if sim_metrics is not None:
-                break
+def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
+    csv_path = base_dir / "results.csv"
+    metrics = [("mfu_pct", "MFU (%)")]
 
-        metrics = [("mfu_pct", "MFU (%)")]
+    if use_csv:
+        df = _load_csv(csv_path)
+        if df is None:
+            print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        models = _find_models(base_dir)
+        if not models:
+            print("No model sub-folders found.", file=sys.stderr)
+            sys.exit(1)
 
+        trackers = get_trackers(models[0] / "scenario.yaml")
+
+        rows: list[dict[str, float | str | None]] = []
+        for model_dir in models:
+            model = model_dir.name
+            ref = _read_reference(model_dir / "reference.yaml")
+
+            sim_metrics = None
+            if trackers:
+                for tracker in trackers:
+                    sim_metrics = tracker.pull_metrics(run_name_prefix=f"validate-e2e-{model}")
+                    if sim_metrics is not None:
+                        break
+
+            row: dict[str, float | str | None] = {"model": model}
+            for key, _label in metrics:
+                row[f"real_{key}"] = ref.get(key)
+                row[f"sim_{key}"] = sim_metrics.get(key) if sim_metrics else None
+            rows.append(row)
+
+        def _has_both_results(row: dict[str, float | str | None]) -> bool:
+            return all(
+                row.get(f"real_{key}") is not None and row.get(f"sim_{key}") is not None
+                for key, _ in metrics
+            )
+
+        complete_rows = []
+        for row in rows:
+            if _has_both_results(row):
+                complete_rows.append(row)
+            else:
+                print(
+                    f"Skipping {row['model']}: missing real or simulated results.", file=sys.stderr
+                )
+
+        records: list[dict[str, float | str]] = []
         for key, label in metrics:
-            real_val = ref.get(key)
-            sim_val = sim_metrics.get(key) if sim_metrics else None
-
-            if real_val is None or sim_val is None:
-                continue
-
-            records.append(
-                {"model": model, "metric": label, "source": "Real", "value": float(real_val)}
+            records.extend(
+                _records_to_long(
+                    [
+                        {
+                            "model": r["model"],
+                            "real": r[f"real_{key}"],
+                            "simulated": r[f"sim_{key}"],
+                        }
+                        for r in complete_rows
+                    ],
+                    key,
+                    label,
+                )
             )
-            records.append(
-                {"model": model, "metric": label, "source": "Simulated", "value": float(sim_val)}
-            )
 
-    if not records:
-        print("No data found for any model. Exiting.", file=sys.stderr)
-        sys.exit(1)
-
-    df = pd.DataFrame(records)
+        if records:
+            df = pd.DataFrame(records)
+            _save_csv(df, csv_path)
+        else:
+            print("No complete wandb data found; falling back to local CSV.", file=sys.stderr)
+            df = _load_csv(csv_path)
+            if df is None:
+                print("No cached results.csv available. Exiting.", file=sys.stderr)
+                sys.exit(1)
     sns.set_theme(style="whitegrid")
 
     metric_labels = df["metric"].unique()
@@ -130,8 +197,13 @@ def main() -> None:
         default=Path(__file__).parent,
         help="Directory containing model sub-folders with reference and scenario YAMLs.",
     )
+    parser.add_argument(
+        "--use-csv",
+        action="store_true",
+        help="Plot from the local results.csv instead of pulling from wandb.",
+    )
     args = parser.parse_args()
-    plot_real_vs_simulated(args.output, args.base_dir)
+    plot_real_vs_simulated(args.output, args.base_dir, use_csv=args.use_csv)
 
 
 if __name__ == "__main__":

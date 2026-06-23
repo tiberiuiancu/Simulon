@@ -31,42 +31,80 @@ def _node_size_from_scenario(path: Path) -> int:
     return int(path.stem.replace("scenario", ""))
 
 
-def plot_mfu_from_wandb(output: Path | None, base_dir: Path) -> None:
-    scenarios = _find_scenarios(base_dir)
-    if not scenarios:
-        print("No scenario files found.", file=sys.stderr)
-        sys.exit(1)
+def _load_csv(csv_path: Path) -> pd.DataFrame | None:
+    if not csv_path.exists():
+        return None
+    try:
+        return pd.read_csv(csv_path)
+    except Exception as exc:
+        print(f"Warning: failed to read {csv_path}: {exc}", file=sys.stderr)
+        return None
 
-    # get_trackers will load the cascading tracking env and instantiate trackers
-    trackers = get_trackers(scenarios[0])
-    if not trackers:
-        print("No active trackers found.", file=sys.stderr)
-        sys.exit(1)
 
+def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+    print(f"Saved results to {csv_path}")
+
+
+def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
+    csv_path = base_dir / "results.csv"
     records: list[dict[str, float | str]] = []
 
-    for sc_path in scenarios:
-        model = _model_from_scenario(sc_path)
-        node_size = _node_size_from_scenario(sc_path)
-        # The run script sets WANDB_RUN_NAME="node-size-{model}-node{size}"
-        run_prefix = f"node-size-{model}-node{node_size}"
+    if use_csv:
+        df = _load_csv(csv_path)
+        if df is None:
+            print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        scenarios = _find_scenarios(base_dir)
+        if not scenarios:
+            print("No scenario files found.", file=sys.stderr)
+            sys.exit(1)
 
-        for tracker in trackers:
-            metrics = tracker.pull_metrics(run_name_prefix=run_prefix)
-            if metrics is None:
-                continue
-            mfu = metrics.get("mfu_pct")
+        # get_trackers will load the cascading tracking env and instantiate trackers
+        trackers = get_trackers(scenarios[0])
+
+        for sc_path in scenarios:
+            model = _model_from_scenario(sc_path)
+            node_size = _node_size_from_scenario(sc_path)
+            # The run script sets WANDB_RUN_NAME="node-size-{model}-node{size}"
+            run_prefix = f"node-size-{model}-node{node_size}"
+
+            mfu: float | None = None
+            if trackers:
+                for tracker in trackers:
+                    metrics = tracker.pull_metrics(run_name_prefix=run_prefix)
+                    if metrics is not None:
+                        mfu = metrics.get("mfu_pct")
+                        if mfu is not None:
+                            break
+
             if mfu is None:
+                print(f"No wandb data for {model} node{node_size}; skipping.", file=sys.stderr)
                 continue
+
             records.append(
                 {"model": model, "node_size": f"{node_size} GPU/node", "mfu_pct": float(mfu)}
             )
 
-    if not records:
-        print("No wandb data found for any scenario. Exiting.", file=sys.stderr)
-        sys.exit(1)
+        if records:
+            df = pd.DataFrame(records)
+            _save_csv(df, csv_path)
+        else:
+            print("No wandb data found; falling back to local CSV.", file=sys.stderr)
+            df = _load_csv(csv_path)
+            if df is None:
+                print("No cached results.csv available. Exiting.", file=sys.stderr)
+                sys.exit(1)
 
-    df = pd.DataFrame(records)
+    required_cols = {"model", "node_size", "mfu_pct"}
+    if not required_cols.issubset(df.columns):
+        print(
+            f"CSV {csv_path} is missing required columns: {sorted(required_cols - set(df.columns))}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     sns.set_theme(style="whitegrid")
     fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -110,8 +148,13 @@ def main() -> None:
         default=Path(__file__).parent,
         help="Directory containing model sub-folders with scenario YAMLs.",
     )
+    parser.add_argument(
+        "--use-csv",
+        action="store_true",
+        help="Plot from the local results.csv instead of pulling from wandb.",
+    )
     args = parser.parse_args()
-    plot_mfu_from_wandb(args.output, args.base_dir)
+    plot_mfu_from_wandb(args.output, args.base_dir, use_csv=args.use_csv)
 
 
 if __name__ == "__main__":

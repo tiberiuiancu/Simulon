@@ -44,30 +44,69 @@ def _model_bw_from_run(run: dict[str, Any]) -> tuple[str, int]:
     return name, _extract_bw(run)
 
 
-def plot_mfu_from_wandb(output: Path | None, base_dir: Path, line: bool = False) -> None:
-    env_file = base_dir / ".tracking.env"
-    trackers = get_trackers(env_file if env_file.exists() else base_dir)
-    if not trackers:
-        print("No active trackers found.", file=sys.stderr)
-        sys.exit(1)
+def _load_csv(csv_path: Path) -> pd.DataFrame | None:
+    if not csv_path.exists():
+        return None
+    try:
+        return pd.read_csv(csv_path)
+    except Exception as exc:
+        print(f"Warning: failed to read {csv_path}: {exc}", file=sys.stderr)
+        return None
 
+
+def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+    print(f"Saved results to {csv_path}")
+
+
+def plot_mfu_from_wandb(
+    output: Path | None, base_dir: Path, line: bool = False, use_csv: bool = False
+) -> None:
+    csv_path = base_dir / "results.csv"
     records: list[dict[str, float | str]] = []
-    for tracker in trackers:
-        runs = tracker.fetch_runs(prefix="link-bw-")
-        for run in runs:
-            model, bw = _model_bw_from_run(run)
-            mfu = run["summary"].get("mfu_pct")
-            if mfu is None:
-                continue
-            records.append(
-                {"model": model, "bw_gbps": bw, "bw_label": f"{bw} Gbps", "mfu_pct": float(mfu)}
-            )
 
-    if not records:
-        print("No wandb data found for any scenario. Exiting.", file=sys.stderr)
+    if use_csv:
+        df = _load_csv(csv_path)
+        if df is None:
+            print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        env_file = base_dir / ".tracking.env"
+        trackers = get_trackers(env_file if env_file.exists() else base_dir)
+        if trackers:
+            for tracker in trackers:
+                runs = tracker.fetch_runs(prefix="link-bw-")
+                for run in runs:
+                    model, bw = _model_bw_from_run(run)
+                    mfu = run["summary"].get("mfu_pct")
+                    if mfu is None:
+                        continue
+                    records.append(
+                        {
+                            "model": model,
+                            "bw_gbps": bw,
+                            "bw_label": f"{bw} Gbps",
+                            "mfu_pct": float(mfu),
+                        }
+                    )
+        if records:
+            df = pd.DataFrame(records)
+            _save_csv(df, csv_path)
+        else:
+            print("No wandb data found; falling back to local CSV.", file=sys.stderr)
+            df = _load_csv(csv_path)
+            if df is None:
+                print("No cached results.csv available. Exiting.", file=sys.stderr)
+                sys.exit(1)
+
+    required_cols = {"model", "bw_gbps", "bw_label", "mfu_pct"}
+    if not required_cols.issubset(df.columns):
+        print(
+            f"CSV {csv_path} is missing required columns: {sorted(required_cols - set(df.columns))}",
+            file=sys.stderr,
+        )
         sys.exit(1)
-
-    df = pd.DataFrame(records)
     sns.set_theme(style="whitegrid")
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -136,8 +175,13 @@ def main() -> None:
     parser.add_argument(
         "--line", action="store_true", help="Render line plot instead of bar plot (default: bar)."
     )
+    parser.add_argument(
+        "--use-csv",
+        action="store_true",
+        help="Plot from the local results.csv instead of pulling from wandb.",
+    )
     args = parser.parse_args()
-    plot_mfu_from_wandb(args.output, args.base_dir, line=args.line)
+    plot_mfu_from_wandb(args.output, args.base_dir, line=args.line, use_csv=args.use_csv)
 
 
 if __name__ == "__main__":
