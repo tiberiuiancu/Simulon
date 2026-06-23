@@ -14,10 +14,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 import yaml
 
 from simulon.tracking import get_trackers
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from _plot_utils import label_for_model, make_figure, plot_metric_panel, setup_latex_style
 
 
 def _find_models(base_dir: Path) -> list[Path]:
@@ -54,10 +56,12 @@ def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
 
 
 def _records_to_long(
-    rows: list[dict[str, float | str]], metric_key: str, metric_label: str
+    rows: list[dict[str, float | str | None]], metric_key: str, metric_label: str
 ) -> list[dict[str, float | str]]:
     records: list[dict[str, float | str]] = []
     for row in rows:
+        if row is None:
+            continue
         model = row["model"]
         real_val = row.get("real")
         sim_val = row.get("simulated")
@@ -74,7 +78,7 @@ def _records_to_long(
 
 def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
     csv_path = base_dir / "results.csv"
-    metrics = [("mfu_pct", "MFU (%)")]
+    metrics = [("mfu_pct", "MFU", "%"), ("per_gpu_tps", "Throughput", "tokens/s/GPU")]
 
     if use_csv:
         df = _load_csv(csv_path)
@@ -102,7 +106,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
                         break
 
             row: dict[str, float | str | None] = {"model": model}
-            for key, _label in metrics:
+            for key, _label, _unit in metrics:
                 row[f"real_{key}"] = ref.get(key)
                 row[f"sim_{key}"] = sim_metrics.get(key) if sim_metrics else None
             rows.append(row)
@@ -110,7 +114,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
         def _has_both_results(row: dict[str, float | str | None]) -> bool:
             return all(
                 row.get(f"real_{key}") is not None and row.get(f"sim_{key}") is not None
-                for key, _ in metrics
+                for key, _label, _unit in metrics
             )
 
         complete_rows = []
@@ -123,7 +127,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
                 )
 
         records: list[dict[str, float | str]] = []
-        for key, label in metrics:
+        for key, label, _unit in metrics:
             records.extend(
                 _records_to_long(
                     [
@@ -141,6 +145,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
 
         if records:
             df = pd.DataFrame(records)
+            df["model"] = df["model"].map(label_for_model)
             _save_csv(df, csv_path)
         else:
             print("No complete wandb data found; falling back to local CSV.", file=sys.stderr)
@@ -148,52 +153,29 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             if df is None:
                 print("No cached results.csv available. Exiting.", file=sys.stderr)
                 sys.exit(1)
-    sns.set_theme(style="whitegrid")
+
+    setup_latex_style()
 
     metric_labels = df["metric"].unique()
-    n_metrics = len(metric_labels)
-    fig, axes = plt.subplots(1, n_metrics, figsize=(4 * n_metrics + 1, 5), sharey=False)
-    if n_metrics == 1:
-        axes = [axes]
+    fig, axes = make_figure(
+        "End-to-End Training Validation",
+        width_in=3.5 * len(metric_labels),
+        n_panels=len(metric_labels),
+    )
+
+    for ax in axes:
+        ax.set_xlabel("")
 
     for ax, metric_label in zip(axes, metric_labels, strict=False):
         sub = df[df["metric"] == metric_label]
-        sns.barplot(
-            data=sub,
-            x="model",
-            y="value",
-            hue="source",
-            hue_order=["Real", "Simulated"],
-            palette={"Real": "#4c72b0", "Simulated": "#dd8452"},
-            ax=ax,
-        )
+        unit = next((unit for key, lbl, unit in metrics if lbl == metric_label), "")
+        ylabel = f"{metric_label} ({unit})" if unit else metric_label
+        plot_metric_panel(ax, sub, metric_label, ylabel)
 
-        for model_name in sub["model"].unique():
-            real_val = sub[(sub["model"] == model_name) & (sub["source"] == "Real")]["value"]
-            sim_val = sub[(sub["model"] == model_name) & (sub["source"] == "Simulated")]["value"]
-            if real_val.empty or sim_val.empty:
-                continue
-            real = float(real_val.iloc[0])
-            sim = float(sim_val.iloc[0])
-            if real == 0:
-                continue
-            pct = (sim - real) / real * 100
-            ax.text(
-                model_name, sim, f"{pct:+.1f}%", ha="center", va="bottom", fontsize=8, color="red"
-            )
-
-        ax.set_ylabel(metric_label)
-        ax.set_xlabel("")
-        ax.set_title(metric_label, fontsize=12, fontweight="bold")
-        ax.tick_params(axis="x", rotation=45)
-        ax.legend(title="", loc="upper right")
-        sns.despine(ax=ax, top=True, right=True)
-
-    fig.suptitle("Real vs Simulated — validate_e2e", fontsize=14, fontweight="bold", y=1.02)
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0, 1, 1.02])
 
     if output:
-        fig.savefig(output, bbox_inches="tight", dpi=150)
+        fig.savefig(output, bbox_inches="tight", dpi=300)
         print(f"Saved plot to {output}")
     else:
         plt.show()
