@@ -22,6 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from _plot_utils import label_for_model, make_figure, plot_metric_panel, setup_latex_style
 
 
+def _short_label_for_e2e(raw_name: str) -> str:
+    return label_for_model(raw_name).replace("GPT-OSS\n", "").replace("GPT-OSS ", "")
+
+
 def _find_models(base_dir: Path) -> list[Path]:
     models = []
     for item in sorted(base_dir.iterdir()):
@@ -145,7 +149,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
 
         if records:
             df = pd.DataFrame(records)
-            df["model"] = df["model"].map(label_for_model)
+            df["model"] = df["model"].map(_short_label_for_e2e)
             _save_csv(df, csv_path)
         else:
             print("No complete wandb data found; falling back to local CSV.", file=sys.stderr)
