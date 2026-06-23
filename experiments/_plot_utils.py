@@ -112,7 +112,7 @@ def plot_metric_panel(
         ax.legend(
             title="",
             loc="upper center",
-            bbox_to_anchor=(0.5, 1.32),
+            bbox_to_anchor=(0.5, 1.20),
             ncol=max(1, len(sub_df["source"].unique())),
             frameon=False,
             handlelength=1.2,
