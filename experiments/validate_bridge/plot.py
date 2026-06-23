@@ -94,7 +94,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             model = model_dir.name
             ref = _read_reference(model_dir / "reference.yaml")
 
-            sim_metrics = None
+            sim_metrics: dict[str, object] | None = None
             if trackers:
                 for tracker in trackers:
                     sim_metrics = tracker.pull_metrics(run_name_prefix=f"validate-bridge-{model}")
@@ -112,6 +112,29 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
                 row.get(f"real_{key}") is not None and row.get(f"sim_{key}") is not None
                 for key, _ in metrics
             )
+
+        complete_rows = []
+        for row in rows:
+            if _has_both_results(row):
+                complete_rows.append(row)
+            else:
+                missing = sorted(
+                    key
+                    for key, _ in metrics
+                    if row.get(f"real_{key}") is None or row.get(f"sim_{key}") is None
+                )
+                found_run = row.get("sim_per_gpu_tps") is not None or sim_metrics is not None
+                if not found_run:
+                    print(
+                        f"Skipping {row['model']}: no finished wandb run found for prefix validate-bridge-{model}.",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"Skipping {row['model']}: run found but missing metrics {missing}; "
+                        f"available summary keys: {sorted(sim_metrics.keys()) if sim_metrics else 'none'}.",
+                        file=sys.stderr,
+                    )
 
         complete_rows = []
         for row in rows:
