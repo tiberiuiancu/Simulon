@@ -168,30 +168,19 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             ax=ax,
         )
 
-        sim_color = sns.color_palette("deep")[1]
-        model_names = sub["model"].unique()
-        n_models = len(model_names)
-        real_by_model = {
-            model_name: float(
-                sub[(sub["model"] == model_name) & (sub["source"] == "Real")]["value"].iloc[0]
+        for model_name in sub["model"].unique():
+            real_val = sub[(sub["model"] == model_name) & (sub["source"] == "Real")]["value"]
+            sim_val = sub[(sub["model"] == model_name) & (sub["source"] == "Simulated")]["value"]
+            if real_val.empty or sim_val.empty:
+                continue
+            real = float(real_val.iloc[0])
+            sim = float(sim_val.iloc[0])
+            if real == 0:
+                continue
+            pct = (sim - real) / real * 100
+            ax.text(
+                model_name, sim, f"{pct:+.1f}%", ha="center", va="bottom", fontsize=8, color="red"
             )
-            for model_name in model_names
-            if not sub[(sub["model"] == model_name) & (sub["source"] == "Real")]["value"].empty
-        }
-        for idx, bar in enumerate(ax.patches):
-            height = bar.get_height()
-            if height == 0 or idx < n_models:
-                continue
-            color = bar.get_facecolor()[:3]
-            if color != sim_color[:3]:
-                continue
-            model_name = model_names[idx - n_models]
-            real = real_by_model.get(model_name)
-            if real is None or real == 0:
-                continue
-            pct = (height - real) / real * 100
-            x = bar.get_x() + bar.get_width() / 2
-            ax.text(x, height, f"{pct:+.1f}%", ha="center", va="bottom", fontsize=8, color="red")
 
         ax.set_ylabel(metric_label)
         ax.set_xlabel("")
