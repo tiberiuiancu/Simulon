@@ -167,7 +167,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
     for ax, metric_label in zip(axes, metric_labels, strict=False):
         sub = df[df["metric"] == metric_label]
         unit = next((unit for key, lbl, unit in metrics if lbl == metric_label), "")
-        ylabel = f"{metric_label} ({unit})" if unit else metric_label
+        ylabel = unit if unit else metric_label
         plot_metric_panel(ax, sub, metric_label, ylabel)
 
     fig.tight_layout(rect=[0, 0, 1, 1.02])
