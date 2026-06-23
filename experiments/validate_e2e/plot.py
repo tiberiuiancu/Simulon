@@ -78,7 +78,7 @@ def _records_to_long(
 
 def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
     csv_path = base_dir / "results.csv"
-    metrics = [("mfu_pct", "MFU", "%"), ("per_gpu_tps", "Throughput", "tokens/s/GPU")]
+    metrics = [("per_gpu_tps", "", "tokens/s/GPU")]
 
     if use_csv:
         df = _load_csv(csv_path)
