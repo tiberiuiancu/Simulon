@@ -24,7 +24,7 @@ echo "Selected models: ${MODELS[*]}"
 set +e
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
-    bash scripts/apptainer-trace.sh "$SCRIPT_DIR/$model/workload.yaml" \
+    bash scripts/apptainer-trace.sh "$SCRIPT_DIR/$model/scenario.yaml" \
         --gpu h100 --memory-snapshot oom.pickle
     trace_rc=$?
     if [ $trace_rc -ne 0 ]; then
