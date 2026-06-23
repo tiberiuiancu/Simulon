@@ -123,9 +123,11 @@ def plot_metric_panel(
 
 def make_figure(title: str, width_in: float = 3.5, n_panels: int = 1) -> tuple:
     """Create a compact figure suitable for a single LaTeX column."""
-    height_in = 2.0
-    fig, axes = plt.subplots(1, n_panels, figsize=(width_in, height_in), sharey=False)
-    if n_panels == 1:
+    if n_panels <= 1:
+        fig, axes = plt.subplots(1, 1, figsize=(width_in, 2.0))
         axes = [axes]
+    else:
+        fig, axes = plt.subplots(n_panels, 1, figsize=(width_in, 2.0 * n_panels), sharey=False)
+        axes = list(axes)
     fig.suptitle(title, fontsize=10, fontweight="bold", y=1.04)
     return fig, axes
