@@ -1,0 +1,55 @@
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/cli/simulate.py:64 in simulate │
+│                                                                              │
+│    61 │   trackers = [] if no_tracking else get_trackers(scenario)           │
+│    62 │   with open(scenario) as f:                                          │
+│    63 │   │   raw = yaml.safe_load(f)                                        │
+│ ❱  64 │   sc = ScenarioConfig.from_yaml(scenario)                            │
+│    65 │                                                                      │
+│    66 │   if trace and isinstance(sc.workload, MegatronWorkload):            │
+│    67 │   │   from simulon.cli.trace import generate_trace                   │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/config/scenario.py:63 in       │
+│ from_yaml                                                                    │
+│                                                                              │
+│   60 │   │                                                                   │
+│   61 │   │   with open(path) as f:                                           │
+│   62 │   │   │   raw = yaml.safe_load(f)                                     │
+│ ❱ 63 │   │   return cls.model_validate(raw)                                  │
+│   64                                                                         │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/.venv/lib/python3.13/site-packages/pyd │
+│ antic/main.py:716 in model_validate                                          │
+│                                                                              │
+│    713 │   │   │   │   code='validate-by-alias-and-name-false',              │
+│    714 │   │   │   )                                                         │
+│    715 │   │                                                                 │
+│ ❱  716 │   │   return cls.__pydantic_validator__.validate_python(            │
+│    717 │   │   │   obj,                                                      │
+│    718 │   │   │   strict=strict,                                            │
+│    719 │   │   │   extra=extra,                                              │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/config/scenario.py:54 in       │
+│ _resolve_refs                                                                │
+│                                                                              │
+│   51 │   │   if isinstance(self.workload, Path):                             │
+│   52 │   │   │   from simulon.config.resolve import resolve_workload         │
+│   53 │   │   │                                                               │
+│ ❱ 54 │   │   │   self.workload = resolve_workload(self.workload)             │
+│   55 │   │   return self                                                     │
+│   56 │                                                                       │
+│   57 │   @classmethod                                                        │
+│                                                                              │
+│ /gpfs/home6/tiberiui/simulon_validate/simulon/config/resolve.py:233 in       │
+│ resolve_workload                                                             │
+│                                                                              │
+│   230 │                                                                      │
+│   231 │   if isinstance(path_or_dict, Path | str):                           │
+│   232 │   │   source = Path(path_or_dict) if isinstance(path_or_dict, str) e │
+│ ❱ 233 │   │   with open(source) as f:                                        │
+│   234 │   │   │   data = yaml.safe_load(f)                                   │
+│   235 │   │   source_file = source                                           │
+│   236 │   else:                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+FileNotFoundError: [Errno 2] No such file or directory: 
+'experiments/validate_e2e/qwen3-30b/workload.yaml'
