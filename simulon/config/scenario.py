@@ -48,11 +48,7 @@ class ScenarioConfig(BaseModel):
             self.datacenter = resolve_datacenter(self.datacenter)
             if self.datacenter.node and self.datacenter.node.from_:
                 self.datacenter.node = resolve_node_spec(self.datacenter)
-        if (
-            isinstance(self.workload, Path)
-            or isinstance(self.workload, dict)
-            and "from" in self.workload
-        ):
+        if isinstance(self.workload, Path | dict):
             from simulon.config.resolve import resolve_workload
 
             self.workload = resolve_workload(self.workload)
