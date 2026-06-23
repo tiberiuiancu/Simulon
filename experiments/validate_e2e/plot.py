@@ -89,6 +89,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
         if df is None:
             print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
             sys.exit(1)
+        df["model"] = df["model"].map(_short_label_for_e2e)
     else:
         models = _find_models(base_dir)
         if not models:
@@ -105,7 +106,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             sim_metrics = None
             if trackers:
                 for tracker in trackers:
-                    sim_metrics = tracker.pull_metrics(run_name_prefix=f"validate-e2e-{model}")
+                    sim_metrics = tracker.pull_metrics(run_name=f"validate-e2e-{model}")
                     if sim_metrics is not None:
                         break
 
