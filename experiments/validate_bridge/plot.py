@@ -74,7 +74,7 @@ def _records_to_long(
 
 def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
     csv_path = base_dir / "results.csv"
-    metrics = [("tokens_per_sec", "Tokens / sec")]
+    metrics = [("throughput_tps", "Tokens / sec")]
 
     if use_csv:
         df = _load_csv(csv_path)
