@@ -38,9 +38,12 @@ def _extract_bw(run: dict[str, Any]) -> int:
 
 def _model_bw_from_run(run: dict[str, Any]) -> tuple[str, int]:
     name = run["display_name"]
-    m = re.match(r"link-bw-(.+)-bw(\d+)", name)
+    m = re.match(r"link-bw-(.+)-bw(\d+)(?:-overlap)?$", name)
     if m:
-        return m.group(1), int(m.group(2))
+        model = m.group(1)
+        if name.endswith("-overlap"):
+            model = f"{model}-overlap"
+        return model, int(m.group(2))
     parts = name.split("-")
     if len(parts) >= 3:
         return "-".join(parts[2:]), _extract_bw(run)
