@@ -128,3 +128,25 @@ class WandbTracker(ExperimentTracker):
         except Exception as exc:
             logger.warning("Failed to fetch runs from W&B: %s", exc)
         return []
+
+    def has_run(self, run_name: str | None = None, workload_hash: str | None = None) -> bool:
+        """Return True if a finished W&B run matches the name and/or workload hash."""
+        try:
+            import wandb
+
+            entity = os.environ.get("WANDB_ENTITY")
+            project = os.environ.get("WANDB_PROJECT", "simulon")
+            api = wandb.Api()
+            filters: dict[str, object] = {"state": "finished"}
+            if run_name is not None:
+                filters["display_name"] = run_name
+            if workload_hash is not None:
+                filters["config.workload_hash"] = workload_hash
+            runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
+            for run in runs:
+                if run_name is not None and run.display_name != run_name:
+                    continue
+                return True
+        except Exception as exc:
+            logger.warning("Failed to check W&B run existence: %s", exc)
+        return False

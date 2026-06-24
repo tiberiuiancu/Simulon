@@ -63,7 +63,7 @@ for model in "${MODELS[@]}"; do
     fi
     echo "  SIMULATE: $model"
     log_file="$SCRIPT_DIR/logs/${model}.log"
-    WANDB_RUN_NAME="validate-e2e-${model}" uv run simulon simulate "$scenario" --energy --chrome-compact --chrome "output/validate-e2e-${model}" > "$log_file" 2>&1 &
+    WANDB_RUN_NAME="validate-e2e-${model}" uv run simulon simulate "$scenario" --skip-if-tracked --energy --chrome-compact --chrome "output/validate-e2e-${model}" > "$log_file" 2>&1 &
     PIDS+=($!)
 done
 

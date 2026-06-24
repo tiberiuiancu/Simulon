@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import typer
@@ -50,6 +51,11 @@ def simulate(
     no_tracking: bool = typer.Option(
         False, "--no-tracking", help="Disable experiment tracking (W&B, MLflow)"
     ),
+    skip_if_tracked: bool = typer.Option(
+        False,
+        "--skip-if-tracked",
+        help="Skip simulation if a finished tracked run with the same name/hash already exists",
+    ),
 ):
     """Run simulation and print an iteration summary.
 
@@ -62,6 +68,25 @@ def simulate(
     with open(scenario) as f:
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.from_yaml(scenario)
+
+    if skip_if_tracked and trackers:
+        from simulon.config.resolve import resolve_gpu_spec
+
+        try:
+            gpu_spec = resolve_gpu_spec(sc.datacenter)
+        except Exception:
+            gpu_spec = None
+        try:
+            workload_hash_value = workload_hash(sc.workload)
+        except Exception:
+            workload_hash_value = None
+        run_name = os.environ.get("WANDB_RUN_NAME") or os.environ.get("MLFLOW_RUN_NAME")
+        for tracker in trackers:
+            if tracker.has_run(run_name=run_name, workload_hash=workload_hash_value):
+                typer.echo(
+                    f"Skipping {scenario}: tracked run already exists (run_name={run_name}, workload_hash={workload_hash_value})."
+                )
+                return
 
     if trace and isinstance(sc.workload, MegatronWorkload):
         from simulon.cli.trace import generate_trace

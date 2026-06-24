@@ -49,6 +49,10 @@ class ExperimentTracker(ABC):
         """
         return []
 
+    def has_run(self, run_name: str | None = None, workload_hash: str | None = None) -> bool:
+        """Return True if a finished run matching *run_name* and/or *workload_hash* exists."""
+        return False
+
     def __enter__(self) -> ExperimentTracker:
         self.start_run()
         return self
