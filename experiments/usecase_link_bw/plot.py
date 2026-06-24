@@ -141,7 +141,8 @@ def plot_mfu_from_wandb(
         ax.set_title("MFU by Link Bandwidth", fontweight="bold")
         y_max = float(df["mfu_pct"].max())
         ax.set_ylim(0, min(100, y_max * 1.15))
-        ax.set_yticks(range(0, int(min(100, y_max * 1.15)) + 1, 10))
+        ax.set_yticks([0, 20, 40, 60])
+        ax.set_yticks(range(0, int(min(100, y_max * 1.15)) + 1, 10), minor=True)
         ax.legend(
             title="NIC speed",
             loc="upper center",
