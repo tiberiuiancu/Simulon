@@ -146,7 +146,7 @@ def plot_mfu_from_wandb(
         ax.legend(
             title="NIC speed",
             loc="upper center",
-            bbox_to_anchor=(0.5, -0.32),
+            bbox_to_anchor=(0.5, -0.30),
             ncol=max(1, len(order)),
             frameon=False,
             handlelength=1.2,
@@ -202,7 +202,7 @@ def plot_mfu_from_wandb(
         ax.legend(
             title="",
             loc="upper center",
-            bbox_to_anchor=(0.5, -0.32),
+            bbox_to_anchor=(0.5, -0.30),
             ncol=max(1, len(models)),
             frameon=False,
             handlelength=1.2,

@@ -151,7 +151,7 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
     ax.legend(
         title="Node config",
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.28),
+        bbox_to_anchor=(0.5, -0.30),
         ncol=max(1, len(order)),
         frameon=False,
         handlelength=1.2,
