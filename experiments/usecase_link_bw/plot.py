@@ -116,7 +116,7 @@ def plot_mfu_from_wandb(
         sys.exit(1)
 
     setup_latex_style()
-    fig, ax = plt.subplots(figsize=(3.5, 2.0))
+    fig, ax = plt.subplots(figsize=(3.5, 2.2))
     df["model_label"] = df["model"].map(label_for_model)
     models = sorted(str(x) for x in df["model_label"].unique())
 
@@ -133,7 +133,7 @@ def plot_mfu_from_wandb(
             order=models,
             hue_order=order,
             palette="deep",
-            width=0.9,
+            width=0.75,
             ax=ax,
         )
         ax.set_ylabel("MFU (%)")

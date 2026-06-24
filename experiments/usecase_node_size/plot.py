@@ -111,7 +111,7 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
         sys.exit(1)
 
     setup_latex_style()
-    fig, ax = plt.subplots(figsize=(3.5, 2.0))
+    fig, ax = plt.subplots(figsize=(3.5, 2.2))
 
     df["model_label"] = df["model"].map(label_for_model)
     order = sorted(str(x) for x in df["node_size"].unique())
@@ -124,6 +124,7 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
         order=models,
         hue_order=order,
         palette="deep",
+        width=0.75,
         ax=ax,
     )
 
