@@ -46,6 +46,8 @@ def label_for_model(raw_name: str) -> str:
         "qwen3-30b": "Qwen3 30B\nA3B",
         "qwen3-30b-overlap": "Qwen3 30B\nA3B",
         "qwen3-235b": "Qwen3 235B\nA22B",
+        "deepseekv3": "DeepSeek-V3",
+        "deepseekv3-overlap": "DeepSeek-V3\n(overlap)",
     }
     return labels.get(raw_name, raw_name.replace("-", " "))
 

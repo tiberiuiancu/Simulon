@@ -18,6 +18,9 @@ import seaborn as sns
 
 from simulon.tracking import get_trackers
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from _plot_utils import label_for_model, setup_latex_style
+
 
 def _find_scenarios(base_dir: Path) -> list[Path]:
     return sorted(base_dir.rglob("scenario*.yaml"))
@@ -90,13 +93,14 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
 
         if records:
             df = pd.DataFrame(records)
-            _save_csv(df, csv_path)
         else:
             print("No wandb data found; falling back to local CSV.", file=sys.stderr)
             df = _load_csv(csv_path)
             if df is None:
                 print("No cached results.csv available. Exiting.", file=sys.stderr)
                 sys.exit(1)
+
+    _save_csv(df, csv_path)
 
     required_cols = {"model", "node_size", "mfu_pct"}
     if not required_cols.issubset(df.columns):
@@ -105,16 +109,19 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
             file=sys.stderr,
         )
         sys.exit(1)
-    sns.set_theme(style="whitegrid")
-    fig, ax = plt.subplots(figsize=(8, 5))
 
-    order = sorted(df["node_size"].unique())
+    setup_latex_style()
+    fig, ax = plt.subplots(figsize=(3.5, 2.0))
+
+    df["model_label"] = df["model"].map(label_for_model)
+    order = sorted(str(x) for x in df["node_size"].unique())
+    models = sorted(str(x) for x in df["model_label"].unique())
     sns.barplot(
         data=df,
-        x="model",
+        x="model_label",
         y="mfu_pct",
         hue="node_size",
-        order=sorted(df["model"].unique()),
+        order=models,
         hue_order=order,
         palette="deep",
         ax=ax,
@@ -122,13 +129,70 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
 
     ax.set_ylabel("MFU (%)")
     ax.set_xlabel("")
-    ax.set_title("MFU by Node Size", fontsize=14, fontweight="bold")
-    ax.legend(title="Node config", loc="upper left")
-    sns.despine(fig=fig, top=True, right=True)
-    fig.tight_layout()
+    ax.set_title("MFU by Node Size", fontweight="bold")
+    ax.legend(
+        title="Node config",
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.28),
+        ncol=max(1, len(order)),
+        frameon=False,
+        handlelength=1.2,
+        handletextpad=0.4,
+        columnspacing=1.0,
+    )
+    ax.tick_params(axis="x", rotation=0)
+    sns.despine(ax=ax, top=True, right=True)
+
+    # Add percentage-difference labels above the second (non-baseline) bar in each group.
+    y_max = float(df["mfu_pct"].max())
+    baseline_label = order[0] if order else None
+    x_by_label = {
+        label.get_text(): float(pos)
+        for label, pos in zip(ax.get_xticklabels(), ax.get_xticks(), strict=False)
+    }
+    if baseline_label is not None and len(order) > 1:
+        baseline_by_model = {
+            model: float(
+                df.loc[
+                    (df["model_label"] == model) & (df["node_size"] == baseline_label), "mfu_pct"
+                ].values[0]
+            )
+            for model in models
+            if len(
+                df.loc[
+                    (df["model_label"] == model) & (df["node_size"] == baseline_label), "mfu_pct"
+                ]
+            )
+            > 0
+        }
+        for model_name in models:
+            x = x_by_label.get(model_name)
+            baseline = baseline_by_model.get(model_name)
+            if x is None or baseline is None or baseline == 0:
+                continue
+            for node_size_label in order[1:]:
+                subset = df.loc[
+                    (df["model_label"] == model_name) & (df["node_size"] == node_size_label),
+                    "mfu_pct",
+                ]
+                if len(subset) == 0:
+                    continue
+                value = float(subset.values[0])
+                pct = (value - baseline) / baseline * 100
+                ax.text(
+                    x,
+                    value + 0.02 * y_max,
+                    f"{pct:+.1f}%",
+                    ha="center",
+                    va="bottom",
+                    fontsize=6,
+                    color="red",
+                )
+
+    fig.tight_layout(rect=(0, 0.05, 1, 1.02))
 
     if output:
-        fig.savefig(output, bbox_inches="tight", dpi=150)
+        fig.savefig(output, bbox_inches="tight", dpi=300)
         print(f"Saved plot to {output}")
     else:
         plt.show()

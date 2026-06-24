@@ -20,6 +20,9 @@ import seaborn as sns
 
 from simulon.tracking import get_trackers
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from _plot_utils import label_for_model, setup_latex_style
+
 
 def _extract_bw(run: dict[str, Any]) -> int:
     cfg = run.get("config", {})
@@ -92,13 +95,14 @@ def plot_mfu_from_wandb(
                     )
         if records:
             df = pd.DataFrame(records)
-            _save_csv(df, csv_path)
         else:
             print("No wandb data found; falling back to local CSV.", file=sys.stderr)
             df = _load_csv(csv_path)
             if df is None:
                 print("No cached results.csv available. Exiting.", file=sys.stderr)
                 sys.exit(1)
+
+    _save_csv(df, csv_path)
 
     required_cols = {"model", "bw_gbps", "bw_label", "mfu_pct"}
     if not required_cols.issubset(df.columns):
@@ -107,52 +111,104 @@ def plot_mfu_from_wandb(
             file=sys.stderr,
         )
         sys.exit(1)
-    sns.set_theme(style="whitegrid")
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    setup_latex_style()
+    fig, ax = plt.subplots(figsize=(3.5, 2.0))
+    df["model_label"] = df["model"].map(label_for_model)
+    models = sorted(str(x) for x in df["model_label"].unique())
 
     if not line:
         order = sorted(
             df["bw_label"].unique(),
-            key=lambda s: int(s.split()[0]) if s.split()[0].isdigit() else 0,
+            key=lambda s: int(str(s).split()[0]) if str(s).split()[0].isdigit() else 0,
         )
         sns.barplot(
             data=df,
-            x="model",
+            x="model_label",
             y="mfu_pct",
             hue="bw_label",
-            order=sorted(df["model"].unique()),
+            order=models,
             hue_order=order,
             palette="deep",
+            width=0.9,
             ax=ax,
         )
         ax.set_ylabel("MFU (%)")
         ax.set_xlabel("")
-        ax.set_title("MFU by Link Bandwidth", fontsize=14, fontweight="bold")
-        ax.legend(title="NIC speed", loc="upper left")
+        ax.set_title("MFU by Link Bandwidth", fontweight="bold")
+        ax.legend(
+            title="NIC speed",
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.32),
+            ncol=max(1, len(order)),
+            frameon=False,
+            handlelength=1.2,
+            handletextpad=0.4,
+            columnspacing=1.0,
+        )
         sns.despine(ax=ax, top=True, right=True)
 
+        # Annotate each non-baseline bar with its percentage difference vs. 400 Gbps.
+        baseline_label = "400 Gbps" if "400 Gbps" in order else (order[0] if order else None)
+        if baseline_label is not None and len(ax.containers) == len(order):
+            baseline_idx = order.index(baseline_label)
+            baseline_container = ax.containers[baseline_idx]
+            for idx, _model_name in enumerate(models):
+                baseline_bar = baseline_container[idx]
+                baseline = float(baseline_bar.get_height())
+                if baseline == 0:
+                    continue
+                for hidx, bw_label in enumerate(order):
+                    if bw_label == baseline_label:
+                        continue
+                    bar = ax.containers[hidx][idx]
+                    value = float(bar.get_height())
+                    pct = (value - baseline) / baseline * 100
+                    x = float(bar.get_x() + bar.get_width() / 2)
+                    y = float(bar.get_y() + bar.get_height())
+                    ax.text(
+                        x,
+                        y + 0.02 * y if y != 0 else 0.02,
+                        f"{pct:+.1f}%",
+                        ha="center",
+                        va="bottom",
+                        fontsize=4,
+                        color="red",
+                    )
+
     else:
-        for model_name in sorted(df["model"].unique()):
-            sub = df[df["model"] == model_name].sort_values(["bw_gbps"])
+        for model_name in models:
+            sub = df.loc[df["model_label"] == model_name, ["bw_gbps", "mfu_pct"]].sort_values(
+                "bw_gbps"
+            )
             ax.plot(
-                sub["bw_gbps"],
-                sub["mfu_pct"],
+                sub["bw_gbps"].to_numpy(),
+                sub["mfu_pct"].to_numpy(),
                 marker="o",
                 label=model_name,
-                linewidth=2,
-                markersize=8,
+                linewidth=1.2,
+                markersize=4,
             )
         ax.set_xlabel("Link bandwidth (Gbps)")
         ax.set_ylabel("MFU (%)")
-        ax.set_title("MFU vs Link Bandwidth", fontsize=14, fontweight="bold")
-        ax.legend(title="Model", loc="upper left")
+        ax.set_title("MFU vs Link Bandwidth", fontweight="bold")
+        ax.legend(
+            title="",
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.32),
+            ncol=max(1, len(models)),
+            frameon=False,
+            handlelength=1.2,
+            handletextpad=0.4,
+            columnspacing=1.0,
+        )
         sns.despine(ax=ax, top=True, right=True)
 
-    fig.tight_layout()
+    ax.tick_params(axis="x", rotation=0)
+    fig.tight_layout(rect=(0, 0.05, 1, 1.02))
 
     if output:
-        fig.savefig(output, bbox_inches="tight", dpi=150)
+        fig.savefig(output, bbox_inches="tight", dpi=300)
         print(f"Saved plot to {output}")
     else:
         plt.show()
