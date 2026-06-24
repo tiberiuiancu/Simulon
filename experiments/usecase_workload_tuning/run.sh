@@ -7,9 +7,10 @@
 #SBATCH --error=%x-%j.err
 
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="${SLURM_SUBMIT_DIR:-$(pwd)}"
 cd "$REPO_ROOT"
+
+SCRIPT_DIR="$REPO_ROOT/experiments/usecase_workload_tuning"
 
 export PYTHONUNBUFFERED=1
 
