@@ -31,7 +31,16 @@ def _model_from_scenario(path: Path) -> str:
 
 
 def _node_size_from_scenario(path: Path) -> int:
-    return int(path.stem.replace("scenario", ""))
+    stem = path.stem.replace("scenario", "").replace("_overlap", "")
+    return int(stem)
+
+
+def _model_from_scenario(path: Path) -> str:
+    return path.parent.name
+
+
+def _is_overlap_scenario(path: Path) -> bool:
+    return path.stem.endswith("_overlap")
 
 
 def _load_csv(csv_path: Path) -> pd.DataFrame | None:
@@ -71,8 +80,12 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
         for sc_path in scenarios:
             model = _model_from_scenario(sc_path)
             node_size = _node_size_from_scenario(sc_path)
-            # The run script sets WANDB_RUN_NAME="node-size-{model}-node{size}"
+            overlap = _is_overlap_scenario(sc_path)
+            # The run script sets WANDB_RUN_NAME="node-size-{model}-node{size}[-overlap]"
             run_prefix = f"node-size-{model}-node{node_size}"
+            if overlap:
+                run_prefix = f"{run_prefix}-overlap"
+                model = f"{model}-overlap"
 
             mfu: float | None = None
             if trackers:

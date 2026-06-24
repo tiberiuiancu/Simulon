@@ -19,6 +19,8 @@ cleanup() {
 trap cleanup INT TERM
 
 MODELS=(deepseekv3 gptoss-120b llama3-70b)
+OVERLAP_MODELS=(deepseekv3)
+OVERLAP_SIZES=(4 8)
 
 set +e
 for model in "${MODELS[@]}"; do
@@ -38,6 +40,11 @@ for model in "${MODELS[@]}"; do
         TOTAL=$((TOTAL + 1))
     done
 done
+for model in "${OVERLAP_MODELS[@]}"; do
+    for size in "${OVERLAP_SIZES[@]}"; do
+        TOTAL=$((TOTAL + 1))
+    done
+done
 
 echo "Starting $TOTAL simulations in parallel (logs: $SCRIPT_DIR/logs/) ..."
 
@@ -46,6 +53,16 @@ for model in "${MODELS[@]}"; do
     for size in 4 8; do
         scenario="$SCRIPT_DIR/$model/scenario${size}.yaml"
         name="${model}-node${size}"
+        echo "  SIMULATE: $name"
+        log_file="$SCRIPT_DIR/logs/${name}.log"
+        WANDB_RUN_NAME="node-size-${name}" uv run simulon simulate "$scenario" --skip-if-tracked --energy --chrome-compact --chrome "output/trace-node-size-${name}" > "$log_file" 2>&1 &
+        PIDS+=($!)
+    done
+done
+for model in "${OVERLAP_MODELS[@]}"; do
+    for size in "${OVERLAP_SIZES[@]}"; do
+        scenario="$SCRIPT_DIR/$model/scenario${size}_overlap.yaml"
+        name="${model}-node${size}-overlap"
         echo "  SIMULATE: $name"
         log_file="$SCRIPT_DIR/logs/${name}.log"
         WANDB_RUN_NAME="node-size-${name}" uv run simulon simulate "$scenario" --skip-if-tracked --energy --chrome-compact --chrome "output/trace-node-size-${name}" > "$log_file" 2>&1 &
