@@ -10,6 +10,7 @@ Usage (from repo root):
 from __future__ import annotations
 
 import contextlib
+import os
 import shutil
 import subprocess
 from argparse import ArgumentParser
@@ -105,29 +106,41 @@ def _run_trace(path: Path) -> bool:
         str(trace_dir),
         "--force-regenerate",
     ]
+    print(f"Tracing {path.name} ...")  # noqa: T201
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return True
     except subprocess.CalledProcessError as exc:
         if "CUDA out of memory" in (exc.stderr or "") or "OutOfMemoryError" in (exc.stderr or ""):
             oom_file.write_text(exc.stderr or "")
+            print(f"  OOM: wrote {oom_file}")  # noqa: T201
             return False
         oom_file.write_text(exc.stderr or f"exit code {exc.returncode}")
+        print(f"  Trace failed: {path.name} (exit {exc.returncode})")  # noqa: T201
         return False
 
 
 def _run_simulate(path: Path) -> dict[str, Any] | None:
     scenario = path / "scenario.yaml"
-    cmd = ["uv", "run", "simulon", "simulate", str(scenario), "--skip-if-tracked", "--no-tracking"]
+    name = path.name
+    cmd = [
+        "uv",
+        "run",
+        "simulon",
+        "simulate",
+        str(scenario),
+        "--skip-if-tracked",
+    ]
+    env = os.environ.copy()
+    env["WANDB_RUN_NAME"] = f"usecase-workload-tuning-{name}"
+    print(f"Simulating {name} ...")  # noqa: T201
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
         metrics: dict[str, Any] = {}
         for line in result.stdout.splitlines():
             if "tokens/s" in line and "(" in line:
                 with contextlib.suppress(Exception):
-                    metrics["throughput_tps"] = float(
-                        line.split("(")[-1].split()[0].replace(",", "")
-                    )
+                    metrics["throughput_tps"] = float(line.split("(")[-1].split()[0].replace(",", ""))
             if "MFU:" in line:
                 with contextlib.suppress(Exception):
                     metrics["mfu_pct"] = float(line.split("MFU:")[-1].replace("%", "").strip())
@@ -135,8 +148,10 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
                 with contextlib.suppress(Exception):
                     metrics["iteration_time_ms"] = float(line.split("ms")[0].split()[-1])
         return metrics
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
+        print(f"  Simulation failed: {name} (exit {exc.returncode})")  # noqa: T201
         return None
+
 
 
 def _grid() -> list[tuple[int, int, int, int | None]]:
