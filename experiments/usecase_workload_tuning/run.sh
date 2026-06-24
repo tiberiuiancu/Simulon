@@ -14,7 +14,5 @@ cd "$REPO_ROOT"
 mkdir -p "$SCRIPT_DIR/logs"
 
 export PYTHONUNBUFFERED=1
-export WANDB_API_KEY="${WANDB_API_KEY:-}"
-export WANDB_PROJECT="${WANDB_PROJECT:-simulon}"
 
 uv run python "$SCRIPT_DIR/grid_search.py"
