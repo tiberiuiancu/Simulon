@@ -130,6 +130,9 @@ def plot_mfu_from_wandb(output: Path | None, base_dir: Path, use_csv: bool = Fal
     ax.set_ylabel("MFU (%)")
     ax.set_xlabel("")
     ax.set_title("MFU by Node Size", fontweight="bold")
+    y_max = float(df["mfu_pct"].max())
+    ax.set_ylim(0, min(100, y_max * 1.15))
+    ax.set_yticks(range(0, int(min(100, y_max * 1.15)) + 1, 10))
     ax.legend(
         title="Node config",
         loc="upper center",
