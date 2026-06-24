@@ -66,6 +66,18 @@ def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
     print(f"Saved results to {csv_path}")
 
 
+def _merge_link_bw_frames(cached_df: pd.DataFrame, fresh_df: pd.DataFrame) -> pd.DataFrame:
+    """Merge cached CSV with fresh W&B records, preferring fresh values by model+bw_label."""
+    df = cached_df.copy()
+    for _, row in fresh_df.iterrows():
+        mask = (df["model"] == row["model"]) & (df["bw_label"] == row["bw_label"])
+        if mask.any():
+            df.loc[mask, "mfu_pct"] = row["mfu_pct"]
+        else:
+            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+    return df
+
+
 def plot_mfu_from_wandb(
     output: Path | None, base_dir: Path, line: bool = False, use_csv: bool = False
 ) -> None:
@@ -96,14 +108,17 @@ def plot_mfu_from_wandb(
                             "mfu_pct": float(mfu),
                         }
                     )
+
+        cached_df = _load_csv(csv_path)
         if records:
-            df = pd.DataFrame(records)
-        else:
+            fresh_df = pd.DataFrame(records)
+            df = _merge_link_bw_frames(cached_df, fresh_df) if cached_df is not None else fresh_df
+        elif cached_df is not None:
             print("No wandb data found; falling back to local CSV.", file=sys.stderr)
-            df = _load_csv(csv_path)
-            if df is None:
-                print("No cached results.csv available. Exiting.", file=sys.stderr)
-                sys.exit(1)
+            df = cached_df
+        else:
+            print("No wandb data and no cached results.csv available. Exiting.", file=sys.stderr)
+            sys.exit(1)
 
     _save_csv(df, csv_path)
 
