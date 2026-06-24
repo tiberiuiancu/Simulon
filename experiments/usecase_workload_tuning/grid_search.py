@@ -10,6 +10,7 @@ Usage (from repo root):
 from __future__ import annotations
 
 import contextlib
+import csv
 import os
 import shutil
 import subprocess
@@ -22,15 +23,13 @@ import yaml
 _BASE_DIR = Path(__file__).parent
 _SCENARIOS_DIR = _BASE_DIR / "scenarios"
 _BASE_WORKLOAD = _SCENARIOS_DIR / "base_workload.yaml"
-_BASE_SCENARIO = _SCENARIOS_DIR / "base_scenario.yaml"
 _NUM_LAYERS = 64
 _NUM_GPUS = 16
 _GBS = 1024
 
 
 def _divisors(n: int) -> list[int]:
-    divs = [i for i in range(1, n + 1) if n % i == 0]
-    return sorted(divs)
+    return sorted(i for i in range(1, n + 1) if n % i == 0)
 
 
 def _mbs_values() -> list[int]:
@@ -86,14 +85,33 @@ def _trace_dir(path: Path) -> Path:
     return path / "traces"
 
 
-def _run_trace(path: Path) -> bool:
+def _workload_hash(path: Path) -> str:
+    from simulon.config.resolve import resolve_workload, workload_hash
+
+    try:
+        wl = resolve_workload(str(path / "workload.yaml"))
+        return workload_hash(wl)[:12]
+    except Exception:
+        return "unknown"
+
+
+def _trace_status(path: Path) -> str:
+    trace_dir = _trace_dir(path)
+    if (trace_dir / ".OOM").exists():
+        return "OOM"
+    if any(trace_dir.glob("trace_rank_*.json")):
+        return "traced"
+    return "pending"
+
+
+def _run_trace(path: Path) -> str:
     trace_dir = _trace_dir(path)
     trace_dir.mkdir(parents=True, exist_ok=True)
     oom_file = trace_dir / ".OOM"
     if oom_file.exists():
-        return False
+        return "OOM"
     if any(trace_dir.glob("trace_rank_*.json")):
-        return True
+        return "traced"
     scenario = path / "scenario.yaml"
     cmd = [
         "uv",
@@ -106,18 +124,13 @@ def _run_trace(path: Path) -> bool:
         str(trace_dir),
         "--force-regenerate",
     ]
-    print(f"Tracing {path.name} ...")  # noqa: T201
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
-        return True
-    except subprocess.CalledProcessError as exc:
-        if "CUDA out of memory" in (exc.stderr or "") or "OutOfMemoryError" in (exc.stderr or ""):
-            oom_file.write_text(exc.stderr or "")
-            print(f"  OOM: wrote {oom_file}")  # noqa: T201
-            return False
-        oom_file.write_text(exc.stderr or f"exit code {exc.returncode}")
-        print(f"  Trace failed: {path.name} (exit {exc.returncode})")  # noqa: T201
-        return False
+        return "traced"
+    except subprocess.CalledProcessError:
+        if oom_file.exists():
+            return "OOM"
+        return "error"
 
 
 def _run_simulate(path: Path) -> dict[str, Any] | None:
@@ -133,7 +146,6 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
     ]
     env = os.environ.copy()
     env["WANDB_RUN_NAME"] = f"usecase-workload-tuning-{name}"
-    print(f"Simulating {name} ...")  # noqa: T201
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
         metrics: dict[str, Any] = {}
@@ -148,10 +160,8 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
                 with contextlib.suppress(Exception):
                     metrics["iteration_time_ms"] = float(line.split("ms")[0].split()[-1])
         return metrics
-    except subprocess.CalledProcessError as exc:
-        print(f"  Simulation failed: {name} (exit {exc.returncode})")  # noqa: T201
+    except subprocess.CalledProcessError:
         return None
-
 
 
 def _grid() -> list[tuple[int, int, int, int | None]]:
@@ -182,6 +192,52 @@ def _generate_configs() -> list[Path]:
     return paths
 
 
+def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
+    from rich.console import Console
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        TextColumn,
+        TimeRemainingColumn,
+    )
+
+    console = Console()
+    results: list[dict[str, Any]] = []
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Workload tuning sweep", total=len(paths))
+        for path in paths:
+            name = path.name
+            trace_hash = _workload_hash(path)
+            status = _trace_status(path)
+            if status in ("OOM", "traced"):
+                message = f"{name}: {status} (traces at {trace_hash})"
+            else:
+                trace_status = _run_trace(path)
+                message = f"{name}: {trace_status} (traces at {trace_hash})"
+            if trace_status == "OOM":
+                results.append({"name": name, "oom": True})
+            elif trace_status == "error":
+                results.append({"name": name, "error": True})
+            elif trace_only:
+                results.append({"name": name, "oom": False, "simulated": False})
+            else:
+                metrics = _run_simulate(path)
+                row: dict[str, Any] = {"name": name, "oom": False, "simulated": metrics is not None}
+                if metrics:
+                    row.update(metrics)
+                results.append(row)
+            console.log(message)
+            progress.advance(task)
+    return results
+
+
 def main() -> None:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -210,24 +266,9 @@ def main() -> None:
             pass
         return
 
-    results: list[dict[str, Any]] = []
-    for path in paths:
-        oom = not _run_trace(path)
-        if oom:
-            results.append({"name": path.name, "oom": True})
-            continue
-        if args.trace_only:
-            results.append({"name": path.name, "oom": False, "simulated": False})
-            continue
-        metrics = _run_simulate(path)
-        row: dict[str, Any] = {"name": path.name, "oom": False, "simulated": metrics is not None}
-        if metrics:
-            row.update(metrics)
-        results.append(row)
+    results = _sweep(paths, trace_only=args.trace_only)
 
     csv_path = _BASE_DIR / "results.csv"
-    import csv
-
     if results:
         fieldnames = sorted({k for r in results for k in r})
         with open(csv_path, "w", newline="") as f:
