@@ -90,11 +90,14 @@ def _pull_energy_metrics(base_dir: Path) -> pd.DataFrame:
                     continue
                 if "node8" not in name:
                     continue
+                tokens_per_iter = _tokens_per_iteration(_workload_for_model(model))
+                if tokens_per_iter <= 0:
+                    continue
                 records.append(
                     {
                         "model": model,
-                        "energy_per_token_wh": float(energy_wh) / float(throughput_tps),
-                        "co2_per_token_g": float(co2eq_g or 0.0) / float(throughput_tps),
+                        "energy_per_token_wh": float(energy_wh) / tokens_per_iter,
+                        "co2_per_token_g": float(co2eq_g or 0.0) / tokens_per_iter,
                     }
                 )
 
@@ -111,6 +114,23 @@ def _pull_energy_metrics(base_dir: Path) -> pd.DataFrame:
 
     _save_csv(df, csv_path)
     return df
+
+
+def _tokens_per_iteration(workload_path: Path) -> int:
+    if not workload_path.exists():
+        return 0
+    try:
+        import yaml
+
+        data = yaml.safe_load(workload_path.read_text())
+        cfg = data.get("config", data) if isinstance(data, dict) else {}
+        return int(cfg.get("global-batch-size", 0)) * int(cfg.get("seq-length", 0))
+    except Exception:
+        return 0
+
+
+def _workload_for_model(model: str) -> Path:
+    return Path(__file__).parent.parent / "usecase_node_size" / model / "workload.yaml"
 
 
 def _merge_frames(cached_df: pd.DataFrame, fresh_df: pd.DataFrame) -> pd.DataFrame:
