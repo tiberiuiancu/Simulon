@@ -118,23 +118,41 @@ def _trace_status(path: Path) -> str:
     return "pending"
 
 
-def _run_trace(path: Path) -> str:
+def _run_trace(path: Path) -> tuple[str, str]:
     trace_dir = _default_trace_dir(path)
     trace_dir.mkdir(parents=True, exist_ok=True)
     oom_file = trace_dir / ".OOM"
     if oom_file.exists():
-        return "OOM"
+        return "OOM", "pre-existing .OOM marker"
     if any(trace_dir.glob("trace_rank_*.json")):
-        return "traced"
+        return "traced", "trace files already present"
     scenario = path / "scenario.yaml"
     cmd = ["simulon", "trace", "generate", str(scenario), "--force-regenerate"]
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
-        return "traced"
-    except subprocess.CalledProcessError:
-        if oom_file.exists():
-            return "OOM"
-        return "error"
+        return "traced", ""
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").lower()
+        stdout = (exc.stdout or "").lower()
+        combined = stdout + "\n" + stderr
+        oom_keywords = (
+            "out of memory",
+            "out-of-memory",
+            "cuda oom",
+            "runtimeerror: cuda",
+            "torch.cuda.outofmemoryerror",
+        )
+        is_oom = oom_file.exists() or any(kw in combined for kw in oom_keywords)
+        if is_oom:
+            if not oom_file.exists():
+                with contextlib.suppress(Exception):
+                    oom_file.write_text(f"returncode={exc.returncode}\n{exc.stderr or ''}")
+            return "OOM", f"Megatron OOM (return code {exc.returncode})"
+
+        return (
+            "error",
+            f"non-OOM error (return code {exc.returncode}): {(exc.stderr or '').strip()[:200]}",
+        )
 
 
 def _run_simulate(path: Path) -> dict[str, Any] | None:
@@ -215,16 +233,17 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
             name = path.name
             trace_hash = _workload_hash(path)
             status = _trace_status(path)
+            trace_detail = ""
             if status in ("OOM", "traced"):
                 trace_status = status
-                message = f"{name}: {trace_status} (traces at {trace_hash})"
+                trace_detail = status
             else:
-                trace_status = _run_trace(path)
-                message = f"{name}: {trace_status} (traces at {trace_hash})"
+                trace_status, trace_detail = _run_trace(path)
+            message = f"{name}: {trace_status} (traces at {trace_hash}) - {trace_detail}"
             if trace_status == "OOM":
                 results.append({"name": name, "oom": True})
             elif trace_status == "error":
-                results.append({"name": name, "error": True})
+                results.append({"name": name, "error": True, "error_detail": trace_detail})
             elif trace_only:
                 results.append({"name": name, "oom": False, "simulated": False})
             else:
