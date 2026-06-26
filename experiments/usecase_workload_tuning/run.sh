@@ -9,9 +9,14 @@
 set -euo pipefail
 
 if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; then
-    SCRIPT_PATH_HOST="$(realpath "${BASH_SOURCE[0]}")"
-    REPO_ROOT_HOST="$(cd "$(dirname "$SCRIPT_PATH_HOST")/../.." && pwd)"
-    SCRIPT_PATH_CONTAINER="/opt/simulon${SCRIPT_PATH_HOST#$REPO_ROOT_HOST}"
+    if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+        REPO_ROOT_HOST="$SLURM_SUBMIT_DIR"
+    else
+        SCRIPT_PATH_HOST="$(realpath "${BASH_SOURCE[0]}")"
+        REPO_ROOT_HOST="$(cd "$(dirname "$SCRIPT_PATH_HOST")/../.." && pwd)"
+    fi
+    SCRIPT_PATH_CONTAINER="$REPO_ROOT_HOST/experiments/usecase_workload_tuning/run.sh"
+    SCRIPT_PATH_CONTAINER="/opt/simulon${SCRIPT_PATH_CONTAINER#$REPO_ROOT_HOST}"
     cd "$REPO_ROOT_HOST"
     apptainer run --nv \
         --bind "$REPO_ROOT_HOST/experiments:/opt/simulon/experiments" \
