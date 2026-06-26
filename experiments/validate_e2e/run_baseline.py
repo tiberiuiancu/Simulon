@@ -100,17 +100,7 @@ def _build_torchrun_cmd(
         derived_args["--wandb-exp-name"] = wandb_run_name
         derived_args["--wandb-save-dir"] = os.path.join(save_dir, "wandb")
 
-    master_addr = os.environ.get("MASTER_ADDR")
-    if not master_addr and os.environ.get("SLURM_JOB_NODELIST"):
-        result = subprocess.run(
-            ["scontrol", "show", "hostnames", os.environ["SLURM_JOB_NODELIST"]],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        master_addr = result.stdout.strip().splitlines()[0]
-    if not master_addr:
-        master_addr = "localhost"
+    master_addr = os.environ.get("MASTER_ADDR", "localhost")
     master_port = os.environ.get("MASTER_PORT", "6000")
 
     rdzv_id = os.environ.get("SLURM_JOB_ID", "baseline")

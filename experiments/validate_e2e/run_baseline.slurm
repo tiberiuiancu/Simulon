@@ -25,10 +25,18 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
         REPO_ROOT_HOST="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
     fi
     cd "$REPO_ROOT_HOST"
+
+    MASTER_PORT="${MASTER_PORT:-6000}"
+    if [ -n "${SLURM_JOB_NODELIST:-}" ] && command -v scontrol >/dev/null 2>&1; then
+        MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
+        export MASTER_ADDR
+    fi
+    export MASTER_PORT
+
     if [[ "$(basename "$INPUT_PATH")" == *"3nic"* ]] || [[ "$(basename "$INPUT_PATH")" == *"3NIC"* ]]; then
         export NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4"
     fi
-    apptainer exec --nv \
+    apptainer exec --nv \\
         --bind "$REPO_ROOT_HOST/experiments:/opt/simulon/experiments" \
         --bind "$REPO_ROOT_HOST/examples:/opt/simulon/examples" \
         --bind "$REPO_ROOT_HOST/vendor:/opt/simulon/vendor" \
