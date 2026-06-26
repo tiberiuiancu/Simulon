@@ -81,8 +81,22 @@ def _write_scenario(path: Path) -> None:
         yaml.dump(scenario, f, default_flow_style=False, sort_keys=False)
 
 
-def _trace_dir(path: Path) -> Path:
-    return path / "traces"
+def _default_trace_dir(path: Path) -> Path:
+    from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
+    from simulon.config.scenario import ScenarioConfig
+
+    try:
+        sc = ScenarioConfig.from_yaml(str(path / "scenario.yaml"))
+        gpu_spec = resolve_gpu_spec(sc.datacenter)
+        gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+    except Exception:
+        gpu_name = "default"
+    try:
+        wl = resolve_workload(str(path / "workload.yaml"))
+        h = workload_hash(wl)
+    except Exception:
+        h = "unknown"
+    return Path("templates/gpu") / gpu_name / "traces" / h
 
 
 def _workload_hash(path: Path) -> str:
@@ -96,7 +110,7 @@ def _workload_hash(path: Path) -> str:
 
 
 def _trace_status(path: Path) -> str:
-    trace_dir = _trace_dir(path)
+    trace_dir = _default_trace_dir(path)
     if (trace_dir / ".OOM").exists():
         return "OOM"
     if any(trace_dir.glob("trace_rank_*.json")):
@@ -105,7 +119,7 @@ def _trace_status(path: Path) -> str:
 
 
 def _run_trace(path: Path) -> str:
-    trace_dir = _trace_dir(path)
+    trace_dir = _default_trace_dir(path)
     trace_dir.mkdir(parents=True, exist_ok=True)
     oom_file = trace_dir / ".OOM"
     if oom_file.exists():
@@ -113,15 +127,7 @@ def _run_trace(path: Path) -> str:
     if any(trace_dir.glob("trace_rank_*.json")):
         return "traced"
     scenario = path / "scenario.yaml"
-    cmd = [
-        "simulon",
-        "trace",
-        "generate",
-        str(scenario),
-        "--output-dir",
-        str(trace_dir),
-        "--force-regenerate",
-    ]
+    cmd = ["simulon", "trace", "generate", str(scenario), "--force-regenerate"]
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return "traced"
@@ -210,7 +216,8 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
             trace_hash = _workload_hash(path)
             status = _trace_status(path)
             if status in ("OOM", "traced"):
-                message = f"{name}: {status} (traces at {trace_hash})"
+                trace_status = status
+                message = f"{name}: {trace_status} (traces at {trace_hash})"
             else:
                 trace_status = _run_trace(path)
                 message = f"{name}: {trace_status} (traces at {trace_hash})"
