@@ -15,6 +15,116 @@ _MEGATRON_ENTRYPOINT = (
 )
 
 
+_DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
+    "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
+    "c4": {
+        "--mock-data": False,
+        "--data-path": "./data/c4_en_llama3",
+        "--tokenizer-type": "HuggingFaceTokenizer",
+        "--tokenizer-model": "NousResearch/Meta-Llama-3-8B",
+        "--vocab-size": 128256,
+        "--split": "1000,0,0",
+    },
+}
+
+_TRACE_DEFAULTS: dict[str, str | int | bool] = {
+    "--lr": 0.001,
+    "--min-lr": 0.0,
+    "--eval-interval": 1000000,
+    "--eval-iters": 0,
+    "--save-interval": 1000000,
+    "--log-interval": 1,
+    "--mock-data": True,
+    "--no-masked-softmax-fusion": True,
+    "--no-bias-swiglu-fusion": True,
+    "--tokenizer-type": "NullTokenizer",
+    "--vocab-size": 32000,
+}
+
+
+def _build_megatron_args(
+    workload,
+    *,
+    dataset: str | None = None,
+    mock_data: bool | None = None,
+    data_path: str | None = None,
+    tokenizer_type: str | None = None,
+    tokenizer_model: str | None = None,
+    vocab_file: str | None = None,
+    merge_file: str | None = None,
+    warmup: int = 3,
+) -> tuple[dict[str, str | int | bool], set[str]]:
+    derived_args: dict[str, str | int | bool]
+    explicitly_set: set[str] = set()
+
+    def _set_arg(flag: str, value: str | int | bool) -> None:
+        derived_args[flag] = value
+        explicitly_set.add(flag)
+
+    cfg = workload.config
+    derived_args = {}
+    for key in (
+        "tensor-model-parallel-size",
+        "pipeline-model-parallel-size",
+        "micro-batch-size",
+        "global-batch-size",
+        "seq-length",
+        "expert-model-parallel-size",
+        "num-layers",
+        "hidden-size",
+        "num-attention-heads",
+        "ffn-hidden-size",
+    ):
+        if key in cfg:
+            _set_arg(f"--{key}", cfg[key])
+    if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
+        _set_arg("--max-position-embeddings", derived_args["--seq-length"])
+    skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
+    for key, value in cfg.items():
+        flag = "--use-distributed-optimizer" if key == "distributed-optimizer" else f"--{key}"
+        if flag not in derived_args and key not in skip:
+            if isinstance(value, bool):
+                _set_arg(flag, value)
+            else:
+                _set_arg(flag, value)
+
+    if dataset is not None:
+        if dataset in _DATASET_PRESETS:
+            for flag, value in _DATASET_PRESETS[dataset].items():
+                _set_arg(flag, value)
+        else:
+            _set_arg("--mock-data", False)
+            _set_arg("--data-path", dataset)
+    if mock_data is not None:
+        _set_arg("--mock-data", mock_data)
+    if data_path is not None:
+        _set_arg("--data-path", data_path)
+    if tokenizer_type is not None:
+        _set_arg("--tokenizer-type", tokenizer_type)
+    if tokenizer_model is not None:
+        _set_arg("--tokenizer-model", tokenizer_model)
+    if vocab_file is not None:
+        _set_arg("--vocab-file", vocab_file)
+    if merge_file is not None:
+        _set_arg("--merge-file", merge_file)
+
+    if dataset == "c4" or (data_path is not None and "c4" in data_path):
+        seq_len = derived_args.get("--seq-length", 8192)
+        _ensure_c4_dataset(
+            str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len)
+        )
+
+    for flag, value in _TRACE_DEFAULTS.items():
+        if flag not in explicitly_set:
+            derived_args[flag] = value
+    if "--train-iters" not in explicitly_set:
+        derived_args["--train-iters"] = warmup + 1
+    if "--trace-warmup-iters" not in explicitly_set:
+        derived_args["--trace-warmup-iters"] = warmup
+
+    return derived_args, explicitly_set
+
+
 @trace_app.command("generate")
 def generate_trace(
     scenario: str = typer.Argument(..., help="Path to scenario.yaml or workload.yaml"),
@@ -111,103 +221,23 @@ def generate_trace(
         h = workload_hash(workload)
         output_dir = Path("templates/gpu") / gpu_name / "traces" / h
 
-    derived_args: dict[str, str | int | bool]
-    explicitly_set: set[str] = set()
-
-    def _set_arg(flag: str, value: str | int | bool) -> None:
-        derived_args[flag] = value
-        explicitly_set.add(flag)
+    derived_args, explicitly_set = _build_megatron_args(
+        workload,
+        dataset=dataset,
+        mock_data=mock_data,
+        data_path=data_path,
+        tokenizer_type=tokenizer_type,
+        tokenizer_model=tokenizer_model,
+        vocab_file=vocab_file,
+        merge_file=merge_file,
+        warmup=warmup,
+    )
 
     cfg = workload.config
-    derived_args = {}
-    for key in (
-        "tensor-model-parallel-size",
-        "pipeline-model-parallel-size",
-        "micro-batch-size",
-        "global-batch-size",
-        "seq-length",
-        "expert-model-parallel-size",
-        "num-layers",
-        "hidden-size",
-        "num-attention-heads",
-        "ffn-hidden-size",
-    ):
-        if key in cfg:
-            _set_arg(f"--{key}", cfg[key])
-    if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
-        _set_arg("--max-position-embeddings", derived_args["--seq-length"])
-    skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
-    for key, value in cfg.items():
-        flag = "--use-distributed-optimizer" if key == "distributed-optimizer" else f"--{key}"
-        if flag not in derived_args and key not in skip:
-            if isinstance(value, bool):
-                _set_arg(flag, value)
-            else:
-                _set_arg(flag, value)
-
     pp = int(cfg.get("pipeline-model-parallel-size", 1))
     tp = int(cfg.get("tensor-model-parallel-size", 1))
     ep = int(cfg.get("expert-model-parallel-size", 1))
     world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
-
-    _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
-        "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
-        "c4": {
-            "--mock-data": False,
-            "--data-path": "./data/c4_en_llama3",
-            "--tokenizer-type": "HuggingFaceTokenizer",
-            "--tokenizer-model": "NousResearch/Meta-Llama-3-8B",
-            "--vocab-size": 128256,
-            "--split": "1000,0,0",
-        },
-    }
-    if dataset is not None:
-        if dataset in _DATASET_PRESETS:
-            for flag, value in _DATASET_PRESETS[dataset].items():
-                _set_arg(flag, value)
-        else:
-            _set_arg("--mock-data", False)
-            _set_arg("--data-path", dataset)
-    if mock_data is not None:
-        _set_arg("--mock-data", mock_data)
-    if data_path is not None:
-        _set_arg("--data-path", data_path)
-    if tokenizer_type is not None:
-        _set_arg("--tokenizer-type", tokenizer_type)
-    if tokenizer_model is not None:
-        _set_arg("--tokenizer-model", tokenizer_model)
-    if vocab_file is not None:
-        _set_arg("--vocab-file", vocab_file)
-    if merge_file is not None:
-        _set_arg("--merge-file", merge_file)
-
-    if dataset == "c4" or (data_path is not None and "c4" in data_path):
-        seq_len = derived_args.get("--seq-length", 8192)
-        _ensure_c4_dataset(
-            str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len)
-        )
-
-    _TRACE_DEFAULTS = {
-        "--lr": 0.001,
-        "--min-lr": 0.0,
-        "--eval-interval": 1000000,
-        "--eval-iters": 0,
-        "--save-interval": 1000000,
-        "--log-interval": 1,
-        "--mock-data": True,
-        "--no-masked-softmax-fusion": True,
-        "--no-bias-swiglu-fusion": True,
-        "--tokenizer-type": "NullTokenizer",
-        "--vocab-size": 32000,
-    }
-    for flag, value in _TRACE_DEFAULTS.items():
-        if flag not in explicitly_set:
-            derived_args[flag] = value
-    if "--train-iters" not in explicitly_set:
-        derived_args["--train-iters"] = warmup + 1
-    if "--trace-warmup-iters" not in explicitly_set:
-        derived_args["--trace-warmup-iters"] = warmup
-    stages_to_trace = stages if stages is not None else list(range(pp))
 
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -222,6 +252,7 @@ def generate_trace(
         )
     )
     ranks_per_stage = world_size // pp if world_size and pp else tp
+    stages_to_trace = stages if stages is not None else list(range(pp))
 
     if all_ranks:
         ranks_to_trace = list(range(world_size))
