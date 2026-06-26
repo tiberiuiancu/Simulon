@@ -15,6 +15,9 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
         SCRIPT_PATH_HOST="$(realpath "${BASH_SOURCE[0]}")"
         REPO_ROOT_HOST="$(cd "$(dirname "$SCRIPT_PATH_HOST")/../.." && pwd)"
     fi
+    echo "[run.sh host] SLURM_SUBMIT_DIR=$SLURM_SUBMIT_DIR"
+    echo "[run.sh host] REPO_ROOT_HOST=$REPO_ROOT_HOST"
+    echo "[run.sh host] Host Megatron commit: $(cd "$REPO_ROOT_HOST/vendor/Megatron-LM-traced" && git log --oneline -1 2>/dev/null || echo 'not a git repo')"
     SCRIPT_PATH_CONTAINER="$REPO_ROOT_HOST/experiments/usecase_workload_tuning/run.sh"
     SCRIPT_PATH_CONTAINER="/opt/simulon${SCRIPT_PATH_CONTAINER#$REPO_ROOT_HOST}"
     cd "$REPO_ROOT_HOST"
