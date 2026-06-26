@@ -32,6 +32,19 @@ def _divisors(n: int) -> list[int]:
     return sorted(i for i in range(1, n + 1) if n % i == 0)
 
 
+def _parse_config_name(name: str) -> tuple[int, int, int, int | None]:
+    parts = name.split("_")
+    tp = int(parts[0].replace("tp", ""))
+    pp = int(parts[1].replace("pp", ""))
+    mbs = int(parts[2].replace("mbs", ""))
+    vpp: int | None = None
+    for part in parts[3:]:
+        if part.startswith("vpp"):
+            vpp = int(part.replace("vpp", ""))
+            break
+    return tp, pp, mbs, vpp
+
+
 def _mbs_values() -> list[int]:
     vals = []
     mbs = 1
@@ -221,6 +234,7 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
 
     console = Console()
     results: list[dict[str, Any]] = []
+    oom_keys: set[tuple[int, int, int | None]] = set()
     with Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
@@ -231,7 +245,18 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
         task = progress.add_task("Workload tuning sweep", total=len(paths))
         for path in paths:
             name = path.name
+            tp, pp, mbs, vpp = _parse_config_name(name)
+            key = (tp, pp, vpp)
             trace_hash = _workload_hash(path)
+            if key in oom_keys:
+                trace_status = "skipped"
+                trace_detail = f"inherited OOM from smaller MBS for tp={tp} pp={pp} vpp={vpp}"
+                message = f"{name}: {trace_status} - {trace_detail}"
+                results.append({"name": name, "oom": True, "skipped": True})
+                console.log(message)
+                progress.advance(task)
+                continue
+
             status = _trace_status(path)
             trace_detail = ""
             if status in ("OOM", "traced"):
@@ -241,6 +266,7 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
                 trace_status, trace_detail = _run_trace(path)
             message = f"{name}: {trace_status} (traces at {trace_hash}) - {trace_detail}"
             if trace_status == "OOM":
+                oom_keys.add(key)
                 results.append({"name": name, "oom": True})
             elif trace_status == "error":
                 results.append({"name": name, "error": True, "error_detail": trace_detail})
