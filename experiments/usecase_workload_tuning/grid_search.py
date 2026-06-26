@@ -165,6 +165,8 @@ def _run_trace(path: Path) -> tuple[str, str]:
             "cuda oom",
             "runtimeerror: cuda",
             "torch.cuda.outofmemoryerror",
+            "torch.outofmemoryerror",
+            "outofmemoryerror",
         )
         if any(kw in combined for kw in oom_keywords):
             with contextlib.suppress(Exception):

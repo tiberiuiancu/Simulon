@@ -301,7 +301,7 @@ def generate_trace(
         if world_size is not None:
             env["WORLD_SIZE"] = str(world_size)
         try:
-            subprocess.run(cmd, check=True, env=env)
+            subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
         except FileNotFoundError as exc:
             typer.echo(f"Error: could not run Megatron entry point: {exc}", err=True)
             raise typer.Exit(1) from exc
@@ -309,6 +309,10 @@ def generate_trace(
             typer.echo(
                 f"Error: Megatron exited with code {exc.returncode} for rank {rank}", err=True
             )
+            if exc.stdout:
+                typer.echo(exc.stdout, err=True)
+            if exc.stderr:
+                typer.echo(exc.stderr, err=True)
             raise typer.Exit(1) from exc
 
     if memory_snapshot is not None:
