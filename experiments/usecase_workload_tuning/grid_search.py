@@ -124,11 +124,19 @@ def _workload_hash(path: Path) -> str:
 
 def _trace_status(path: Path) -> str:
     trace_dir = _default_trace_dir(path)
+    if (trace_dir / ".INVALID").exists():
+        return "invalid"
     if (trace_dir / ".OOM").exists():
         return "OOM"
     if any(trace_dir.glob("trace_rank_*.json")):
         return "traced"
     return "pending"
+
+
+def _write_invalid_marker(path: Path, reason: str) -> None:
+    trace_dir = _default_trace_dir(path)
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    (trace_dir / ".INVALID").write_text(reason)
 
 
 def _run_trace(path: Path) -> tuple[str, str]:
@@ -211,6 +219,13 @@ def _grid() -> list[tuple[int, int, int, int | None]]:
     return combos
 
 
+def _is_valid_config(tp: int, pp: int, mbs: int) -> tuple[bool, str]:
+    dp = _NUM_GPUS // tp // pp
+    if _GBS % (mbs * dp) != 0:
+        return False, f"global_batch_size={_GBS} not divisible by mbs*dp={mbs * dp}"
+    return True, ""
+
+
 def _generate_configs() -> list[Path]:
     base = _load_base_workload()
     paths: list[Path] = []
@@ -248,6 +263,7 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
             tp, pp, mbs, vpp = _parse_config_name(name)
             key = (tp, pp, vpp)
             trace_hash = _workload_hash(path)
+
             if key in oom_keys:
                 trace_status = "skipped"
                 trace_detail = f"inherited OOM from smaller MBS for tp={tp} pp={pp} vpp={vpp}"
@@ -257,9 +273,20 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
                 progress.advance(task)
                 continue
 
+            valid, invalid_reason = _is_valid_config(tp, pp, mbs)
+            if not valid:
+                trace_status = "invalid"
+                trace_detail = invalid_reason
+                message = f"{name}: {trace_status} - {trace_detail}"
+                _write_invalid_marker(path, invalid_reason)
+                results.append({"name": name, "invalid": True, "invalid_reason": invalid_reason})
+                console.log(message)
+                progress.advance(task)
+                continue
+
             status = _trace_status(path)
             trace_detail = ""
-            if status in ("OOM", "traced"):
+            if status in ("OOM", "traced", "invalid"):
                 trace_status = status
                 trace_detail = status
             else:
@@ -268,6 +295,8 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
             if trace_status == "OOM":
                 oom_keys.add(key)
                 results.append({"name": name, "oom": True})
+            elif trace_status == "invalid":
+                results.append({"name": name, "invalid": True, "invalid_reason": trace_detail})
             elif trace_status == "error":
                 results.append({"name": name, "error": True, "error_detail": trace_detail})
             elif trace_only:
