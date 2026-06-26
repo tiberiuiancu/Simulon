@@ -28,24 +28,37 @@ _MEGATRON_ENTRYPOINT = (
 
 def _resolve_workload(input_path: str) -> tuple[MegatronWorkload, int, int, int | None]:
     path = Path(input_path).resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Input path does not exist inside container: {path}")
+
+    scenario = False
+    workload: MegatronWorkload | None = None
+    num_nodes = int(os.environ.get("NUM_NODES", 1))
+    gpus_per_node = int(os.environ.get("GPUS_PER_NODE", 1))
+    nics_per_node: int | None = None
+
     try:
         sc = ScenarioConfig.from_yaml(str(path))
         workload = sc.workload
         dc = sc.datacenter
         num_nodes = dc.num_nodes
         node_spec = resolve_node_spec(dc)
-        gpus_per_node = node_spec.gpus_per_node
+        if node_spec.gpus_per_node is not None:
+            gpus_per_node = node_spec.gpus_per_node
         nics_per_node = node_spec.nics_per_node
+        scenario = True
     except Exception:
-        workload = resolve_workload(str(path))
-        num_nodes = int(os.environ.get("NUM_NODES", 1))
-        gpus_per_node = int(os.environ.get("GPUS_PER_NODE", 1))
-        nics_per_node = None
+        try:
+            workload = resolve_workload(str(path))
+        except Exception as workload_exc:
+            raise RuntimeError(f"Could not parse {path} as scenario or workload") from workload_exc
 
     if not isinstance(workload, MegatronWorkload):
         raise ValueError("Baseline runner only supports Megatron workloads")
-    if gpus_per_node is None:
-        raise ValueError("Could not determine gpus_per_node from scenario or env")
+    if not scenario and (num_nodes == 1 and gpus_per_node == 1):
+        raise ValueError(
+            "Workload-only input requires NUM_NODES and GPUS_PER_NODE env vars to be set"
+        )
 
     return workload, num_nodes, gpus_per_node, nics_per_node
 
@@ -135,9 +148,7 @@ def main() -> None:
     model_name = Path(args.input).parent.name
     wandb_project = args.wandb_project or os.environ.get("WANDB_PROJECT")
     wandb_entity = args.wandb_entity or os.environ.get("WANDB_ENTITY")
-    wandb_run_name = args.wandb_run_name or os.environ.get(
-        "WANDB_RUN_NAME", f"validate-e2e-baseline-{model_name}"
-    )
+    wandb_run_name = args.wandb_run_name or f"validate-e2e-baseline-{model_name}"
     save_dir = args.save_dir or f"./output/baseline-{model_name}"
 
     cmd = _build_torchrun_cmd(

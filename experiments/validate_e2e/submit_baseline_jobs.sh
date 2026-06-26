@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 EXCLUDE=(qwen3-32b)
 
@@ -10,11 +11,12 @@ for dir in "$SCRIPT_DIR"/*/; do
         echo "Skipping excluded model: $model"
         continue
     fi
-    workload="$dir/workload.yaml"
-    if [ ! -f "$workload" ]; then
-        echo "Warning: no workload.yaml for $model, skipping"
+    scenario="$dir/scenario.yaml"
+    if [ ! -f "$scenario" ]; then
+        echo "Warning: no scenario.yaml for $model, skipping"
         continue
     fi
-    echo "Submitting baseline job for $model"
-    bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$workload'"
+    scenario_rel="${scenario#$REPO_ROOT/}"
+    echo "Submitting baseline job for $model ($scenario_rel)"
+    bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
 done
