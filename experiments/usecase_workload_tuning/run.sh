@@ -26,7 +26,7 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
         --bind "$REPO_ROOT_HOST/templates:/opt/simulon/templates" \
         --bind "$REPO_ROOT_HOST/output:/opt/simulon/output" \
         --bind "$REPO_ROOT_HOST/.tracking.env:/opt/simulon/.tracking.env" \
-        simulon-nemo.sif \
+        "$REPO_ROOT_HOST/simulon-nemo.sif" \
         bash "$SCRIPT_PATH_CONTAINER" "$@"
     exit $?
 fi
