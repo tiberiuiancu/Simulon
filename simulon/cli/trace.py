@@ -32,6 +32,8 @@ _TRACE_DEFAULTS: dict[str, str | int | bool] = {
     "--min-lr": 0.0,
     "--eval-interval": 1000000,
     "--eval-iters": 0,
+    "--eval-global-batch-size": 1,
+    "--eval-micro-batch-size": 1,
     "--save-interval": 1000000,
     "--log-interval": 1,
     "--mock-data": True,
