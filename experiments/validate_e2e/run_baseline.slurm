@@ -4,6 +4,7 @@
 #SBATCH --nodes=4
 #SBATCH --gpus-per-node=4
 #SBATCH --ntasks-per-node=4
+#SBATCH --switches=1
 #SBATCH --job-name=validate-e2e-baseline
 #SBATCH --output=baseline-%x-%j.out
 #SBATCH --error=baseline-%x-%j.err
