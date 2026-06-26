@@ -313,6 +313,20 @@ def generate_trace(
                 typer.echo(exc.stdout, err=True)
             if exc.stderr:
                 typer.echo(exc.stderr, err=True)
+            error_log = output_dir / ".error.log"
+            try:
+                with open(error_log, "w") as f:
+                    f.write(f"rank={rank}\n")
+                    f.write(f"returncode={exc.returncode}\n")
+                    f.write(f"cmd={' '.join(cmd)}\n")
+                    if exc.stdout:
+                        f.write("\n--- stdout ---\n")
+                        f.write(exc.stdout)
+                    if exc.stderr:
+                        f.write("\n--- stderr ---\n")
+                        f.write(exc.stderr)
+            except Exception:
+                pass
             raise typer.Exit(1) from exc
 
     if memory_snapshot is not None:

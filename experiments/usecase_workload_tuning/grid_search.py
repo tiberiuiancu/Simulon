@@ -156,9 +156,15 @@ def _run_trace(path: Path) -> tuple[str, str]:
         if oom_file.exists():
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
-        stderr = (exc.stderr or "").lower()
-        stdout = (exc.stdout or "").lower()
-        combined = stdout + "\n" + stderr
+        error_log = trace_dir / ".error.log"
+        combined = ""
+        if error_log.exists():
+            with contextlib.suppress(Exception):
+                combined = error_log.read_text().lower()
+        if not combined:
+            stderr = (exc.stderr or "").lower()
+            stdout = (exc.stdout or "").lower()
+            combined = stdout + "\n" + stderr
         oom_keywords = (
             "out of memory",
             "out-of-memory",
@@ -167,6 +173,7 @@ def _run_trace(path: Path) -> tuple[str, str]:
             "torch.cuda.outofmemoryerror",
             "torch.outofmemoryerror",
             "outofmemoryerror",
+            "cuda" + "memory" + "allocate",
         )
         if any(kw in combined for kw in oom_keywords):
             with contextlib.suppress(Exception):
