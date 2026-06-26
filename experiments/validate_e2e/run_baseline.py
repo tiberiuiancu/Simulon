@@ -100,18 +100,34 @@ def _build_torchrun_cmd(
         derived_args["--wandb-exp-name"] = wandb_run_name
         derived_args["--wandb-save-dir"] = os.path.join(save_dir, "wandb")
 
+    master_addr = os.environ.get("MASTER_ADDR")
+    if not master_addr and os.environ.get("SLURM_JOB_NODELIST"):
+        result = subprocess.run(
+            ["scontrol", "show", "hostnames", os.environ["SLURM_JOB_NODELIST"]],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        master_addr = result.stdout.strip().splitlines()[0]
+    if not master_addr:
+        master_addr = "localhost"
+    master_port = os.environ.get("MASTER_PORT", "6000")
+
+    rdzv_id = os.environ.get("SLURM_JOB_ID", "baseline")
     cmd: list[str] = [
         sys.executable,
         "-m",
         "torch.distributed.run",
-        "--nproc_per_node",
-        str(gpus_per_node),
         "--nnodes",
         str(num_nodes),
+        "--nproc_per_node",
+        str(gpus_per_node),
+        "--rdzv_id",
+        str(rdzv_id),
         "--rdzv_backend",
         "c10d",
         "--rdzv_endpoint",
-        os.environ.get("MASTER_ADDR", "localhost") + ":" + os.environ.get("MASTER_PORT", "6000"),
+        f"{master_addr}:{master_port}",
         str(_MEGATRON_ENTRYPOINT),
     ]
     for flag, value in derived_args.items():
