@@ -37,15 +37,22 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
         export NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4"
     fi
     apptainer exec --nv \\
-        --bind "$REPO_ROOT_HOST/experiments:/opt/simulon/experiments" \
-        --bind "$REPO_ROOT_HOST/examples:/opt/simulon/examples" \
-        --bind "$REPO_ROOT_HOST/vendor:/opt/simulon/vendor" \
-        --bind "$REPO_ROOT_HOST/simulon:/opt/simulon/simulon" \
-        --bind "$REPO_ROOT_HOST/templates:/opt/simulon/templates" \
-        --bind "$REPO_ROOT_HOST/output:/opt/simulon/output" \
-        --bind "$REPO_ROOT_HOST/.tracking.env:/opt/simulon/.tracking.env" \
-        "$REPO_ROOT_HOST/simulon-nemo.sif" \
+        --env MASTER_ADDR="$MASTER_ADDR" \\
+        --env MASTER_PORT="$MASTER_PORT" \\
+        --env NCCL_IB_HCA="${NCCL_IB_HCA:-}" \\
+        --env WANDB_API_KEY="${WANDB_API_KEY:-}" \\
+        --env WANDB_ENTITY="${WANDB_ENTITY:-}" \\
+        --env WANDB_PROJECT="${WANDB_PROJECT:-}" \\
+        --bind "$REPO_ROOT_HOST/experiments:/opt/simulon/experiments" \\
+        --bind "$REPO_ROOT_HOST/examples:/opt/simulon/examples" \\
+        --bind "$REPO_ROOT_HOST/vendor:/opt/simulon/vendor" \\
+        --bind "$REPO_ROOT_HOST/simulon:/opt/simulon/simulon" \\
+        --bind "$REPO_ROOT_HOST/templates:/opt/simulon/templates" \\
+        --bind "$REPO_ROOT_HOST/output:/opt/simulon/output" \\
+        --bind "$REPO_ROOT_HOST/.tracking.env:/opt/simulon/.tracking.env" \\
+        "$REPO_ROOT_HOST/simulon-nemo.sif" \\
         bash -c "cd /opt/simulon && python3 experiments/validate_e2e/run_baseline.py \"$INPUT_PATH\""
+
     exit $?
 fi
 
