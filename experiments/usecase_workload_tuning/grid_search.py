@@ -114,8 +114,6 @@ def _run_trace(path: Path) -> str:
         return "traced"
     scenario = path / "scenario.yaml"
     cmd = [
-        "uv",
-        "run",
         "simulon",
         "trace",
         "generate",
@@ -136,14 +134,7 @@ def _run_trace(path: Path) -> str:
 def _run_simulate(path: Path) -> dict[str, Any] | None:
     scenario = path / "scenario.yaml"
     name = path.name
-    cmd = [
-        "uv",
-        "run",
-        "simulon",
-        "simulate",
-        str(scenario),
-        "--skip-if-tracked",
-    ]
+    cmd = ["simulon", "simulate", str(scenario), "--skip-if-tracked"]
     env = os.environ.copy()
     env["WANDB_RUN_NAME"] = f"usecase-workload-tuning-{name}"
     try:
@@ -152,7 +143,9 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
         for line in result.stdout.splitlines():
             if "tokens/s" in line and "(" in line:
                 with contextlib.suppress(Exception):
-                    metrics["throughput_tps"] = float(line.split("(")[-1].split()[0].replace(",", ""))
+                    metrics["throughput_tps"] = float(
+                        line.split("(")[-1].split()[0].replace(",", "")
+                    )
             if "MFU:" in line:
                 with contextlib.suppress(Exception):
                     metrics["mfu_pct"] = float(line.split("MFU:")[-1].replace("%", "").strip())

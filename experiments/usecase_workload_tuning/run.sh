@@ -7,11 +7,29 @@
 #SBATCH --error=%x-%j.err
 
 set -euo pipefail
-REPO_ROOT="${SLURM_SUBMIT_DIR:-$(pwd)}"
-cd "$REPO_ROOT"
 
-SCRIPT_DIR="$REPO_ROOT/experiments/usecase_workload_tuning"
+if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; then
+    SCRIPT_PATH_HOST="$(realpath "${BASH_SOURCE[0]}")"
+    REPO_ROOT_HOST="$(cd "$(dirname "$SCRIPT_PATH_HOST")/../.." && pwd)"
+    SCRIPT_PATH_CONTAINER="/opt/simulon${SCRIPT_PATH_HOST#$REPO_ROOT_HOST}"
+    cd "$REPO_ROOT_HOST"
+    apptainer run --nv \
+        --bind "$REPO_ROOT_HOST/experiments:/opt/simulon/experiments" \
+        --bind "$REPO_ROOT_HOST/examples:/opt/simulon/examples" \
+        --bind "$REPO_ROOT_HOST/vendor:/opt/simulon/vendor" \
+        --bind "$REPO_ROOT_HOST/simulon:/opt/simulon/simulon" \
+        --bind "$REPO_ROOT_HOST/templates:/opt/simulon/templates" \
+        --bind "$REPO_ROOT_HOST/output:/opt/simulon/output" \
+        --bind "$REPO_ROOT_HOST/.tracking.env:/opt/simulon/.tracking.env" \
+        simulon-nemo.sif \
+        bash "$SCRIPT_PATH_CONTAINER" "$@"
+    exit $?
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
 
-uv run python "$SCRIPT_DIR/grid_search.py"
+python3 "$SCRIPT_DIR/grid_search.py"
