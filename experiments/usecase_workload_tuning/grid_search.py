@@ -175,7 +175,7 @@ def _run_trace(path: Path) -> tuple[str, str]:
 
         return (
             "error",
-            f"non-OOM error (return code {exc.returncode}): {(exc.stderr or '').strip()[:200]}",
+            f"non-OOM error (return code {exc.returncode}): {(exc.stderr or '').strip()[:1000]}",
         )
 
 

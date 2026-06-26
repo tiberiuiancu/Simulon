@@ -37,4 +37,7 @@ cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
 
+echo "[run.sh] Megatron submodule commit: $(cd "$REPO_ROOT/vendor/Megatron-LM-traced" && git log --oneline -1)"
+echo "[run.sh] pretrain_gpt.py OOM handler present: $(grep -c 'except Exception as exc' "$REPO_ROOT/vendor/Megatron-LM-traced/pretrain_gpt.py")"
+
 python3 "$SCRIPT_DIR/grid_search.py" --clean-invalid-markers ${MAX_RUNS:+--max-runs "$MAX_RUNS"}
