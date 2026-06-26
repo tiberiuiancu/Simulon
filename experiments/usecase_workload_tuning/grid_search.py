@@ -153,6 +153,9 @@ def _run_trace(path: Path) -> tuple[str, str]:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return "traced", ""
     except subprocess.CalledProcessError as exc:
+        if oom_file.exists():
+            return "OOM", f"Megatron OOM (return code {exc.returncode})"
+
         stderr = (exc.stderr or "").lower()
         stdout = (exc.stdout or "").lower()
         combined = stdout + "\n" + stderr
@@ -163,11 +166,9 @@ def _run_trace(path: Path) -> tuple[str, str]:
             "runtimeerror: cuda",
             "torch.cuda.outofmemoryerror",
         )
-        is_oom = oom_file.exists() or any(kw in combined for kw in oom_keywords)
-        if is_oom:
-            if not oom_file.exists():
-                with contextlib.suppress(Exception):
-                    oom_file.write_text(f"returncode={exc.returncode}\n{exc.stderr or ''}")
+        if any(kw in combined for kw in oom_keywords):
+            with contextlib.suppress(Exception):
+                oom_file.write_text(f"returncode={exc.returncode}\n{exc.stderr or ''}")
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
         return (
