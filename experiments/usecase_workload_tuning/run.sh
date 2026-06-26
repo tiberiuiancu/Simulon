@@ -39,5 +39,7 @@ export PYTHONUNBUFFERED=1
 
 echo "[run.sh] Megatron submodule commit: $(cd "$REPO_ROOT/vendor/Megatron-LM-traced" && git log --oneline -1)"
 echo "[run.sh] pretrain_gpt.py OOM handler present: $(grep -c 'except Exception as exc' "$REPO_ROOT/vendor/Megatron-LM-traced/pretrain_gpt.py")"
+echo "[run.sh] /opt/simulon/vendor is symlink? $(test -L /opt/simulon/vendor && echo yes || echo no)"
+echo "[run.sh] /opt/simulon/vendor real path: $(readlink -f /opt/simulon/vendor)"
 
 python3 "$SCRIPT_DIR/grid_search.py" --clean-invalid-markers ${MAX_RUNS:+--max-runs "$MAX_RUNS"}
