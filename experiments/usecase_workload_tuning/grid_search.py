@@ -333,6 +333,11 @@ def main() -> None:
         default=None,
         help="Only process the first N generated configs (for testing).",
     )
+    parser.add_argument(
+        "--clean-invalid-markers",
+        action="store_true",
+        help="Remove .INVALID markers so previously-invalid configs are re-evaluated.",
+    )
     args = parser.parse_args()
 
     if args.clean:
@@ -341,6 +346,11 @@ def main() -> None:
                 shutil.rmtree(path)
 
     paths = _generate_configs()
+    if args.clean_invalid_markers:
+        for path in paths:
+            invalid_file = _default_trace_dir(path) / ".INVALID"
+            if invalid_file.exists():
+                invalid_file.unlink()
     if args.max_runs is not None:
         paths = paths[: args.max_runs]
     if args.dry_run:
