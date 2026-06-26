@@ -253,6 +253,12 @@ def main() -> None:
         action="store_true",
         help="Remove all generated config subdirectories before running.",
     )
+    parser.add_argument(
+        "--max-runs",
+        type=int,
+        default=None,
+        help="Only process the first N generated configs (for testing).",
+    )
     args = parser.parse_args()
 
     if args.clean:
@@ -261,6 +267,8 @@ def main() -> None:
                 shutil.rmtree(path)
 
     paths = _generate_configs()
+    if args.max_runs is not None:
+        paths = paths[: args.max_runs]
     if args.dry_run:
         for _path in paths:
             pass

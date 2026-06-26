@@ -32,4 +32,4 @@ cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
 
-python3 "$SCRIPT_DIR/grid_search.py"
+python3 "$SCRIPT_DIR/grid_search.py" ${MAX_RUNS:+--max-runs "$MAX_RUNS"}
