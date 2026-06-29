@@ -149,8 +149,10 @@ def _run_trace(path: Path) -> tuple[str, str]:
         return "traced", "trace files already present"
     scenario = path / "scenario.yaml"
     cmd = ["bash", "./scripts/apptainer-trace.sh", str(scenario)]
+    env = os.environ.copy()
+    env["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
     try:
-        subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL, timeout=1800)
+        subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL, timeout=1800, env=env)
         return "traced", ""
     except subprocess.CalledProcessError as exc:
         if oom_file.exists():
@@ -176,22 +178,17 @@ def _run_trace(path: Path) -> tuple[str, str]:
         )
         combined_lower = combined
         has_cuda_oom_phrase = (
-            "cuda" in combined_lower
-            and "memory" in combined_lower
-            and "allocate" in combined_lower
+            "cuda" in combined_lower and "memory" in combined_lower and "allocate" in combined_lower
         )
         if any(kw in combined_lower for kw in oom_keywords) or has_cuda_oom_phrase:
             with contextlib.suppress(Exception):
                 oom_file.write_text(f"returncode={exc.returncode}\n{exc.stderr or ''}")
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
-        return (
-            "error",
-            f"non-OOM error (return code {exc.returncode})",
-        )
+        return ("error", f"non-OOM error (return code {exc.returncode})")
     except subprocess.TimeoutExpired:
         if oom_file.exists():
-            return "OOM", f"Megatron OOM (timeout, .OOM present)"
+            return "OOM", "Megatron OOM (timeout, .OOM present)"
         return "error", "trace timeout after 1800s"
 
 
