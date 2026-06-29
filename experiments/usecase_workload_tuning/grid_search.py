@@ -195,7 +195,7 @@ def _run_trace(path: Path) -> tuple[str, str]:
 def _run_simulate(path: Path) -> dict[str, Any] | None:
     scenario = path / "scenario.yaml"
     name = path.name
-    cmd = ["simulon", "simulate", str(scenario), "--skip-if-tracked"]
+    cmd = ["simulon", "simulate", str(scenario), "--skip-if-tracked", "--energy"]
     env = os.environ.copy()
     env["WANDB_RUN_NAME"] = f"usecase-workload-tuning-{name}"
     try:
@@ -213,6 +213,12 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
             if "wall time" in line and "ms" in line:
                 with contextlib.suppress(Exception):
                     metrics["iteration_time_ms"] = float(line.split("ms")[0].split()[-1])
+            if "Energy per iteration:" in line:
+                with contextlib.suppress(Exception):
+                    metrics["energy_wh"] = float(line.split("Wh")[0].split()[-1])
+            if "CO2eq:" in line:
+                with contextlib.suppress(Exception):
+                    metrics["co2eq_g"] = float(line.split("CO2eq:")[-1].split()[0])
         return metrics
     except subprocess.CalledProcessError:
         return None
@@ -328,6 +334,14 @@ def _sweep(paths: list[Path], trace_only: bool) -> list[dict[str, Any]]:
     return results
 
 
+def _purge_traces(paths: list[Path]) -> None:
+    for path in paths:
+        trace_dir = _default_trace_dir(path)
+        if trace_dir.exists():
+            shutil.rmtree(trace_dir)
+            print(f"Purged {trace_dir}")  # noqa: T201
+
+
 def main() -> None:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -354,6 +368,11 @@ def main() -> None:
         action="store_true",
         help="Remove .INVALID markers so previously-invalid configs are re-evaluated.",
     )
+    parser.add_argument(
+        "--purge",
+        action="store_true",
+        help="Remove all trace directories before running so every config is re-traced.",
+    )
     args = parser.parse_args()
 
     if args.clean:
@@ -362,6 +381,8 @@ def main() -> None:
                 shutil.rmtree(path)
 
     paths = _generate_configs()
+    if args.purge:
+        _purge_traces(paths)
     if args.clean_invalid_markers:
         for path in paths:
             invalid_file = _default_trace_dir(path) / ".INVALID"
