@@ -14,4 +14,4 @@ cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
 
-python3 "$SCRIPT_DIR/grid_search.py" --clean-invalid-markers ${MAX_RUNS:+--max-runs "$MAX_RUNS"}
+uv run python3 "$SCRIPT_DIR/grid_search.py" --clean-invalid-markers ${MAX_RUNS:+--max-runs "$MAX_RUNS"}
