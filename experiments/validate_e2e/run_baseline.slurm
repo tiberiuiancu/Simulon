@@ -36,7 +36,9 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
     if [[ "$(basename "$INPUT_PATH")" == *"3nic"* ]] || [[ "$(basename "$INPUT_PATH")" == *"3NIC"* ]]; then
         export NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4"
     fi
-    apptainer exec --nv \
+
+    srun --nodes="$SLURM_NNODES" --ntasks-per-node=1 \
+        apptainer exec --nv \
         --env "MASTER_ADDR=$MASTER_ADDR" \
         --env "MASTER_PORT=$MASTER_PORT" \
         --env "NCCL_IB_HCA=${NCCL_IB_HCA:-}" \
