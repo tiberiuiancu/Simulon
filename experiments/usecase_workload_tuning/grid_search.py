@@ -150,7 +150,7 @@ def _run_trace(path: Path) -> tuple[str, str]:
     scenario = path / "scenario.yaml"
     cmd = ["bash", "./scripts/apptainer-trace.sh", str(scenario)]
     try:
-        subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL, timeout=600)
+        subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL, timeout=300)
         return "traced", ""
     except subprocess.CalledProcessError as exc:
         if oom_file.exists():
@@ -192,7 +192,7 @@ def _run_trace(path: Path) -> tuple[str, str]:
     except subprocess.TimeoutExpired:
         if oom_file.exists():
             return "OOM", f"Megatron OOM (timeout, .OOM present)"
-        return "error", "trace timeout after 600s"
+        return "error", "trace timeout after 300s"
 
 
 def _run_simulate(path: Path) -> dict[str, Any] | None:

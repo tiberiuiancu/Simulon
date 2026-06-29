@@ -6,4 +6,4 @@ apptainer run --nv \
     --bind $(pwd)/templates:/opt/simulon/templates \
     --bind $(pwd)/output:/opt/simulon/output \
     simulon-nemo.sif \
-    bash -c 'CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate "$@"' -- "$@"
+    bash -c 'CUDA_DEVICE_MAX_CONNECTIONS=1 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True simulon trace generate "$@"' -- "$@"
