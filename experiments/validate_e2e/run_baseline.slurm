@@ -39,6 +39,7 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
 
     srun --nodes="$SLURM_NNODES" --ntasks-per-node=1 \
         apptainer exec --nv \
+        --env "CUDA_DEVICE_MAX_CONNECTIONS=1" \
         --env "MASTER_ADDR=$MASTER_ADDR" \
         --env "MASTER_PORT=$MASTER_PORT" \
         --env "NCCL_IB_HCA=${NCCL_IB_HCA:-}" \
