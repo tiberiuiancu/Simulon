@@ -108,7 +108,10 @@ def compute_cost(scenario, energy_result: EnergyResult) -> CostResult:
     raw: list[tuple[str, tuple[float, float | None, float | None] | None]] = []
 
     # GPU
-    raw.append(("gpu", _scale_cost(gpu_spec.cost, gpus_per_node * num_nodes)))
+    gpu_cost = _scale_cost(gpu_spec.cost, gpus_per_node * num_nodes)
+    node_cost = _scale_cost(node.cost, num_nodes)
+    raw.append(("gpu", gpu_cost))
+    raw.append(("node", node_cost))
 
     # CPU
     cpu = dc.node.cpu
