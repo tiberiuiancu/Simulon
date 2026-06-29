@@ -143,16 +143,19 @@ def _run_trace(path: Path) -> tuple[str, str]:
     trace_dir = _default_trace_dir(path)
     trace_dir.mkdir(parents=True, exist_ok=True)
     oom_file = trace_dir / ".OOM"
+    print(f"[grid_search] {path.name} trace_dir={trace_dir.resolve()} oom_before={oom_file.exists()}", flush=True)
     if oom_file.exists():
         return "OOM", "pre-existing .OOM marker"
     if any(trace_dir.glob("trace_rank_*.json")):
         return "traced", "trace files already present"
     scenario = path / "scenario.yaml"
     cmd = ["simulon", "trace", "generate", str(scenario), "--force-regenerate"]
+    print(f"[grid_search] {path.name} running {' '.join(cmd)}", flush=True)
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return "traced", ""
     except subprocess.CalledProcessError as exc:
+        print(f"[grid_search] {path.name} after failure oom_exists={oom_file.exists()} error_log_exists={(trace_dir / '.error.log').exists()}", flush=True)
         if oom_file.exists():
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
@@ -181,10 +184,12 @@ def _run_trace(path: Path) -> tuple[str, str]:
             and "allocate" in combined_lower
         )
         if any(kw in combined_lower for kw in oom_keywords) or has_cuda_oom_phrase:
+            print(f"[grid_search] {path.name} classifying as OOM from fallback keywords", flush=True)
             with contextlib.suppress(Exception):
                 oom_file.write_text(f"returncode={exc.returncode}\n{exc.stderr or ''}")
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
+        print(f"[grid_search] {path.name} classifying as non-OOM; combined keywords not matched", flush=True)
         return (
             "error",
             f"non-OOM error (return code {exc.returncode}): {(exc.stderr or '').strip()[:1000]}",
