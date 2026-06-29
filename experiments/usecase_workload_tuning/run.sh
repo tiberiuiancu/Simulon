@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+if [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -f "$SLURM_SUBMIT_DIR/experiments/usecase_workload_tuning/grid_search.py" ]; then
     REPO_ROOT="$SLURM_SUBMIT_DIR"
 else
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
