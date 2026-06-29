@@ -17,10 +17,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from grid_search import _default_trace_dir, _generate_configs
 
 
-def _git_add(path: Path, dry_run: bool) -> None:
+def _git_add(path: Path, dry_run: bool, *, force: bool = False) -> None:
     if not path.exists():
         return
-    cmd = ["git", "add", str(path)]
+    cmd = ["git", "add"]
+    if force:
+        cmd.append("-f")
+    cmd.append(str(path))
     if dry_run:
         print(f"Would run: {' '.join(cmd)}")
         return
@@ -39,7 +42,7 @@ def main() -> None:
 
     for path in _generate_configs():
         trace_dir = _default_trace_dir(path)
-        _git_add(trace_dir, args.dry_run)
+        _git_add(trace_dir, args.dry_run, force=True)
         _git_add(path, args.dry_run)
 
     for extra in (
