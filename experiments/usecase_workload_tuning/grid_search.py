@@ -148,7 +148,7 @@ def _run_trace(path: Path) -> tuple[str, str]:
     if any(trace_dir.glob("trace_rank_*.json")):
         return "traced", "trace files already present"
     scenario = path / "scenario.yaml"
-    cmd = ["./scripts/apptainer-trace.sh", str(scenario)]
+    cmd = ["bash", "./scripts/apptainer-trace.sh", str(scenario)]
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return "traced", ""
