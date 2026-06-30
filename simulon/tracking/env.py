@@ -25,7 +25,7 @@ def load_tracking_env_file(path: Path) -> None:
             key, val = line.split("=", 1)
             key = key.strip()
             val = val.strip().strip('"').strip("'")
-            if key and key not in os.environ:
+            if key and (key not in os.environ or os.environ.get(key, "").strip() == ""):
                 os.environ[key] = val
 
 
