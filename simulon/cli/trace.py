@@ -82,7 +82,7 @@ def _build_megatron_args(
     skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
     for key, value in cfg.items():
         flag = "--use-distributed-optimizer" if key == "distributed-optimizer" else f"--{key}"
-        if flag not in derived_args and key not in skip:
+        if flag not in derived_args and key not in skip and value is not None:
             if isinstance(value, bool):
                 _set_arg(flag, value)
             else:
