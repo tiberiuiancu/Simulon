@@ -1,6 +1,6 @@
 rank=0
 returncode=1
-cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 2 --pipeline-model-parallel-size 1 --micro-batch-size 1 --global-batch-size 1024 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --data-parallel-sharding-strategy no_shard --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-micro-batch-size 1 --eval-global-batch-size 8 --fake-process-group --rank 0 --trace-dir /gpfs/home6/tiberiui/simulon_validate/templates/gpu/h100/traces/7d802f3522438755
+cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 2 --pipeline-model-parallel-size 1 --micro-batch-size 1 --global-batch-size 1024 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --data-parallel-sharding-strategy no_shard --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-global-batch-size 27648 --fake-process-group --rank 0 --trace-dir /gpfs/home6/tiberiui/simulon_validate/templates/gpu/h100/traces/7d802f3522438755
 
 --- stdout ---
 LANG_RL Log directory: None
@@ -166,7 +166,7 @@ using torch.bfloat16 for parameters ...
   ep_overlap_early_attn_memory_release ............ False
   error_injection_rate ............................ 0
   error_injection_type ............................ transient_error
-  eval_global_batch_size .......................... 8
+  eval_global_batch_size .......................... 27648
   eval_interval ................................... 999999
   eval_iters ...................................... 0
   eval_micro_batch_size ........................... 1
@@ -762,14 +762,14 @@ WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode 
 make: Entering directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
 make: Nothing to be done for 'default'.
 make: Leaving directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
->>> done with dataset index builder. Compilation time: 0.059 seconds
-time to initialize megatron (seconds): 17.782
-[after in-process setup and before initialize_megatron] datetime: 2026-06-29 15:13:29.106157 
-[after in-job setup and before initialize_megatron] datetime: 2026-06-29 15:13:29.162588 
-[before library-setup] datetime: 2026-06-29 15:12:50.739195
-[after library-setup] datetime: 2026-06-29 15:13:28.962653
-[before megatron-init] datetime: 2026-06-29 15:13:29.106156
-[after megatron is initialized] datetime: 2026-06-29 15:13:33.193524 
+>>> done with dataset index builder. Compilation time: 0.054 seconds
+time to initialize megatron (seconds): 17.967
+[after in-process setup and before initialize_megatron] datetime: 2026-06-30 12:41:37.451766 
+[after in-job setup and before initialize_megatron] datetime: 2026-06-30 12:41:37.507680 
+[before library-setup] datetime: 2026-06-30 12:40:59.171423
+[after library-setup] datetime: 2026-06-30 12:41:37.312140
+[before megatron-init] datetime: 2026-06-30 12:41:37.451766
+[after megatron is initialized] datetime: 2026-06-30 12:41:41.393203 
 building GPT model ...
  > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 15815695360
 INFO:megatron.core.distributed.distributed_data_parallel:Setting up DistributedDataParallel with config DistributedDataParallelConfig(grad_reduce_in_fp32=True, overlap_grad_reduce=False, overlap_param_gather=False, align_param_gather=False, use_distributed_optimizer=True, num_distributed_optimizer_instances=1, check_for_nan_in_grad=False, check_for_large_grads=False, bucket_size=None, pad_buckets_for_high_nccl_busbw=False, reduce_scatter_with_fp32_accumulation=False, param_name_patterns_for_fp32_local_accumulation=(), average_in_collective=False, fp8_param_gather=False, fp4_param_gather=False, reuse_grad_buf_for_mxfp8_param_ag=False, use_megatron_fsdp=False, use_custom_fsdp=False, data_parallel_sharding_strategy='no_shard', gradient_reduce_div_fusion=True, suggested_communication_unit_size=None, keep_fp8_transpose_cache=False, nccl_ub=False, fsdp_double_buffer=False, fsdp_db_use_persist_buf_on_alloc_fail=False, fsdp_all_gather_in_start_param_sync=True, outer_dp_sharding_strategy='no_shard', disable_symmetric_registration=False, fsdp_manual_registration=False, delay_wgrad_compute=False, megatron_fsdp_main_params_dtype=torch.float32, megatron_fsdp_main_grads_dtype=None, megatron_fsdp_grad_comm_dtype=None, megatron_fsdp_use_decoupled_grad=False)
@@ -777,6 +777,8 @@ INFO:megatron.core.distributed.distributed_data_parallel:Setting up DistributedD
 --- stderr ---
 /usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
   import pynvml  # type: ignore[import]
+/opt/venv/lib/python3.12/site-packages/comet_ml/error_tracking/api.py:51: UserWarning: We won't be continuing development on SDK 3.0. Please use the last stable version of the SDK to get access to the newest features and fixes. See https://github.com/getsentry/sentry-python/discussions/4955
+  sentry_sdk.init(
 Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
 /opt/venv/lib/python3.12/site-packages/modelopt/torch/__init__.py:36: UserWarning: transformers version 5.3.0 is not tested with nvidia-modelopt and may cause issues. Please install recommended version with `pip install nvidia-modelopt[hf]` if working with HF models.
   _warnings.warn(

@@ -1,6 +1,6 @@
 rank=0
 returncode=1
-cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 1 --pipeline-model-parallel-size 2 --micro-batch-size 1 --global-batch-size 1024 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --data-parallel-sharding-strategy no_shard --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --num-virtual-stages-per-pipeline-rank 32 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-micro-batch-size 1 --eval-global-batch-size 8 --fake-process-group --rank 0 --trace-dir /gpfs/home6/tiberiui/simulon_validate/templates/gpu/h100/traces/0b6ab7da712f4851
+cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 1 --pipeline-model-parallel-size 2 --micro-batch-size 1 --global-batch-size 1024 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --data-parallel-sharding-strategy no_shard --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --num-virtual-stages-per-pipeline-rank 32 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-global-batch-size 27648 --fake-process-group --rank 0 --trace-dir /gpfs/home6/tiberiui/simulon_validate/templates/gpu/h100/traces/0b6ab7da712f4851
 
 --- stdout ---
 LANG_RL Log directory: None
@@ -166,7 +166,7 @@ using torch.bfloat16 for parameters ...
   ep_overlap_early_attn_memory_release ............ False
   error_injection_rate ............................ 0
   error_injection_type ............................ transient_error
-  eval_global_batch_size .......................... 8
+  eval_global_batch_size .......................... 27648
   eval_interval ................................... 999999
   eval_iters ...................................... 0
   eval_micro_batch_size ........................... 1
@@ -762,14 +762,14 @@ WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode 
 make: Entering directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
 make: Nothing to be done for 'default'.
 make: Leaving directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
->>> done with dataset index builder. Compilation time: 0.059 seconds
-time to initialize megatron (seconds): 16.633
-[after in-process setup and before initialize_megatron] datetime: 2026-06-29 15:08:30.479936 
-[after in-job setup and before initialize_megatron] datetime: 2026-06-29 15:08:30.536690 
-[before library-setup] datetime: 2026-06-29 15:07:52.127409
-[after library-setup] datetime: 2026-06-29 15:08:30.335882
-[before megatron-init] datetime: 2026-06-29 15:08:30.479935
-[after megatron is initialized] datetime: 2026-06-29 15:08:33.483220 
+>>> done with dataset index builder. Compilation time: 0.053 seconds
+time to initialize megatron (seconds): 16.528
+[after in-process setup and before initialize_megatron] datetime: 2026-06-30 12:36:42.124807 
+[after in-job setup and before initialize_megatron] datetime: 2026-06-30 12:36:42.182185 
+[before library-setup] datetime: 2026-06-30 12:36:04.237611
+[after library-setup] datetime: 2026-06-30 12:36:41.983986
+[before megatron-init] datetime: 2026-06-30 12:36:42.124806
+[after megatron is initialized] datetime: 2026-06-30 12:36:45.193216 
 building GPT model ...
 building GPT model ...
 building GPT model ...
@@ -1284,7 +1284,7 @@ Params for bucket 1 (452276640 elements, 452276736 padded size, 0 param(s) with 
 	module.decoder.layers.0.self_attention.linear_qkv.layer_norm_weight (param.main_grad.dtype=torch.float32)
 	module.decoder.layers.0.self_attention.linear_proj.bias (param.main_grad.dtype=torch.float32)
 	module.decoder.layers.0.self_attention.linear_proj.weight (param.main_grad.dtype=torch.float32)
-INFO:megatron.core.optimizer:Setting up optimizer with config OptimizerConfig(lr=0.0006, min_lr=0.0, decoupled_lr=None, decoupled_min_lr=None, weight_decay=0.05, apply_wd_to_qk_layernorm=False, fp8_recipe='delayed', fp16=False, bf16=True, reuse_grad_buf_for_mxfp8_param_ag=False, params_dtype=torch.bfloat16, use_precision_aware_optimizer=False, store_param_remainders=True, main_grads_dtype=torch.float32, main_params_dtype=torch.float32, exp_avg_dtype=torch.float32, exp_avg_sq_dtype=torch.float32, optimizer='adam', loss_scale=None, initial_loss_scale=4294967296, min_loss_scale=1.0, loss_scale_window=1000, hysteresis=2, adam_beta1=0.9, adam_beta2=0.95, adam_eps=1e-08, decoupled_weight_decay=True, sgd_momentum=0.9, muon_momentum=0.9, muon_split_qkv=True, muon_nesterov=False, muon_scale_mode='spectral', muon_fp32_matmul_prec='medium', muon_coefficient_type='quintic', muon_num_ns_steps=5, muon_tp_mode='blockwise', muon_extra_scale_factor=1.0, muon_scalar_optimizer='adam', lion_beta1=0.95, lion_beta2=0.98, soap_shampoo_beta=0.95, soap_precondition_frequency=1, soap_use_kl_shampoo=True, adaptive_muon_moment2_method='adamuon', adaptive_muon_beta2=0.95, adaptive_muon_eps=1e-08, use_distributed_optimizer=True, use_layer_wise_distributed_optimizer=False, overlap_param_gather=False, overlap_param_gather_with_optimizer_step=False, optimizer_cpu_offload=False, optimizer_offload_fraction=1.0, use_torch_optimizer_for_cpu_offload=False, overlap_cpu_optimizer_d2h_h2d=False, pin_cpu_grads=True, pin_cpu_params=True, clip_grad=1.0, log_num_zeros_in_grad=False, barrier_with_L1_time=True, timers=<megatron.core.timers.Timers object at 0x1543055f5040>, config_logger_dir='', optimizer_cuda_graph=False)
+INFO:megatron.core.optimizer:Setting up optimizer with config OptimizerConfig(lr=0.0006, min_lr=0.0, decoupled_lr=None, decoupled_min_lr=None, weight_decay=0.05, apply_wd_to_qk_layernorm=False, fp8_recipe='delayed', fp16=False, bf16=True, reuse_grad_buf_for_mxfp8_param_ag=False, params_dtype=torch.bfloat16, use_precision_aware_optimizer=False, store_param_remainders=True, main_grads_dtype=torch.float32, main_params_dtype=torch.float32, exp_avg_dtype=torch.float32, exp_avg_sq_dtype=torch.float32, optimizer='adam', loss_scale=None, initial_loss_scale=4294967296, min_loss_scale=1.0, loss_scale_window=1000, hysteresis=2, adam_beta1=0.9, adam_beta2=0.95, adam_eps=1e-08, decoupled_weight_decay=True, sgd_momentum=0.9, muon_momentum=0.9, muon_split_qkv=True, muon_nesterov=False, muon_scale_mode='spectral', muon_fp32_matmul_prec='medium', muon_coefficient_type='quintic', muon_num_ns_steps=5, muon_tp_mode='blockwise', muon_extra_scale_factor=1.0, muon_scalar_optimizer='adam', lion_beta1=0.95, lion_beta2=0.98, soap_shampoo_beta=0.95, soap_precondition_frequency=1, soap_use_kl_shampoo=True, adaptive_muon_moment2_method='adamuon', adaptive_muon_beta2=0.95, adaptive_muon_eps=1e-08, use_distributed_optimizer=True, use_layer_wise_distributed_optimizer=False, overlap_param_gather=False, overlap_param_gather_with_optimizer_step=False, optimizer_cpu_offload=False, optimizer_offload_fraction=1.0, use_torch_optimizer_for_cpu_offload=False, overlap_cpu_optimizer_d2h_h2d=False, pin_cpu_grads=True, pin_cpu_params=True, clip_grad=1.0, log_num_zeros_in_grad=False, barrier_with_L1_time=True, timers=<megatron.core.timers.Timers object at 0x1472545916d0>, config_logger_dir='', optimizer_cuda_graph=False)
 
 --- stderr ---
 /usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.

@@ -1,6 +1,6 @@
 rank=0
 returncode=1
-cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 1 --pipeline-model-parallel-size 2 --micro-batch-size 1 --global-batch-size 1024 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --data-parallel-sharding-strategy no_shard --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --num-virtual-stages-per-pipeline-rank 2 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-micro-batch-size 1 --eval-global-batch-size 8 --fake-process-group --rank 0 --trace-dir /gpfs/home6/tiberiui/simulon_validate/templates/gpu/h100/traces/751984802007b589
+cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 1 --pipeline-model-parallel-size 2 --micro-batch-size 1 --global-batch-size 1024 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --data-parallel-sharding-strategy no_shard --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --num-virtual-stages-per-pipeline-rank 2 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-global-batch-size 27648 --fake-process-group --rank 0 --trace-dir /gpfs/home6/tiberiui/simulon_validate/templates/gpu/h100/traces/751984802007b589
 
 --- stdout ---
 LANG_RL Log directory: None
@@ -166,7 +166,7 @@ using torch.bfloat16 for parameters ...
   ep_overlap_early_attn_memory_release ............ False
   error_injection_rate ............................ 0
   error_injection_type ............................ transient_error
-  eval_global_batch_size .......................... 8
+  eval_global_batch_size .......................... 27648
   eval_interval ................................... 999999
   eval_iters ...................................... 0
   eval_micro_batch_size ........................... 1
@@ -762,14 +762,14 @@ WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode 
 make: Entering directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
 make: Nothing to be done for 'default'.
 make: Leaving directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
->>> done with dataset index builder. Compilation time: 0.058 seconds
-time to initialize megatron (seconds): 17.444
-[after in-process setup and before initialize_megatron] datetime: 2026-06-29 15:05:34.446972 
-[after in-job setup and before initialize_megatron] datetime: 2026-06-29 15:05:34.503585 
-[before library-setup] datetime: 2026-06-29 15:04:55.164299
-[after library-setup] datetime: 2026-06-29 15:05:34.304638
-[before megatron-init] datetime: 2026-06-29 15:05:34.446971
-[after megatron is initialized] datetime: 2026-06-29 15:05:37.530828 
+>>> done with dataset index builder. Compilation time: 0.055 seconds
+time to initialize megatron (seconds): 16.947
+[after in-process setup and before initialize_megatron] datetime: 2026-06-30 12:33:50.111284 
+[after in-job setup and before initialize_megatron] datetime: 2026-06-30 12:33:50.167995 
+[before library-setup] datetime: 2026-06-30 12:33:11.710956
+[after library-setup] datetime: 2026-06-30 12:33:49.969395
+[before megatron-init] datetime: 2026-06-30 12:33:50.111284
+[after megatron is initialized] datetime: 2026-06-30 12:33:52.994906 
 building GPT model ...
 building GPT model ...
  > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 15815029760
