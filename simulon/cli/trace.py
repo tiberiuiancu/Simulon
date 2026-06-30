@@ -348,6 +348,135 @@ def generate_trace(
         typer.echo(f"  {tf.name}")
 
 
+@trace_app.command("sync")
+def sync_traces(
+    folders: list[Path] = typer.Argument(..., help="Folders to crawl for scenario.yaml files"),
+    commit: str | None = typer.Option(
+        None, "--commit", help="Commit message (also stages all changes)"
+    ),
+    push: bool = typer.Option(
+        False, "--push", help="Run git push after committing (ignored on failure)"
+    ),
+    prune: bool = typer.Option(
+        False,
+        "--prune",
+        help="Remove trace dirs under templates/gpu not referenced by any scenario",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print actions without running them"),
+):
+    """Stage/push trace folders referenced by scenario YAMLs.
+
+    For every scenario.yaml found under the supplied folders, if the workload is a
+    Megatron workload the command resolves the target trace directory
+    (templates/gpu/<gpu>/traces/<workload-hash>) and stages it with ``git add -f``.
+    Local data always wins, so an existing tracked trace folder is overwritten.
+    """
+    import shutil
+
+    from simulon.config.resolve import resolve_gpu_spec, workload_hash
+    from simulon.config.scenario import ScenarioConfig
+    from simulon.config.workload import MegatronWorkload
+
+    referenced: set[Path] = set()
+    staged = 0
+    missing = 0
+
+    for folder in folders:
+        if not folder.exists():
+            typer.echo(f"Skipping missing folder: {folder}", err=True)
+            continue
+        for scenario_path in sorted(folder.rglob("scenario.yaml")):
+            try:
+                sc = ScenarioConfig.from_yaml(scenario_path)
+            except Exception as exc:
+                typer.echo(f"Failed to load {scenario_path}: {exc}", err=True)
+                continue
+
+            workload = sc.workload
+            if not isinstance(workload, MegatronWorkload):
+                continue
+
+            try:
+                gpu_spec = resolve_gpu_spec(sc.datacenter)
+                gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+            except Exception:
+                gpu_name = "default"
+
+            h = workload_hash(workload)
+            trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
+            referenced.add(trace_dir)
+
+            if not trace_dir.exists():
+                typer.echo(f"No local trace for {scenario_path} -> {trace_dir}")
+                missing += 1
+                continue
+
+            cmd = ["git", "add", "-f", str(trace_dir)]
+            if dry_run:
+                typer.echo(f"Would run: {' '.join(cmd)}")
+            else:
+                subprocess.run(cmd, check=True)
+                typer.echo(f"Staged {trace_dir} (from {scenario_path})")
+            staged += 1
+
+    if prune:
+        base = Path("templates/gpu")
+        removed = 0
+        if base.exists():
+            for gpu_dir in sorted(base.iterdir()):
+                if not gpu_dir.is_dir():
+                    continue
+                traces_dir = gpu_dir / "traces"
+                if not traces_dir.is_dir():
+                    continue
+                for trace_dir in sorted(traces_dir.iterdir()):
+                    if not trace_dir.is_dir():
+                        continue
+                    if trace_dir in referenced:
+                        continue
+                    if dry_run:
+                        typer.echo(f"Would prune: {trace_dir}")
+                    else:
+                        shutil.rmtree(trace_dir)
+                        # also drop from git index if tracked
+                        subprocess.run(
+                            ["git", "rm", "-rf", "--cached", str(trace_dir)], check=False
+                        )
+                        typer.echo(f"Pruned {trace_dir}")
+                    removed += 1
+        if dry_run:
+            typer.echo(f"Would prune {removed} trace director{'y' if removed == 1 else 'ies'}.")
+        else:
+            typer.echo(f"Pruned {removed} trace director{'y' if removed == 1 else 'ies'}.")
+
+    if dry_run:
+        typer.echo(
+            f"Would stage {staged} trace folder{'s' if staged != 1 else ''}; {missing} missing."
+        )
+        return
+
+    typer.echo(f"Staged {staged} trace folder{'s' if staged != 1 else ''}; {missing} missing.")
+
+    if commit:
+        if staged == 0 and not prune:
+            typer.echo("Nothing staged; skipping commit.")
+        else:
+            cmd = ["git", "commit", "-m", commit]
+            try:
+                subprocess.run(cmd, check=True)
+                typer.echo(f"Committed: {commit}")
+            except subprocess.CalledProcessError as exc:
+                typer.echo(f"Commit failed: {exc}", err=True)
+                raise typer.Exit(1) from exc
+
+    if push:
+        try:
+            subprocess.run(["git", "push"], check=True)
+            typer.echo("Pushed.")
+        except subprocess.CalledProcessError as exc:
+            typer.echo(f"Push failed (ignored): {exc}", err=True)
+
+
 @trace_app.command("list")
 def list_traces(
     all: bool = typer.Option(False, "--all", "-a", help="Show all traces (no pagination)"),
