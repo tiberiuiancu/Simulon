@@ -50,6 +50,11 @@ _CSV_COLS = [
     "mbs",
     "vpp",
     "status",
+    "oom",
+    "skipped",
+    "invalid",
+    "error",
+    "simulated",
     "throughput_tps",
     "mfu_pct",
     "iteration_time_ms",
@@ -79,7 +84,9 @@ def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
 
 def _truthy(row: pd.Series, key: str) -> bool:
     value = row.get(key)
-    return bool(value) if value is not None else False
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return False
+    return bool(value)
 
 
 def _status_from_row(row: pd.Series) -> str:
@@ -93,6 +100,10 @@ def _status_from_row(row: pd.Series) -> str:
         return "error"
     if _truthy(row, "simulated"):
         return "valid"
+    # Fall back to the status column written by previous plot runs
+    status = row.get("status")
+    if isinstance(status, str) and status in _STATUS_COLORS:
+        return status
     return "error"
 
 
@@ -119,6 +130,36 @@ def _vpp_options(pp: int) -> Sequence[int | None]:
         return [None]
     layers_per_stage = _NUM_LAYERS // pp
     return sorted(i for i in range(1, layers_per_stage + 1) if layers_per_stage % i == 0)
+
+
+def _scan_trace_statuses(names: list[str]) -> dict[str, str]:
+    from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
+    from simulon.config.scenario import ScenarioConfig
+
+    statuses: dict[str, str] = {}
+    for name in names:
+        scenario_path = (
+            Path("experiments/usecase_workload_tuning/scenarios") / name / "scenario.yaml"
+        )
+        if not scenario_path.exists():
+            continue
+        try:
+            sc = ScenarioConfig.from_yaml(str(scenario_path))
+            gpu_spec = resolve_gpu_spec(sc.datacenter)
+            gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+        except Exception:
+            gpu_name = "default"
+        try:
+            wl = resolve_workload(str(scenario_path.parent / "workload.yaml"))
+            h = workload_hash(wl)
+        except Exception:
+            continue
+        trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
+        if (trace_dir / ".OOM").exists():
+            statuses[name] = "oom"
+        elif (trace_dir / ".INVALID").exists():
+            statuses[name] = "invalid"
+    return statuses
 
 
 def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
@@ -148,10 +189,20 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
     status_map: dict[str, str] = {}
     extra_map: dict[str, dict[str, str]] = {}
     metric_map: dict[str, dict[str, Any]] = {}
+    trace_status_map: dict[str, str] = _scan_trace_statuses(df["name"].tolist())
     if cached_df is not None:
         for _, row in cached_df.iterrows():
             name = str(row["name"])
-            status_map[name] = _status_from_row(row)
+            csv_status = _status_from_row(row)
+            trace_status = trace_status_map.get(name)
+            if trace_status in ("oom", "invalid"):
+                status_map[name] = trace_status
+                df.loc[df["name"] == name, trace_status] = True
+            else:
+                status_map[name] = csv_status
+                for col in ("oom", "skipped", "invalid", "error", "simulated"):
+                    if _truthy(row, col):
+                        df.loc[df["name"] == name, col] = True
             invalid_reason = row.get("invalid_reason")
             error_detail = row.get("error_detail")
             extra_map[name] = {
