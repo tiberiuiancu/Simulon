@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --partition=gpu_h100
-#SBATCH --time=4:00:00
+#SBATCH --time=24:00:00
 #SBATCH --gpus=1
 #SBATCH --job-name=system-tuning
 #SBATCH --output=%x-%j.out
