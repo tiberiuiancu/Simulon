@@ -352,6 +352,8 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
     )
 
     console = Console()
+    from simulon.config.resolve import resolve_workload, workload_hash
+
     results: list[dict[str, Any]] = []
     oom_keys: set[tuple[int, int, int | None, int | None]] = set()
     total_sims = len(paths) * len(_NODE_SIZES) * len(_LINK_BWS)
@@ -380,6 +382,12 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
                     ep = int(part.replace("ep", ""))
             key = (tp, pp, vpp, ep)
 
+            try:
+                wl = resolve_workload(str(path / "workload.yaml"))
+                h = workload_hash(wl)
+            except Exception:
+                h = "unknown"
+
             if model.name == "gptoss-120b":
                 valid, invalid_reason = _is_valid_gptoss(
                     tp, pp, ep or 8, vpp, model.num_layers, model.gbs
@@ -401,12 +409,12 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
                         "invalid_reason": invalid_reason,
                     }
                 )
-                console.log(f"{model.name}/{name}: invalid - {invalid_reason}")
+                console.log(f"{model.name}/{name}: invalid - {invalid_reason} [hash={h}]")
                 progress.advance(task, advance=len(_NODE_SIZES) * len(_LINK_BWS))
                 continue
 
             if key in oom_keys:
-                console.log(f"{model.name}/{name}: skipped (inherited OOM)")
+                console.log(f"{model.name}/{name}: skipped (inherited OOM) [hash={h}]")
                 results.append(
                     {
                         "model": model.name,
@@ -430,7 +438,7 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
 
             if status == "OOM":
                 oom_keys.add(key)
-                console.log(f"{model.name}/{name}: OOM - {trace_detail}")
+                console.log(f"{model.name}/{name}: OOM - {trace_detail} [hash={h}]")
                 for node_size in _NODE_SIZES:
                     for link_bw in _LINK_BWS:
                         results.append(
@@ -450,7 +458,7 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
                 continue
 
             if status == "invalid":
-                console.log(f"{model.name}/{name}: invalid - {trace_detail}")
+                console.log(f"{model.name}/{name}: invalid - {trace_detail} [hash={h}]")
                 for node_size in _NODE_SIZES:
                     for link_bw in _LINK_BWS:
                         results.append(
@@ -471,7 +479,7 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
                 continue
 
             if status == "error":
-                console.log(f"{model.name}/{name}: error - {trace_detail}")
+                console.log(f"{model.name}/{name}: error - {trace_detail} [hash={h}]")
                 for node_size in _NODE_SIZES:
                     for link_bw in _LINK_BWS:
                         results.append(
@@ -491,7 +499,7 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
                         progress.advance(task)
                 continue
 
-            console.log(f"{model.name}/{name}: traced - {trace_detail}")
+            console.log(f"{model.name}/{name}: traced - {trace_detail} [hash={h}]")
 
             if trace_only:
                 for node_size in _NODE_SIZES:
@@ -590,11 +598,11 @@ def main() -> None:
 
     paths_by_model = {model.name: _generate_model_configs(model) for model in models}
 
-    if args.purge:
-        _purge_traces(paths_by_model)
-
     if args.max_runs is not None:
         paths_by_model = {name: paths[: args.max_runs] for name, paths in paths_by_model.items()}
+
+    if args.purge:
+        _purge_traces(paths_by_model)
 
     if args.dry_run:
         for model in models:
