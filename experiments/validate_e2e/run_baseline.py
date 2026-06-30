@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -161,10 +162,9 @@ def main() -> None:
     if job_id:
         default_run_name = f"{default_run_name}-{job_id}"
     wandb_run_name = args.wandb_run_name or default_run_name
-    default_save_dir = f"./output/baseline-{model_name}"
-    if job_id:
-        default_save_dir = f"{default_save_dir}-{job_id}"
-    save_dir = args.save_dir or default_save_dir
+    save_dir = (
+        args.save_dir or f"/scratch-shared/tiberiui/baseline-{model_name}-{job_id or 'local'}"
+    )
 
     cmd = _build_torchrun_cmd(
         workload,
@@ -188,7 +188,12 @@ def main() -> None:
     )  # noqa: T201
     print(f"  command: {' '.join(cmd)}")  # noqa: T201
 
-    subprocess.run(cmd, check=True)
+    try:
+        subprocess.run(cmd, check=True)
+    finally:
+        if os.path.isdir(save_dir):
+            shutil.rmtree(save_dir)
+            print(f"Removed local output directory: {save_dir}")  # noqa: T201
 
 
 if __name__ == "__main__":
