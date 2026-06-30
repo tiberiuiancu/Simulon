@@ -195,8 +195,8 @@ def _run_trace(workload_path: Path) -> tuple[str, str]:
     if any(trace_dir.glob("trace_rank_*.json")):
         return "traced", "trace files already present"
 
-    workload = workload_path / "workload.yaml"
-    cmd = ["bash", "./scripts/apptainer-trace.sh", str(workload), "--gpu", "h100"]
+    scenario_path = workload_path / "scenario.yaml"
+    cmd = ["bash", "./scripts/apptainer-trace.sh", str(scenario_path)]
     env = os.environ.copy()
     env["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
     try:
