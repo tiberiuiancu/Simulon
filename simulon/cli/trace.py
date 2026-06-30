@@ -122,18 +122,8 @@ def _build_megatron_args(
     if "--trace-warmup-iters" not in explicitly_set:
         derived_args["--trace-warmup-iters"] = warmup
 
-    # Megatron validates eval batch sizes at startup even when eval is disabled.
-    if (
-        "--eval-global-batch-size" not in explicitly_set
-        and "--eval-micro-batch-size" not in explicitly_set
-    ):
-        tp = int(cfg.get("tensor-model-parallel-size", 1))
-        pp = int(cfg.get("pipeline-model-parallel-size", 1))
-        ep = int(cfg.get("expert-model-parallel-size", 1))
-        world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
-        dp = world_size // (tp * pp * ep) if world_size and tp * pp * ep else 1
-        derived_args["--eval-micro-batch-size"] = 1
-        derived_args["--eval-global-batch-size"] = max(1, dp)
+    if "--eval-global-batch-size" not in explicitly_set:
+        derived_args["--eval-global-batch-size"] = 27648
 
     return derived_args, explicitly_set
 
