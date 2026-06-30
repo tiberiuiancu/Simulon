@@ -562,6 +562,12 @@ def main() -> None:
         help="Comma-separated model names to run (default: all).",
     )
     parser.add_argument(
+        "--max-runs",
+        type=int,
+        default=None,
+        help="Only process the first N generated configs per model (for testing).",
+    )
+    parser.add_argument(
         "--purge",
         action="store_true",
         help="Remove all trace directories before running so every config is re-traced.",
@@ -586,6 +592,9 @@ def main() -> None:
 
     if args.purge:
         _purge_traces(paths_by_model)
+
+    if args.max_runs is not None:
+        paths_by_model = {name: paths[: args.max_runs] for name, paths in paths_by_model.items()}
 
     if args.dry_run:
         for model in models:
