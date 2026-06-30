@@ -290,6 +290,7 @@ def generate_trace(
         env = os.environ.copy()
         if world_size is not None:
             env["WORLD_SIZE"] = str(world_size)
+        env["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
         try:
             subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
         except FileNotFoundError as exc:
