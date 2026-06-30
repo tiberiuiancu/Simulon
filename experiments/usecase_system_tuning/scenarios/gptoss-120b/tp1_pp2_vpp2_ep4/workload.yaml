@@ -4,8 +4,8 @@ config:
   tensor-model-parallel-size: 1
   pipeline-model-parallel-size: 2
   expert-model-parallel-size: 4
-  overlap-grad-reduce: true
-  overlap-param-gather: true
+  overlap-grad-reduce: false
+  overlap-param-gather: false
   num-layers: 36
   hidden-size: 2880
   ffn-hidden-size: 2880

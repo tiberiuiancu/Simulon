@@ -29,8 +29,8 @@ config:
   adam-beta2: 0.95
   use-distributed-optimizer: true
   grad-reduce-in-bf16: true
-  overlap-grad-reduce: true
-  overlap-param-gather: true
+  overlap-grad-reduce: false
+  overlap-param-gather: false
   micro-batch-size: 1
   global-batch-size: 512
   manual-gc: true
