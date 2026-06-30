@@ -33,7 +33,6 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
         --env "CUDA_DEVICE_MAX_CONNECTIONS=1" \
         --env "MASTER_ADDR=$MASTER_ADDR" \
         --env "MASTER_PORT=$MASTER_PORT" \
-        --env "WANDB_API_KEY=${WANDB_API_KEY:-}" \
         --env "WANDB_ENTITY=${WANDB_ENTITY:-}" \
         --env "WANDB_PROJECT=${WANDB_PROJECT:-}" \
         --bind "$REPO_ROOT_HOST/experiments:/opt/simulon/experiments" \
