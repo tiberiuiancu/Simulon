@@ -107,6 +107,7 @@ def _write_workload(
 def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
     node_file = _NODES_DIR / f"node{node_size}_bw{link_bw}.yaml"
     num_nodes = _TOTAL_GPUS // node_size
+    workload_name = workload_path.name
     scenario = {
         "datacenter": {
             "num_nodes": num_nodes,
@@ -116,6 +117,7 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
                 "electricity_cost_per_kwh": 0.15,
                 "datacenter_lifetime_years": 5,
                 "idle_fraction": 0.2,
+                "traces_dir": f"templates/gpu/h100/traces/system-tuning-{workload_name}-node{node_size}-bw{link_bw}",
             },
         },
         "workload": str(workload_path / "workload.yaml"),
@@ -126,9 +128,29 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
     return scenario_path
 
 
+def _scenario_trace_dir(workload_path: Path) -> Path | None:
+    from simulon.config.scenario import ScenarioConfig
+
+    scenario_path = workload_path / "scenario.yaml"
+    if not scenario_path.exists():
+        return None
+    try:
+        sc = ScenarioConfig.from_yaml(str(scenario_path))
+        traces_dir = sc.datacenter.datacenter.traces_dir if sc.datacenter.datacenter else None
+        if traces_dir:
+            return Path(str(traces_dir))
+    except Exception:
+        pass
+    return None
+
+
 def _default_trace_dir(workload_path: Path) -> Path:
     from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
     from simulon.config.scenario import ScenarioConfig
+
+    explicit = _scenario_trace_dir(workload_path)
+    if explicit is not None:
+        return explicit
 
     scenario_path = workload_path / "scenario.yaml"
     if not scenario_path.exists():
