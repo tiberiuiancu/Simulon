@@ -208,23 +208,27 @@ def generate_trace(
     if not isinstance(workload, MegatronWorkload):
         raise typer.BadParameter("Workload must be a Megatron workload")
 
-    # Determine GPU name and compute default trace path if no --output-dir
     if output_dir is None:
         if is_scenario:
             assert sc is not None
             dc = sc.datacenter
             assert not isinstance(dc, Path)
-            try:
-                gpu_spec = resolve_gpu_spec(dc)
-                gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
-            except Exception:
-                gpu_name = "default"
+            traces_dir = dc.datacenter.traces_dir if dc.datacenter else None
+            if traces_dir:
+                output_dir = Path(str(traces_dir))
+            else:
+                try:
+                    gpu_spec = resolve_gpu_spec(dc)
+                    gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+                except Exception:
+                    gpu_name = "default"
+                h = workload_hash(workload)
+                output_dir = Path("templates/gpu") / gpu_name / "traces" / h
         else:
             assert gpu is not None
             gpu_name = gpu.lower().replace(" ", "-")
-
-        h = workload_hash(workload)
-        output_dir = Path("templates/gpu") / gpu_name / "traces" / h
+            h = workload_hash(workload)
+            output_dir = Path("templates/gpu") / gpu_name / "traces" / h
 
     derived_args, explicitly_set = _build_megatron_args(
         workload,
@@ -374,9 +378,12 @@ def sync_traces(
     """Stage/push trace folders referenced by scenario YAMLs.
 
     For every scenario.yaml found under the supplied folders, if the workload is a
-    Megatron workload the command resolves the target trace directory
-    (templates/gpu/<gpu>/traces/<workload-hash>) and stages it with ``git add
-    -f``. Local data always wins, so an existing tracked trace folder is overwritten.
+    Megatron workload the command resolves the target trace directory and stages it
+    with ``git add -f``. Local data always wins, so an existing tracked trace folder is
+    overwritten.
+
+    The trace directory is read from ``datacenter.datacenter.traces_dir`` if set,
+    otherwise it falls back to ``templates/gpu/<gpu>/traces/<workload-hash>``.
 
     Use ``--default`` to sync all traces from ``experiments`` and ``examples``,
     prune stale ones, commit, and push in one shot.
@@ -416,14 +423,16 @@ def sync_traces(
             if not isinstance(workload, MegatronWorkload):
                 continue
 
-            try:
-                gpu_spec = resolve_gpu_spec(sc.datacenter)
-                gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
-            except Exception:
-                gpu_name = "default"
-
-            h = workload_hash(workload)
-            trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
+            if sc.datacenter.datacenter and sc.datacenter.datacenter.traces_dir:
+                trace_dir = Path(str(sc.datacenter.datacenter.traces_dir))
+            else:
+                try:
+                    gpu_spec = resolve_gpu_spec(sc.datacenter)
+                    gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+                except Exception:
+                    gpu_name = "default"
+                h = workload_hash(workload)
+                trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
             referenced.add(trace_dir)
 
             if not trace_dir.exists():

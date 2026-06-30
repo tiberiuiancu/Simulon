@@ -86,18 +86,40 @@ def _write_workload(
 
 
 def _write_scenario(path: Path) -> None:
+    name = path.name
+    trace_name = name.replace("_", "-")
     scenario = {
-        "datacenter": {"num_nodes": 4, "node": "templates/node/snellius-h100-4g.yaml"},
+        "datacenter": {
+            "num_nodes": 4,
+            "node": "templates/node/snellius-h100-4g.yaml",
+            "datacenter": {"traces_dir": f"templates/gpu/h100/traces/workload-tuning-{trace_name}"},
+        },
         "workload": str(path / "workload.yaml"),
     }
     with open(path / "scenario.yaml", "w") as f:
         yaml.dump(scenario, f, default_flow_style=False, sort_keys=False)
 
 
+def _scenario_trace_dir(path: Path) -> Path | None:
+    from simulon.config.scenario import ScenarioConfig
+
+    try:
+        sc = ScenarioConfig.from_yaml(str(path / "scenario.yaml"))
+        traces_dir = sc.datacenter.datacenter.traces_dir if sc.datacenter.datacenter else None
+        if traces_dir:
+            return Path(str(traces_dir))
+    except Exception:
+        pass
+    return None
+
+
 def _default_trace_dir(path: Path) -> Path:
     from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
     from simulon.config.scenario import ScenarioConfig
 
+    explicit = _scenario_trace_dir(path)
+    if explicit is not None:
+        return explicit
     try:
         sc = ScenarioConfig.from_yaml(str(path / "scenario.yaml"))
         gpu_spec = resolve_gpu_spec(sc.datacenter)
