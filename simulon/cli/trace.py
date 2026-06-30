@@ -350,7 +350,14 @@ def generate_trace(
 
 @trace_app.command("sync")
 def sync_traces(
-    folders: list[Path] = typer.Argument(..., help="Folders to crawl for scenario.yaml files"),
+    folders: list[Path] = typer.Argument(
+        None, help="Folders to crawl for scenario.yaml files (ignored with --default)"
+    ),
+    default: bool = typer.Option(
+        False,
+        "--default",
+        help='Equivalent to --prune --commit "sync traces" --push experiments examples',
+    ),
     commit: str | None = typer.Option(
         None, "--commit", help="Commit message (also stages all changes)"
     ),
@@ -368,9 +375,22 @@ def sync_traces(
 
     For every scenario.yaml found under the supplied folders, if the workload is a
     Megatron workload the command resolves the target trace directory
-    (templates/gpu/<gpu>/traces/<workload-hash>) and stages it with ``git add -f``.
-    Local data always wins, so an existing tracked trace folder is overwritten.
+    (templates/gpu/<gpu>/traces/<workload-hash>) and stages it with ``git add
+    -f``. Local data always wins, so an existing tracked trace folder is overwritten.
+
+    Use ``--default`` to sync all traces from ``experiments`` and ``examples``,
+    prune stale ones, commit, and push in one shot.
     """
+    if default:
+        folders = [Path("experiments"), Path("examples")]
+        prune = True
+        if commit is None:
+            commit = "sync traces"
+        push = True
+
+    if not folders:
+        raise typer.BadParameter("Provide at least one folder, or use --default.")
+
     import shutil
 
     from simulon.config.resolve import resolve_gpu_spec, workload_hash
