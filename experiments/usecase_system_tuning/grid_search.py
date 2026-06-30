@@ -117,7 +117,7 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
                 "electricity_cost_per_kwh": 0.15,
                 "datacenter_lifetime_years": 5,
                 "idle_fraction": 0.2,
-                "traces_dir": f"templates/gpu/h100/traces/system-tuning-{workload_name}-node{node_size}-bw{link_bw}",
+                "traces_dir": f"templates/gpu/h100/traces/system-tuning-{workload_name}",
             },
         },
         "workload": str(workload_path / "workload.yaml"),
@@ -131,16 +131,14 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
 def _scenario_trace_dir(workload_path: Path) -> Path | None:
     from simulon.config.scenario import ScenarioConfig
 
-    scenario_path = workload_path / "scenario.yaml"
-    if not scenario_path.exists():
-        return None
-    try:
-        sc = ScenarioConfig.from_yaml(str(scenario_path))
-        traces_dir = sc.datacenter.datacenter.traces_dir if sc.datacenter.datacenter else None
-        if traces_dir:
-            return Path(str(traces_dir))
-    except Exception:
-        pass
+    for scenario_path in sorted(workload_path.glob("node*_bw*.yaml")):
+        try:
+            sc = ScenarioConfig.from_yaml(str(scenario_path))
+            traces_dir = sc.datacenter.datacenter.traces_dir if sc.datacenter.datacenter else None
+            if traces_dir:
+                return Path(str(traces_dir))
+        except Exception:
+            continue
     return None
 
 
@@ -152,8 +150,11 @@ def _default_trace_dir(workload_path: Path) -> Path:
     if explicit is not None:
         return explicit
 
-    scenario_path = workload_path / "scenario.yaml"
-    if not scenario_path.exists():
+    for scenario_path in sorted(workload_path.glob("node*_bw*.yaml")):
+        if scenario_path.exists():
+            break
+    else:
+        scenario_path = workload_path / f"node{_NODE_SIZES[0]}_bw{_LINK_BWS[0]}.yaml"
         _write_scenario(workload_path, _NODE_SIZES[0], _LINK_BWS[0])
     try:
         sc = ScenarioConfig.from_yaml(str(scenario_path))
@@ -195,7 +196,7 @@ def _run_trace(workload_path: Path) -> tuple[str, str]:
     if any(trace_dir.glob("trace_rank_*.json")):
         return "traced", "trace files already present"
 
-    scenario_path = workload_path / "scenario.yaml"
+    scenario_path = workload_path / f"node{_NODE_SIZES[0]}_bw{_LINK_BWS[0]}.yaml"
     cmd = ["bash", "./scripts/apptainer-trace.sh", str(scenario_path)]
     env = os.environ.copy()
     env["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
