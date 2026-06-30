@@ -6,6 +6,8 @@ from pathlib import Path
 import typer
 import yaml
 
+os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
+
 from simulon.cli.utils import _ensure_c4_dataset
 
 trace_app = typer.Typer(help="Trace generation commands.")
@@ -290,7 +292,6 @@ def generate_trace(
         env = os.environ.copy()
         if world_size is not None:
             env["WORLD_SIZE"] = str(world_size)
-        env["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
         try:
             subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
         except FileNotFoundError as exc:
