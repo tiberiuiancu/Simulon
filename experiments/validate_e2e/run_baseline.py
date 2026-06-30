@@ -161,7 +161,10 @@ def main() -> None:
     if job_id:
         default_run_name = f"{default_run_name}-{job_id}"
     wandb_run_name = args.wandb_run_name or default_run_name
-    save_dir = args.save_dir or f"./output/baseline-{model_name}"
+    default_save_dir = f"./output/baseline-{model_name}"
+    if job_id:
+        default_save_dir = f"{default_save_dir}-{job_id}"
+    save_dir = args.save_dir or default_save_dir
 
     cmd = _build_torchrun_cmd(
         workload,
