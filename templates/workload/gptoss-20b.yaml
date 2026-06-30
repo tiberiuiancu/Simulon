@@ -66,8 +66,8 @@ config:
   use-torch-fsdp2: false
 
   use-distributed-optimizer: true
-  overlap-grad-reduce: true
-  overlap-param-gather: true
+  overlap-grad-reduce: false
+  overlap-param-gather: false
 
   distributed-backend: nccl
   distributed-timeout-minutes: 30
