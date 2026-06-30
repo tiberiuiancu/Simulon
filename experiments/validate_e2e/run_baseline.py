@@ -154,7 +154,11 @@ def main() -> None:
     model_name = Path(args.input).parent.name
     wandb_project = args.wandb_project or os.environ.get("WANDB_PROJECT")
     wandb_entity = args.wandb_entity or os.environ.get("WANDB_ENTITY")
-    wandb_run_name = args.wandb_run_name or f"validate-e2e-baseline-{model_name}"
+    job_id = os.environ.get("SLURM_JOB_ID", "")
+    default_run_name = f"validate-e2e-baseline-{model_name}"
+    if job_id:
+        default_run_name = f"{default_run_name}-{job_id}"
+    wandb_run_name = args.wandb_run_name or default_run_name
     save_dir = args.save_dir or f"./output/baseline-{model_name}"
 
     cmd = _build_torchrun_cmd(
@@ -174,7 +178,9 @@ def main() -> None:
     print(  # noqa: T201
         f"  warmup={args.warmup_iters} train={args.train_iters} total={args.warmup_iters + args.train_iters}"
     )
-    print(f"  wandb_run_name={wandb_run_name}")  # noqa: T201
+    print(
+        f"  wandb_project={wandb_project} wandb_entity={wandb_entity} wandb_run_name={wandb_run_name}"
+    )  # noqa: T201
     print(f"  command: {' '.join(cmd)}")  # noqa: T201
 
     subprocess.run(cmd, check=True)
