@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=2
 #SBATCH --ntasks-per-node=2
-# #SBATCH --switches=1
+#SBATCH --switches=1
 #SBATCH --job-name=validate-e2e-smoke
 #SBATCH --output=baseline-smoke-%x-%j.out
 #SBATCH --error=baseline-smoke-%x-%j.err
