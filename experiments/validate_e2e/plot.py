@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Plot real vs simulated metrics for validate_e2e experiments.
+"""Plot real vs simulated iteration time for validate_e2e experiments.
+
+Pulls baseline iteration-time metrics from W&B (per-iteration, iterations >= 4)
+and simulation total_time_ms from W&B, then plots a grouped bar chart comparing
+the two for each config.
 
 Usage (from repo root):
     uv run python experiments/validate_e2e/plot.py
     uv run python experiments/validate_e2e/plot.py --output results.pdf
+    uv run python experiments/validate_e2e/plot.py --use-csv
 """
 
 from __future__ import annotations
@@ -13,36 +18,23 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-import yaml
-
-from simulon.tracking import get_trackers
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from _plot_utils import label_for_model, make_figure, plot_metric_panel, setup_latex_style
+from _plot_utils import label_for_model, make_figure, setup_latex_style
+
+_WARMUP_ITERS = 3
 
 
-def _short_label_for_e2e(raw_name: str) -> str:
-    return label_for_model(raw_name).replace("GPT-OSS\n", "").replace("GPT-OSS ", "")
-
-
-def _find_models(base_dir: Path) -> list[Path]:
+def _find_configs(base_dir: Path) -> list[str]:
     configs_dir = base_dir / "configs"
     search_dir = configs_dir if configs_dir.is_dir() else base_dir
-    models = []
-    for item in sorted(search_dir.iterdir()):
-        if (
-            item.is_dir()
-            and (item / "reference.yaml").exists()
-            and (item / "scenario.yaml").exists()
-        ):
-            models.append(item)
-    return models
-
-
-def _read_reference(ref_path: Path) -> dict:
-    with open(ref_path) as f:
-        return yaml.safe_load(f) or {}
+    return sorted(
+        item.name
+        for item in search_dir.iterdir()
+        if item.is_dir() and (item / "scenario.yaml").exists()
+    )
 
 
 def _load_csv(csv_path: Path) -> pd.DataFrame | None:
@@ -61,121 +53,180 @@ def _save_csv(df: pd.DataFrame, csv_path: Path) -> None:
     print(f"Saved results to {csv_path}")
 
 
-def _records_to_long(
-    rows: list[dict[str, float | str | None]], metric_key: str, metric_label: str
-) -> list[dict[str, float | str]]:
-    records: list[dict[str, float | str]] = []
-    for row in rows:
-        if row is None:
+def _pull_baseline_iteration_times(config: str) -> list[float]:
+    import os
+
+    import wandb
+
+    entity = os.environ.get("WANDB_ENTITY")
+    project = os.environ.get("WANDB_PROJECT", "simulon")
+    api = wandb.Api()
+
+    prefix = f"validate-e2e-baseline-{config}-"
+    filters: dict[str, object] = {"state": "finished", "display_name": {"$regex": f"^{prefix}"}}
+    runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
+
+    values: list[float] = []
+    for run in runs:
+        rest = run.display_name[len(prefix) :]
+        if not rest or rest == "local":
             continue
-        model = row["model"]
-        real_val = row.get("real")
-        sim_val = row.get("simulated")
-        if real_val is None or sim_val is None:
+        try:
+            int(rest)
+        except ValueError:
             continue
-        records.append(
-            {"model": model, "metric": metric_label, "source": "Real", "value": float(real_val)}
-        )
-        records.append(
-            {"model": model, "metric": metric_label, "source": "Simulated", "value": float(sim_val)}
-        )
-    return records
+        history = run.history(samples=10000)
+        if "iteration-time" not in history.columns:
+            continue
+        for _, row in history.iterrows():
+            step = row.get("_step", row.get("iteration", 0))
+            if step <= _WARMUP_ITERS:
+                continue
+            val = row["iteration-time"]
+            if pd.notna(val):
+                values.append(float(val) * 1000.0)
+    return values
 
 
-def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
-    csv_path = base_dir / "results.csv"
-    metrics = [("per_gpu_tps", "Throughput", "tokens/s/GPU")]
+def _pull_simulated_iteration_time(config: str) -> float | None:
+    import os
 
-    if use_csv:
-        df = _load_csv(csv_path)
-        if df is None:
-            print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
-            sys.exit(1)
-        df["model"] = df["model"].map(_short_label_for_e2e)
-    else:
-        models = _find_models(base_dir)
-        if not models:
-            print("No model sub-folders found.", file=sys.stderr)
-            sys.exit(1)
+    import wandb
 
-        trackers = get_trackers(models[0] / "scenario.yaml")
+    entity = os.environ.get("WANDB_ENTITY")
+    project = os.environ.get("WANDB_PROJECT", "simulon")
+    api = wandb.Api()
 
-        rows: list[dict[str, float | str | None]] = []
-        for model_dir in models:
-            model = model_dir.name
-            ref = _read_reference(model_dir / "reference.yaml")
+    filters: dict[str, object] = {"state": "finished", "display_name": f"validate-e2e-{config}"}
+    runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
+    for run in runs:
+        if run.display_name != f"validate-e2e-{config}":
+            continue
+        summary = dict(run.summary)
+        val = summary.get("total_time_ms")
+        if val is not None:
+            return float(val)
+    return None
 
-            sim_metrics = None
-            if trackers:
-                for tracker in trackers:
-                    sim_metrics = tracker.pull_metrics(run_name=f"validate-e2e-{model}")
-                    if sim_metrics is not None:
-                        break
 
-            row: dict[str, float | str | None] = {"model": model}
-            for key, _label, _unit in metrics:
-                row[f"real_{key}"] = ref.get(key)
-                row[f"sim_{key}"] = sim_metrics.get(key) if sim_metrics else None
-            rows.append(row)
+def _gather_results(base_dir: Path) -> pd.DataFrame:
+    configs = _find_configs(base_dir)
+    if not configs:
+        print("No config sub-folders found.", file=sys.stderr)
+        sys.exit(1)
 
-        def _has_both_results(row: dict[str, float | str | None]) -> bool:
-            return all(
-                row.get(f"real_{key}") is not None and row.get(f"sim_{key}") is not None
-                for key, _label, _unit in metrics
+    from simulon.tracking.env import load_cascading_tracking_env
+
+    first_scenario = base_dir / "configs" / configs[0] / "scenario.yaml"
+    if not first_scenario.exists():
+        first_scenario = base_dir / configs[0] / "scenario.yaml"
+    load_cascading_tracking_env(str(first_scenario))
+
+    rows: list[dict[str, float | str | None]] = []
+    for config in configs:
+        baseline_values = _pull_baseline_iteration_times(config)
+        sim_ms = _pull_simulated_iteration_time(config)
+
+        if baseline_values:
+            baseline_mean = float(np.mean(baseline_values))
+            baseline_std = (
+                float(np.std(baseline_values, ddof=1)) if len(baseline_values) > 1 else 0.0
             )
-
-        complete_rows = []
-        for row in rows:
-            if _has_both_results(row):
-                complete_rows.append(row)
-            else:
-                print(
-                    f"Skipping {row['model']}: missing real or simulated results.", file=sys.stderr
-                )
-
-        records: list[dict[str, float | str]] = []
-        for key, label, _unit in metrics:
-            records.extend(
-                _records_to_long(
-                    [
-                        {
-                            "model": r["model"],
-                            "real": r[f"real_{key}"],
-                            "simulated": r[f"sim_{key}"],
-                        }
-                        for r in complete_rows
-                    ],
-                    key,
-                    label,
-                )
-            )
-
-        if records:
-            df = pd.DataFrame(records)
-            df["model"] = df["model"].map(_short_label_for_e2e)
-            _save_csv(df, csv_path)
         else:
-            print("No complete wandb data found; falling back to local CSV.", file=sys.stderr)
-            df = _load_csv(csv_path)
-            if df is None:
-                print("No cached results.csv available. Exiting.", file=sys.stderr)
-                sys.exit(1)
+            baseline_mean = None
+            baseline_std = None
 
+        if baseline_mean is None:
+            print(f"Skipping {config}: no baseline iteration-time data from W&B.", file=sys.stderr)
+        if sim_ms is None:
+            print(f"Skipping {config}: no simulation total_time_ms from W&B.", file=sys.stderr)
+
+        rows.append(
+            {
+                "model": config,
+                "baseline_mean_ms": baseline_mean,
+                "baseline_std_ms": baseline_std,
+                "simulated_ms": sim_ms,
+            }
+        )
+
+    complete = [
+        r for r in rows if r["baseline_mean_ms"] is not None and r["simulated_ms"] is not None
+    ]
+    if not complete:
+        print("No complete results from W&B. Exiting.", file=sys.stderr)
+        sys.exit(1)
+
+    return pd.DataFrame(complete)
+
+
+def _plot(df: pd.DataFrame, output: Path | None) -> None:
     setup_latex_style()
 
-    metric_labels = df["metric"].unique()
-    fig, axes = make_figure(
-        "GPT-OSS End-to-End Training Validation", width_in=3.5, n_panels=len(metric_labels)
+    df = df.copy()
+    df["label"] = df["model"].map(label_for_model)
+
+    fig, ax = make_figure("E2E Validation: Iteration Time", width_in=5.5)
+    ax.set_axisbelow(True)
+
+    x = np.arange(len(df))
+    bar_width = 0.35
+
+    baseline_vals = df["baseline_mean_ms"].values.astype(float)
+    baseline_stds = df["baseline_std_ms"].fillna(0).values.astype(float)
+    sim_vals = df["simulated_ms"].values.astype(float)
+
+    ax.bar(
+        x - bar_width / 2,
+        baseline_vals,
+        bar_width,
+        yerr=baseline_stds,
+        label="Baseline",
+        color="#4c72b0",
+        capsize=3,
+        edgecolor="white",
+        linewidth=0.5,
+    )
+    ax.bar(
+        x + bar_width / 2,
+        sim_vals,
+        bar_width,
+        label="Simulated",
+        color="#dd8452",
+        edgecolor="white",
+        linewidth=0.5,
     )
 
-    for ax in axes:
-        ax.set_xlabel("")
+    y_max = max(float(np.max(baseline_vals + baseline_stds)), float(np.max(sim_vals)))
+    for i, (real, sim) in enumerate(zip(baseline_vals, sim_vals, strict=False)):
+        if real > 0:
+            pct = (sim - real) / real * 100
+            ax.text(
+                x[i] + bar_width / 2,
+                sim + 0.03 * y_max,
+                f"{pct:+.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=7,
+                color="red",
+            )
 
-    for ax, metric_label in zip(axes, metric_labels, strict=False):
-        sub = df[df["metric"] == metric_label]
-        unit = next((unit for key, lbl, unit in metrics if lbl == metric_label), "")
-        ylabel = unit if unit else metric_label
-        plot_metric_panel(ax, sub, metric_label, ylabel)
+    ax.set_xticks(x)
+    ax.set_xticklabels(df["label"], fontsize=8)
+    ax.set_ylabel("Iteration time (ms)")
+    ax.set_xlabel("")
+    ax.tick_params(axis="x", rotation=0)
+    ax.legend(
+        title="",
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=2,
+        frameon=False,
+        handlelength=1.2,
+        handletextpad=0.4,
+        columnspacing=1.0,
+    )
+    ax.set_ylim(0, y_max * 1.15)
 
     fig.tight_layout(rect=[0, 0, 1, 1.02])
 
@@ -184,6 +235,21 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
         print(f"Saved plot to {output}")
     else:
         plt.show()
+
+
+def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
+    csv_path = base_dir / "results.csv"
+
+    if use_csv:
+        df = _load_csv(csv_path)
+        if df is None:
+            print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        df = _gather_results(base_dir)
+        _save_csv(df, csv_path)
+
+    _plot(df, output)
 
 
 def main() -> None:
@@ -198,12 +264,12 @@ def main() -> None:
         "--base-dir",
         type=Path,
         default=Path(__file__).parent,
-        help="Directory containing model sub-folders with reference and scenario YAMLs.",
+        help="Directory containing configs/ sub-folders with scenario YAMLs.",
     )
     parser.add_argument(
         "--use-csv",
         action="store_true",
-        help="Plot from the local results.csv instead of pulling from wandb.",
+        help="Plot from the local results.csv instead of pulling from W&B.",
     )
     args = parser.parse_args()
     plot_real_vs_simulated(args.output, args.base_dir, use_csv=args.use_csv)
