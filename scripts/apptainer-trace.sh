@@ -8,4 +8,4 @@ apptainer exec --nv \
     --bind "$(pwd)/output:/opt/simulon/output" \
     --workdir /opt/simulon \
     simulon-nemo.sif \
-    bash -c 'cd /opt/simulon && CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate "$@"' -- "$@"
+    bash -c 'CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate "$@"' -- "$@"
