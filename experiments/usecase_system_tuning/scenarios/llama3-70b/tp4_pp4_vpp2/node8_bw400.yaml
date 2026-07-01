@@ -1,6 +1,11 @@
 datacenter:
   num_nodes: 8
-  node: /Users/tibi/uni/t/simulon-validate/experiments/usecase_system_tuning/nodes/node8_bw400.yaml
+  node:
+    from: templates/node/dgx-h100.yaml
+    scale_out:
+      nic:
+        speed: 400Gbps
+    cost: 300000
   datacenter:
     pue: 1.2
     electricity_cost_per_kwh: 0.15

@@ -23,11 +23,17 @@ import yaml
 
 _BASE_DIR = Path(__file__).parent
 _SCENARIOS_DIR = _BASE_DIR / "scenarios"
-_NODES_DIR = _BASE_DIR / "nodes"
 
 _NODE_SIZES = [4, 8]
 _LINK_BWS = [100, 200, 400, 800]
 _TOTAL_GPUS = 64
+
+_NODE_TEMPLATE_FOR_SIZE: dict[int, str] = {
+    4: "templates/node/snellius-h100-4g.yaml",
+    8: "templates/node/dgx-h100.yaml",
+}
+
+_NODE_COST_USD: dict[int, float] = {4: 150_000, 8: 300_000}
 
 
 @dataclass(frozen=True)
@@ -105,14 +111,17 @@ def _write_workload(
 
 
 def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
-    node_file = _NODES_DIR / f"node{node_size}_bw{link_bw}.yaml"
     num_nodes = _TOTAL_GPUS // node_size
     model_name = workload_path.parent.name
     workload_name = workload_path.name
     scenario = {
         "datacenter": {
             "num_nodes": num_nodes,
-            "node": str(node_file),
+            "node": {
+                "from": _NODE_TEMPLATE_FOR_SIZE[node_size],
+                "scale_out": {"nic": {"speed": f"{link_bw}Gbps"}},
+                "cost": _NODE_COST_USD[node_size],
+            },
             "datacenter": {
                 "pue": 1.2,
                 "electricity_cost_per_kwh": 0.15,
@@ -240,7 +249,16 @@ def _run_trace(workload_path: Path) -> tuple[str, str]:
 
 
 def _run_simulate(scenario_path: Path, run_name: str) -> dict[str, Any] | None:
-    cmd = ["simulon", "simulate", str(scenario_path), "--skip-if-tracked", "--energy", "--cost"]
+    cmd = [
+        "simulon",
+        "simulate",
+        str(scenario_path),
+        "--network-simulation",
+        "collective",
+        "--skip-if-tracked",
+        "--energy",
+        "--cost",
+    ]
     env = os.environ.copy()
     env["WANDB_RUN_NAME"] = run_name
     try:
