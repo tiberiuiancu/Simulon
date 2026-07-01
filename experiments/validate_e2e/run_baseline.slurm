@@ -33,7 +33,7 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
     fi
     export MASTER_PORT
 
-    if [[ "$(basename "$INPUT_PATH")" == *"3nic"* ]] || [[ "$(basename "$INPUT_PATH")" == *"3NIC"* ]]; then
+    if [[ "$(basename "$(dirname "$INPUT_PATH")")" == *"3nic"* ]]; then
         export NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4"
     fi
 
