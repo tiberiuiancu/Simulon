@@ -128,15 +128,15 @@ def _gather_results(base_dir: Path) -> pd.DataFrame:
         sim_ms = _pull_simulated_iteration_time(config)
 
         if baseline_values:
-            baseline_mean = float(np.mean(baseline_values))
-            baseline_std = (
-                float(np.std(baseline_values, ddof=1)) if len(baseline_values) > 1 else 0.0
-            )
+            baseline_median = float(np.median(baseline_values))
+            baseline_min = float(np.min(baseline_values))
+            baseline_max = float(np.max(baseline_values))
         else:
-            baseline_mean = None
-            baseline_std = None
+            baseline_median = None
+            baseline_min = None
+            baseline_max = None
 
-        if baseline_mean is None:
+        if baseline_median is None:
             print(f"Skipping {config}: no baseline iteration-time data from W&B.", file=sys.stderr)
         if sim_ms is None:
             print(f"Skipping {config}: no simulation total_time_ms from W&B.", file=sys.stderr)
@@ -144,14 +144,15 @@ def _gather_results(base_dir: Path) -> pd.DataFrame:
         rows.append(
             {
                 "model": config,
-                "baseline_mean_ms": baseline_mean,
-                "baseline_std_ms": baseline_std,
+                "baseline_median_ms": baseline_median,
+                "baseline_min_ms": baseline_min,
+                "baseline_max_ms": baseline_max,
                 "simulated_ms": sim_ms,
             }
         )
 
     complete = [
-        r for r in rows if r["baseline_mean_ms"] is not None and r["simulated_ms"] is not None
+        r for r in rows if r["baseline_median_ms"] is not None and r["simulated_ms"] is not None
     ]
     if not complete:
         print("No complete results from W&B. Exiting.", file=sys.stderr)
@@ -173,15 +174,18 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     x = np.arange(len(df))
     bar_width = 0.35
 
-    baseline_vals = df["baseline_mean_ms"].values.astype(float)
-    baseline_stds = df["baseline_std_ms"].fillna(0).values.astype(float)
+    baseline_vals = df["baseline_median_ms"].values.astype(float)
+    baseline_lows = df["baseline_min_ms"].fillna(0).values.astype(float)
+    baseline_highs = df["baseline_max_ms"].fillna(0).values.astype(float)
     sim_vals = df["simulated_ms"].values.astype(float)
+
+    yerr = np.vstack([baseline_vals - baseline_lows, baseline_highs - baseline_vals])
 
     ax.bar(
         x - bar_width / 2,
         baseline_vals,
         bar_width,
-        yerr=baseline_stds,
+        yerr=yerr,
         label="Baseline",
         color="#4c72b0",
         capsize=3,
@@ -198,7 +202,7 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         linewidth=0.5,
     )
 
-    y_max = max(float(np.max(baseline_vals + baseline_stds)), float(np.max(sim_vals)))
+    y_max = max(float(np.max(baseline_highs)), float(np.max(sim_vals)))
     for i, (real, sim) in enumerate(zip(baseline_vals, sim_vals, strict=False)):
         if real > 0:
             pct = (sim - real) / real * 100
