@@ -130,7 +130,7 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
                 "traces_dir": f"templates/gpu/h100/traces/system-tuning-{model_name}-{workload_name}",
             },
         },
-        "workload": str(workload_path / "workload.yaml"),
+        "workload": "workload.yaml",
     }
     scenario_path = workload_path / f"node{node_size}_bw{link_bw}.yaml"
     with open(scenario_path, "w") as f:

@@ -94,7 +94,7 @@ def _write_scenario(path: Path) -> None:
             "node": "templates/node/snellius-h100-4g.yaml",
             "datacenter": {"traces_dir": f"templates/gpu/h100/traces/workload-tuning-{trace_name}"},
         },
-        "workload": str(path / "workload.yaml"),
+        "workload": "workload.yaml",
     }
     with open(path / "scenario.yaml", "w") as f:
         yaml.dump(scenario, f, default_flow_style=False, sort_keys=False)
