@@ -27,8 +27,10 @@ def _short_label_for_e2e(raw_name: str) -> str:
 
 
 def _find_models(base_dir: Path) -> list[Path]:
+    configs_dir = base_dir / "configs"
+    search_dir = configs_dir if configs_dir.is_dir() else base_dir
     models = []
-    for item in sorted(base_dir.iterdir()):
+    for item in sorted(search_dir.iterdir()):
         if (
             item.is_dir()
             and (item / "reference.yaml").exists()

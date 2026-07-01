@@ -4,10 +4,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
-EXCLUDE=(__pycache__ gptoss-smoke qwen3-32b)
+EXCLUDE=(__pycache__ configs gptoss-smoke qwen3-32b)
 
 TOTAL=0
-for dir in "$SCRIPT_DIR"/*/; do
+for dir in "$SCRIPT_DIR/configs"/*/; do
     model="$(basename "$dir")"
     if printf '%s\n' "${EXCLUDE[@]}" | grep -qx "$model"; then
         echo "Skipping excluded model: $model"

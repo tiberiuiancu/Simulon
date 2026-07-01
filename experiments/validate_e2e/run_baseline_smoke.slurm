@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-INPUT_PATH="${1:-experiments/validate_e2e/gptoss-smoke/scenario.yaml}"
+INPUT_PATH="${1:-experiments/validate_e2e/configs/gptoss-smoke/scenario.yaml}"
 
 if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; then
     if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
