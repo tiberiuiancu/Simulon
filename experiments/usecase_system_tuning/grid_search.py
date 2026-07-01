@@ -105,6 +105,8 @@ def _write_workload(
         cfg["config"].pop("num-layers-per-virtual-pipeline-stage", None)
     if ep is not None:
         cfg["config"]["expert-model-parallel-size"] = ep
+        if tp > 1:
+            cfg["config"]["sequence-parallel"] = True
     else:
         cfg["config"].pop("expert-model-parallel-size", None)
     with open(path / "workload.yaml", "w") as f:
