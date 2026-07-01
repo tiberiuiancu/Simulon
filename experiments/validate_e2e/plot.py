@@ -166,7 +166,8 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     df = df.copy()
     df["label"] = df["model"].map(label_for_model)
 
-    fig, ax = make_figure("E2E Validation: Iteration Time", width_in=5.5)
+    fig, axes = make_figure("E2E Validation: Iteration Time", width_in=5.5)
+    ax = axes[0] if isinstance(axes, list) else axes
     ax.set_axisbelow(True)
 
     x = np.arange(len(df))
