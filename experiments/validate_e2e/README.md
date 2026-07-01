@@ -19,8 +19,6 @@ This submits:
 - one baseline Slurm job per config (via `run_baseline.slurm`) that runs real Megatron training and logs to W&B
 - one simulation Slurm job (via `run_sim.slurm`) that traces each config with `simulon trace generate` and then simulates it with `simulon simulate`
 
-`qwen3-32b` is excluded from the real baseline jobs because it requires 16 nodes × 4 GPUs; it is still traced and simulated in the simulation sweep.
-
 ## Plotting
 
 ```bash

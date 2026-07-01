@@ -5,7 +5,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 EXCLUDE=(__pycache__ configs)
-BASELINE_EXCLUDE=(qwen3-32b)
 
 TOTAL_BASELINES=0
 for dir in "$SCRIPT_DIR/configs"/*/; do
@@ -20,13 +19,9 @@ for dir in "$SCRIPT_DIR/configs"/*/; do
     fi
     scenario_rel="${scenario#$REPO_ROOT/}"
 
-    if ! printf '%s\n' "${BASELINE_EXCLUDE[@]}" | grep -qx "$model"; then
-        echo "Submitting baseline job for $model ($scenario_rel)"
-        bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
-        TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
-    else
-        echo "Skipping baseline job for $model (requires too many GPUs)"
-    fi
+    echo "Submitting baseline job for $model ($scenario_rel)"
+    bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
+    TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
 done
 
 echo "Submitting simulation sweep job"
