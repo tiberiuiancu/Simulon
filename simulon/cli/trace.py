@@ -209,7 +209,10 @@ def generate_trace(
         raise typer.BadParameter("Workload must be a Megatron workload")
 
     if output_dir is None:
-        if is_scenario:
+        env_traces_dir = os.environ.get("SIMULON_TRACES_DIR")
+        if env_traces_dir:
+            output_dir = Path(env_traces_dir)
+        elif is_scenario:
             assert sc is not None
             dc = sc.datacenter
             assert not isinstance(dc, Path)

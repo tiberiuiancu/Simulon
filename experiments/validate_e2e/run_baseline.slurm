@@ -33,9 +33,12 @@ if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; the
     fi
     export MASTER_PORT
 
-    if [[ "$(basename "$(dirname "$INPUT_PATH")")" == *"3nic"* ]]; then
-        export NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4"
-    fi
+    config_dir="$(basename "$(dirname "$INPUT_PATH")")"
+    case "$config_dir" in
+        *3nic*) export NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4" ;;
+        *2nic*) export NCCL_IB_HCA="mlx5_3,mlx5_4" ;;
+        *1nic*) export NCCL_IB_HCA="mlx5_4" ;;
+    esac
 
     srun --nodes="$SLURM_NNODES" --ntasks-per-node=1 \
         apptainer exec --nv \

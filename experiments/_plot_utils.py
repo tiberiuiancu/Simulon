@@ -37,6 +37,8 @@ def label_for_model(raw_name: str) -> str:
     labels: dict[str, str] = {
         "gptoss-bf16": "BF16",
         "gptoss-bf16-3nic": "BF16\n(3 NIC)",
+        "gptoss-bf16-2nic": "BF16\n(2 NIC)",
+        "gptoss-bf16-1nic": "BF16\n(1 NIC)",
         "gptoss-bf16-pp4-ep4": "BF16\n(PP4 EP4)",
         "gptoss-fp8": "FP8",
         "gptoss-fp8-3nic": "FP8\n(3 NIC)",

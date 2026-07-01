@@ -269,6 +269,11 @@ class _PendingPPTransfer:
 
 def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload) -> Path:
     """Resolve the directory that contains per-rank trace files."""
+    import os
+
+    env_traces_dir = os.environ.get("SIMULON_TRACES_DIR")
+    if env_traces_dir:
+        return Path(env_traces_dir)
     traces_dir = datacenter.datacenter.traces_dir if datacenter and datacenter.datacenter else None
     if traces_dir is not None:
         return Path(traces_dir)

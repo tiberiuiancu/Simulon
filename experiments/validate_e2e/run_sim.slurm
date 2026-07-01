@@ -19,33 +19,33 @@ cd "$REPO_ROOT"
 export PYTHONUNBUFFERED=1
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
+JOB_ID="${SLURM_JOB_ID:-local}"
 CONFIGS_DIR="$REPO_ROOT/experiments/validate_e2e/configs"
-
-# Tracking credentials are loaded by simulon simulate from the .tracking.env cascade.
-# Explicitly set WANDB_RUN_NAME per config below so each simulation has a unique run.
 
 for dir in "$CONFIGS_DIR"/*/; do
     model="$(basename "$dir")"
     scenario="$dir/scenario.yaml"
     scenario_rel="${scenario#$REPO_ROOT/}"
     run_name="validate-e2e-$model"
+    trace_dir="templates/gpu/h100/traces/validate-e2e-$model-$JOB_ID"
 
     echo ""
     echo "============================================================"
     echo "Config: $model"
     echo "Scenario: $scenario_rel"
+    echo "Trace dir: $trace_dir"
     echo "Run name: $run_name"
     echo "============================================================"
 
     echo "[trace] $model"
-    if bash "$REPO_ROOT/scripts/apptainer-trace.sh" "$scenario_rel"; then
+    if SIMULON_TRACES_DIR="$trace_dir" bash "$REPO_ROOT/scripts/apptainer-trace.sh" "$scenario_rel"; then
         echo "[trace] $model: OK"
     else
         echo "[trace] $model: FAILED (exit code $?)" >&2
     fi
 
     echo "[simulate] $model"
-    if WANDB_RUN_NAME="$run_name" uv run simulon simulate \
+    if SIMULON_TRACES_DIR="$trace_dir" WANDB_RUN_NAME="$run_name" uv run simulon simulate \
         --network-simulation collective \
         --energy \
         "$scenario_rel"; then
@@ -56,4 +56,4 @@ for dir in "$CONFIGS_DIR"/*/; do
 done
 
 echo ""
-echo "Validate-e2e simulation sweep complete."
+echo "Validate-e2e simulation sweep complete (job $JOB_ID)."

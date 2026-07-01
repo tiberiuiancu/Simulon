@@ -1,5 +1,6 @@
 apptainer exec --nv \
     --env "CUDA_DEVICE_MAX_CONNECTIONS=1" \
+    --env "SIMULON_TRACES_DIR=${SIMULON_TRACES_DIR:-}" \
     --bind "$(pwd)/experiments:/opt/simulon/experiments" \
     --bind "$(pwd)/examples:/opt/simulon/examples" \
     --bind "$(pwd)/vendor:/opt/simulon/vendor" \

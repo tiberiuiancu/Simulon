@@ -29,7 +29,10 @@ for dir in "$SCRIPT_DIR/configs"/*/; do
     TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
 done
 
-echo "Submitting simulation sweep job"
-bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm'"
+NUM_SIM_JOBS=30
+echo "Submitting $NUM_SIM_JOBS simulation sweep jobs"
+for i in $(seq 1 "$NUM_SIM_JOBS"); do
+    bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm'"
+done
 
-echo "Submitted $TOTAL_BASELINES baseline job(s) + 1 simulation sweep job."
+echo "Submitted $TOTAL_BASELINES baseline job(s) + $NUM_SIM_JOBS simulation sweep jobs."

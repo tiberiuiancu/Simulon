@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Plot real vs simulated iteration time for validate_e2e experiments.
 
-Pulls baseline iteration-time metrics from W&B (per-iteration, iterations >= 4)
-and simulation total_time_ms from W&B, then plots a grouped bar chart comparing
-the two for each config.
+Pulls baseline iteration-time metrics from W&B (per-iteration, iterations > 3)
+and simulation total_time_ms from W&B (multiple runs), then plots violin plots
+comparing the two distributions for each config.
 
 Usage (from repo root):
     uv run python experiments/validate_e2e/plot.py
@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from _plot_utils import label_for_model, make_figure, setup_latex_style
+from _plot_utils import label_for_model, setup_latex_style
 
 _WARMUP_ITERS = 3
 
@@ -33,7 +33,7 @@ def _find_configs(base_dir: Path) -> list[str]:
     return sorted(
         item.name
         for item in search_dir.iterdir()
-        if item.is_dir() and (item / "scenario.yaml").exists() and "3nic" not in item.name
+        if item.is_dir() and (item / "scenario.yaml").exists()
     )
 
 
@@ -88,7 +88,7 @@ def _pull_baseline_iteration_times(config: str) -> list[float]:
     return values
 
 
-def _pull_simulated_iteration_time(config: str) -> float | None:
+def _pull_simulated_iteration_times(config: str) -> list[float]:
     import os
 
     import wandb
@@ -99,14 +99,16 @@ def _pull_simulated_iteration_time(config: str) -> float | None:
 
     filters: dict[str, object] = {"state": "finished", "display_name": f"validate-e2e-{config}"}
     runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
+
+    values: list[float] = []
     for run in runs:
         if run.display_name != f"validate-e2e-{config}":
             continue
         summary = dict(run.summary)
         val = summary.get("total_time_ms")
         if val is not None:
-            return float(val)
-    return None
+            values.append(float(val))
+    return values
 
 
 def _gather_results(base_dir: Path) -> pd.DataFrame:
@@ -122,43 +124,26 @@ def _gather_results(base_dir: Path) -> pd.DataFrame:
         first_scenario = base_dir / configs[0] / "scenario.yaml"
     load_cascading_tracking_env(str(first_scenario))
 
-    rows: list[dict[str, float | str | None]] = []
+    records: list[dict[str, float | str]] = []
     for config in configs:
         baseline_values = _pull_baseline_iteration_times(config)
-        sim_ms = _pull_simulated_iteration_time(config)
+        sim_values = _pull_simulated_iteration_times(config)
 
-        if baseline_values:
-            baseline_median = float(np.median(baseline_values))
-            baseline_min = float(np.min(baseline_values))
-            baseline_max = float(np.max(baseline_values))
-        else:
-            baseline_median = None
-            baseline_min = None
-            baseline_max = None
-
-        if baseline_median is None:
+        if not baseline_values:
             print(f"Skipping {config}: no baseline iteration-time data from W&B.", file=sys.stderr)
-        if sim_ms is None:
+        if not sim_values:
             print(f"Skipping {config}: no simulation total_time_ms from W&B.", file=sys.stderr)
 
-        rows.append(
-            {
-                "model": config,
-                "baseline_median_ms": baseline_median,
-                "baseline_min_ms": baseline_min,
-                "baseline_max_ms": baseline_max,
-                "simulated_ms": sim_ms,
-            }
-        )
+        for v in baseline_values:
+            records.append({"model": config, "source": "Baseline", "value": v})
+        for v in sim_values:
+            records.append({"model": config, "source": "Simulated", "value": v})
 
-    complete = [
-        r for r in rows if r["baseline_median_ms"] is not None and r["simulated_ms"] is not None
-    ]
-    if not complete:
-        print("No complete results from W&B. Exiting.", file=sys.stderr)
+    if not records:
+        print("No results from W&B. Exiting.", file=sys.stderr)
         sys.exit(1)
 
-    return pd.DataFrame(complete)
+    return pd.DataFrame(records)
 
 
 def _plot(df: pd.DataFrame, output: Path | None) -> None:
@@ -167,70 +152,95 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     df = df.copy()
     df["label"] = df["model"].map(label_for_model)
 
-    fig, axes = make_figure("E2E Validation: Iteration Time", width_in=5.5)
-    ax = axes[0] if isinstance(axes, list) else axes
-    ax.set_axisbelow(True)
+    models = list(df["model"].unique())
+    labels = [label_for_model(m) for m in models]
+    n = len(models)
 
-    x = np.arange(len(df))
-    bar_width = 0.35
+    fig, ax = plt.subplots(figsize=(max(5.5, 1.2 * n), 3.0))
 
-    baseline_vals = df["baseline_median_ms"].values.astype(float)
-    baseline_lows = df["baseline_min_ms"].fillna(0).values.astype(float)
-    baseline_highs = df["baseline_max_ms"].fillna(0).values.astype(float)
-    sim_vals = df["simulated_ms"].values.astype(float)
+    positions_baseline = np.arange(n) * 2.0
+    positions_sim = positions_baseline + 1.0
 
-    yerr = np.vstack([baseline_vals - baseline_lows, baseline_highs - baseline_vals])
+    baseline_data = [
+        df[(df["model"] == m) & (df["source"] == "Baseline")]["value"].values.astype(float)
+        for m in models
+    ]
+    sim_data = [
+        df[(df["model"] == m) & (df["source"] == "Simulated")]["value"].values.astype(float)
+        for m in models
+    ]
 
-    ax.bar(
-        x - bar_width / 2,
-        baseline_vals,
-        bar_width,
-        yerr=yerr,
-        label="Baseline",
-        color="#4c72b0",
-        capsize=3,
-        edgecolor="white",
-        linewidth=0.5,
-    )
-    ax.bar(
-        x + bar_width / 2,
-        sim_vals,
-        bar_width,
-        label="Simulated",
-        color="#dd8452",
-        edgecolor="white",
-        linewidth=0.5,
-    )
+    color_baseline = "#4c72b0"
+    color_sim = "#dd8452"
 
-    y_max = max(float(np.max(baseline_highs)), float(np.max(sim_vals)))
-    for i, (real, sim) in enumerate(zip(baseline_vals, sim_vals, strict=False)):
-        if real > 0:
-            pct = (sim - real) / real * 100
-            ax.text(
-                x[i] + bar_width / 2,
-                sim + 0.03 * y_max,
-                f"{pct:+.1f}%",
-                ha="center",
-                va="bottom",
-                fontsize=7,
-                color="red",
-            )
+    for i, (bd, sd) in enumerate(zip(baseline_data, sim_data, strict=False)):
+        pos_b = positions_baseline[i]
+        pos_s = positions_sim[i]
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(df["label"], fontsize=8)
+        if len(bd) > 0:
+            parts_b = ax.violinplot(bd, positions=[pos_b], widths=0.8, showmedians=True)
+            for pc in parts_b["bodies"]:
+                pc.set_facecolor(color_baseline)
+                pc.set_alpha(0.7)
+            parts_b["cmedians"].set_color("white")
+            parts_b["cmins"].set_color(color_baseline)
+            parts_b["cmaxes"].set_color(color_baseline)
+
+        if len(sd) > 0:
+            parts_s = ax.violinplot(sd, positions=[pos_s], widths=0.8, showmedians=True)
+            for pc in parts_s["bodies"]:
+                pc.set_facecolor(color_sim)
+                pc.set_alpha(0.7)
+            parts_s["cmedians"].set_color("white")
+            parts_s["cmins"].set_color(color_sim)
+            parts_s["cmaxes"].set_color(color_sim)
+
+        if len(bd) > 0 and len(sd) > 0:
+            real_median = float(np.median(bd))
+            sim_median = float(np.median(sd))
+            if real_median > 0:
+                pct = (sim_median - real_median) / real_median * 100
+                y_top = max(float(np.max(bd)), float(np.max(sd)))
+                ax.text(
+                    pos_s,
+                    y_top * 1.03,
+                    f"{pct:+.1f}%",
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                    color="red",
+                )
+
+    all_positions = np.concatenate([positions_baseline, positions_sim])
+    ax.set_xticks(np.sort(all_positions))
+    tick_labels = []
+    for i in range(n):
+        tick_labels.append(f"{labels[i]}\n(Base)")
+        tick_labels.append(f"{labels[i]}\n(Sim)")
+    ax.set_xticklabels(tick_labels, fontsize=7)
     ax.set_ylabel("Iteration time (ms)")
-    ax.set_xlabel("")
-    ax.tick_params(axis="x", rotation=0)
+    ax.set_title("E2E Validation: Iteration Time", fontsize=10, fontweight="bold")
+
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        Patch(facecolor=color_baseline, alpha=0.7, label="Baseline"),
+        Patch(facecolor=color_sim, alpha=0.7, label="Simulated"),
+    ]
     ax.legend(
-        title="",
+        handles=legend_elements,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.18),
+        bbox_to_anchor=(0.5, -0.15),
         ncol=2,
         frameon=False,
         handlelength=1.2,
         handletextpad=0.4,
         columnspacing=1.0,
     )
+    ax.tick_params(axis="x", rotation=0)
+
+    all_vals = df["value"].values.astype(float)
+    y_max = float(np.max(all_vals)) if len(all_vals) else 1.0
     ax.set_ylim(0, y_max * 1.15)
 
     fig.tight_layout(rect=[0, 0, 1, 1.02])

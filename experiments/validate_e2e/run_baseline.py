@@ -142,7 +142,7 @@ def main() -> None:
     parser.add_argument("input", help="Path to scenario.yaml or workload.yaml")
     parser.add_argument("--warmup-iters", type=int, default=3, help="Iterations treated as warmup")
     parser.add_argument(
-        "--train-iters", type=int, default=10, help="Iterations after warmup to run"
+        "--train-iters", type=int, default=30, help="Iterations after warmup to run"
     )
     parser.add_argument("--wandb-project", type=str, default=None)
     parser.add_argument("--wandb-entity", type=str, default=None)
