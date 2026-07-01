@@ -88,12 +88,6 @@ def _build_torchrun_cmd(
     derived_args["--eval-interval"] = 1000000
     derived_args["--save-interval"] = 1000000
     derived_args["--log-throughput"] = True
-    derived_args["--tensorboard-dir"] = os.path.join(save_dir or "./output", "tensorboard")
-    derived_args["--log-timers-to-tensorboard"] = True
-    derived_args["--log-world-size-to-tensorboard"] = True
-
-    if save_dir is not None:
-        derived_args["--save"] = save_dir
 
     if wandb_project:
         derived_args["--wandb-project"] = wandb_project
