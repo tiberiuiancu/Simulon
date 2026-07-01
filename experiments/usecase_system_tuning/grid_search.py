@@ -187,7 +187,9 @@ def _trace_status(workload_path: Path) -> str:
         return "invalid"
     if (trace_dir / ".OOM").exists():
         return "OOM"
-    if any(trace_dir.glob("trace_rank_*.json")):
+    if (trace_dir / ".error.log").exists():
+        return "error"
+    if (trace_dir / "workload.yaml").exists() and any(trace_dir.glob("trace_rank_*.json")):
         return "traced"
     return "pending"
 
@@ -202,10 +204,11 @@ def _run_trace(workload_path: Path) -> tuple[str, str]:
     trace_dir = _default_trace_dir(workload_path)
     trace_dir.mkdir(parents=True, exist_ok=True)
     oom_file = trace_dir / ".OOM"
+    error_log = trace_dir / ".error.log"
     if oom_file.exists():
         return "OOM", "pre-existing .OOM marker"
-    if any(trace_dir.glob("trace_rank_*.json")):
-        return "traced", "trace files already present"
+    if error_log.exists():
+        return "error", "pre-existing .error.log marker"
 
     scenario_path = workload_path / f"node{_NODE_SIZES[0]}_bw{_LINK_BWS[0]}.yaml"
     cmd = ["bash", "./scripts/apptainer-trace.sh", str(scenario_path)]
@@ -218,7 +221,6 @@ def _run_trace(workload_path: Path) -> tuple[str, str]:
         if oom_file.exists():
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
-        error_log = trace_dir / ".error.log"
         combined = ""
         if error_log.exists():
             with contextlib.suppress(Exception):
@@ -242,10 +244,19 @@ def _run_trace(workload_path: Path) -> tuple[str, str]:
                 oom_file.write_text(f"returncode={exc.returncode}\n{exc.stderr or ''}")
             return "OOM", f"Megatron OOM (return code {exc.returncode})"
 
+        if not error_log.exists():
+            with contextlib.suppress(Exception):
+                error_log.write_text(
+                    f"rank=all\nreturncode={exc.returncode}\ncmd={' '.join(cmd)}\n"
+                    f"--- stdout ---\n{exc.stdout or ''}\n--- stderr ---\n{exc.stderr or ''}"
+                )
         return ("error", f"non-OOM error (return code {exc.returncode})")
     except subprocess.TimeoutExpired:
         if oom_file.exists():
             return "OOM", "Megatron OOM (timeout, .OOM present)"
+        if not error_log.exists():
+            with contextlib.suppress(Exception):
+                error_log.write_text("trace timeout after 1800s")
         return "error", "trace timeout after 1800s"
 
 
