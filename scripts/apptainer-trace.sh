@@ -6,5 +6,6 @@ apptainer exec --nv \
     --bind "$(pwd)/simulon:/opt/simulon/simulon" \
     --bind "$(pwd)/templates:/opt/simulon/templates" \
     --bind "$(pwd)/output:/opt/simulon/output" \
+    --workdir /opt/simulon \
     simulon-nemo.sif \
-    bash -c 'CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate "$@"' -- "$@"
+    bash -c 'cd /opt/simulon && CUDA_DEVICE_MAX_CONNECTIONS=1 simulon trace generate "$@"' -- "$@"
