@@ -107,6 +107,7 @@ def _write_workload(
 def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
     node_file = _NODES_DIR / f"node{node_size}_bw{link_bw}.yaml"
     num_nodes = _TOTAL_GPUS // node_size
+    model_name = workload_path.parent.name
     workload_name = workload_path.name
     scenario = {
         "datacenter": {
@@ -117,7 +118,7 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
                 "electricity_cost_per_kwh": 0.15,
                 "datacenter_lifetime_years": 5,
                 "idle_fraction": 0.2,
-                "traces_dir": f"templates/gpu/h100/traces/system-tuning-{workload_name}",
+                "traces_dir": f"templates/gpu/h100/traces/system-tuning-{model_name}-{workload_name}",
             },
         },
         "workload": str(workload_path / "workload.yaml"),
