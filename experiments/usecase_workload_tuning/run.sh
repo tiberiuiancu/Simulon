@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
-#SBATCH --time=1:45:00
+#SBATCH --time=12:00:00
 #SBATCH --gpus=1
 #SBATCH --job-name=qwen32b-workload-tuning
 #SBATCH --output=%x-%j.out
