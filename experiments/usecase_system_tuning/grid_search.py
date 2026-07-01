@@ -23,6 +23,7 @@ import yaml
 
 _BASE_DIR = Path(__file__).parent
 _SCENARIOS_DIR = _BASE_DIR / "scenarios"
+_REPO_ROOT = _BASE_DIR.parent.parent
 
 _NODE_SIZES = [4, 8]
 _LINK_BWS = [100, 200, 400, 800]
@@ -130,7 +131,7 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
                 "traces_dir": f"templates/gpu/h100/traces/system-tuning-{model_name}-{workload_name}",
             },
         },
-        "workload": "workload.yaml",
+        "workload": str((workload_path / "workload.yaml").relative_to(_REPO_ROOT)),
     }
     scenario_path = workload_path / f"node{node_size}_bw{link_bw}.yaml"
     with open(scenario_path, "w") as f:

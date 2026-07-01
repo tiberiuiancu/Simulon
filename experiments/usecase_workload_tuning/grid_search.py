@@ -22,6 +22,8 @@ import yaml
 
 _BASE_DIR = Path(__file__).parent
 _SCENARIOS_DIR = _BASE_DIR / "scenarios"
+_REPO_ROOT = _BASE_DIR.parent.parent
+
 _BASE_WORKLOAD = _SCENARIOS_DIR / "base_workload.yaml"
 _NUM_LAYERS = 64
 _NUM_GPUS = 16
@@ -94,7 +96,7 @@ def _write_scenario(path: Path) -> None:
             "node": "templates/node/snellius-h100-4g.yaml",
             "datacenter": {"traces_dir": f"templates/gpu/h100/traces/workload-tuning-{trace_name}"},
         },
-        "workload": "workload.yaml",
+        "workload": str((path / "workload.yaml").relative_to(_REPO_ROOT)),
     }
     with open(path / "scenario.yaml", "w") as f:
         yaml.dump(scenario, f, default_flow_style=False, sort_keys=False)
