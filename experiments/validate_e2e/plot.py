@@ -33,7 +33,7 @@ def _find_configs(base_dir: Path) -> list[str]:
     return sorted(
         item.name
         for item in search_dir.iterdir()
-        if item.is_dir() and (item / "scenario.yaml").exists()
+        if item.is_dir() and (item / "scenario.yaml").exists() and "3nic" not in item.name
     )
 
 
