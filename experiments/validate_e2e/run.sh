@@ -46,7 +46,7 @@ for dir in "$SCRIPT_DIR/configs"/*/; do
     if printf '%s\n' "${EXCLUDE[@]}" | grep -qx "$model"; then
         continue
     fi
-    scenario="$dir/scenario.yaml"
+    scenario="${dir%/}/scenario.yaml"
     if [ ! -f "$scenario" ]; then
         echo "Warning: no scenario.yaml for $model, skipping"
         continue
