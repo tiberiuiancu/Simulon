@@ -37,6 +37,22 @@ for dir in "$CONFIGS_DIR"/*/; do
     echo "Run name: $run_name"
     echo "============================================================"
 
+    if uv run python3 -c "
+import os, sys, wandb
+api = wandb.Api()
+entity = os.environ.get('WANDB_ENTITY')
+project = os.environ.get('WANDB_PROJECT', 'simulon')
+path = f'{entity}/{project}' if entity else project
+runs = api.runs(path, filters={'state': 'finished', 'display_name': '${run_name}'})
+for r in runs:
+    if r.display_name == '${run_name}':
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
+        echo "[skip] $model: already tracked in W&B as ${run_name}"
+        continue
+    fi
+
     echo "[trace] $model"
     if SIMULON_TRACES_DIR="$trace_dir" bash "$REPO_ROOT/scripts/apptainer-trace.sh" "$scenario_rel"; then
         echo "[trace] $model: OK"

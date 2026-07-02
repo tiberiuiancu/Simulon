@@ -27,14 +27,34 @@ from _plot_utils import label_for_model, setup_latex_style
 _WARMUP_ITERS = 3
 
 
+_PLOT_ORDER = [
+    ("gptoss-bf16", "GPT-OSS 20B\n(EP8 PP2)"),
+    ("gptoss-bf16-pp4-ep4", "GPT-OSS 20B\n(EP4 PP4)"),
+    ("gptoss-bf16", "GPT-OSS 20B\n(100% BW)"),
+    ("gptoss-bf16-3nic", "GPT-OSS 20B\n(75% BW)"),
+    ("gptoss-bf16-2nic", "GPT-OSS 20B\n(50% BW)"),
+    ("gptoss-bf16-1nic", "GPT-OSS 20B\n(25% BW)"),
+    ("gptoss-bf16", "GPT-OSS 20B\n(BF16)"),
+    ("gptoss-fp8", "GPT-OSS 20B\n(FP8)"),
+    ("qwen3-32b", "Qwen3-32B\n(TP4 PP1)"),
+    ("qwen3-32b-tp4-pp2-mbs2-vpp8", "Qwen3-32B\n(TP4 PP2 VPP8)"),
+    ("qwen3-32b-tp2-pp4-mbs1-vpp1", "Qwen3-32B\n(TP2 PP4)"),
+]
+
+_DIVIDERS_AFTER_IDX = {1, 5, 7}
+
+
 def _find_configs(base_dir: Path) -> list[str]:
     configs_dir = base_dir / "configs"
     search_dir = configs_dir if configs_dir.is_dir() else base_dir
-    return sorted(
+    found = {
         item.name
         for item in search_dir.iterdir()
         if item.is_dir() and (item / "scenario.yaml").exists()
-    )
+    }
+    ordered = [model for model, _label in _PLOT_ORDER if model in found]
+    extras = sorted(found - {model for model, _label in _PLOT_ORDER})
+    return ordered + extras
 
 
 def _load_csv(csv_path: Path) -> pd.DataFrame | None:
@@ -150,98 +170,102 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     setup_latex_style()
 
     df = df.copy()
-    df["label"] = df["model"].map(label_for_model)
-
-    models = list(df["model"].unique())
-    labels = [label_for_model(m) for m in models]
+    available = set(df["model"].unique())
+    models = [model for model, _label in _PLOT_ORDER if model in available]
+    labels = [label for model, label in _PLOT_ORDER if model in available]
+    known = {model for model, _label in _PLOT_ORDER}
+    extras = sorted(available - known)
+    models.extend(extras)
+    labels.extend(label_for_model(m) for m in extras)
     n = len(models)
 
-    fig, ax = plt.subplots(figsize=(max(5.5, 1.2 * n), 3.0))
+    baseline_min = []
+    baseline_max = []
+    sim_mean = []
+    sim_std = []
+    pct_labels = []
 
-    positions_baseline = np.arange(n) * 2.0
-    positions_sim = positions_baseline + 1.0
+    for m in models:
+        bd = df[(df["model"] == m) & (df["source"] == "Baseline")]["value"].values.astype(float)
+        sd = df[(df["model"] == m) & (df["source"] == "Simulated")]["value"].values.astype(float)
 
-    baseline_data = [
-        df[(df["model"] == m) & (df["source"] == "Baseline")]["value"].values.astype(float)
-        for m in models
-    ]
-    sim_data = [
-        df[(df["model"] == m) & (df["source"] == "Simulated")]["value"].values.astype(float)
-        for m in models
-    ]
+        b_min = float(np.min(bd)) if len(bd) else 0.0
+        b_max = float(np.max(bd)) if len(bd) else 0.0
+        s_mean = float(np.mean(sd)) if len(sd) else 0.0
+        s_std = float(np.std(sd)) if len(sd) else 0.0
+
+        baseline_min.append(b_min)
+        baseline_max.append(b_max)
+        sim_mean.append(s_mean)
+        sim_std.append(s_std)
+
+        if b_min > 0 and s_mean > 0:
+            pct_labels.append(f"{(s_mean - b_min) / b_min * 100:+.1f}%")
+        else:
+            pct_labels.append("")
+
+    x = np.arange(n)
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(max(7.0, 1.1 * n), 3.5))
 
     color_baseline = "#4c72b0"
     color_sim = "#dd8452"
 
-    for i, (bd, sd) in enumerate(zip(baseline_data, sim_data, strict=False)):
-        pos_b = positions_baseline[i]
-        pos_s = positions_sim[i]
+    ax.bar(
+        x - width / 2,
+        baseline_min,
+        width,
+        yerr=[np.zeros(n), np.array(baseline_max) - np.array(baseline_min)],
+        capsize=3,
+        color=color_baseline,
+        alpha=0.8,
+        label="Baseline (min)",
+        error_kw={"ecolor": "#333333", "elinewidth": 1.0},
+    )
+    ax.bar(
+        x + width / 2,
+        sim_mean,
+        width,
+        yerr=sim_std,
+        capsize=3,
+        color=color_sim,
+        alpha=0.8,
+        label="Simulated (mean)",
+        error_kw={"ecolor": "#333333", "elinewidth": 1.0},
+    )
 
-        if len(bd) > 0:
-            parts_b = ax.violinplot(bd, positions=[pos_b], widths=0.8, showmedians=True)
-            for pc in parts_b["bodies"]:
-                pc.set_facecolor(color_baseline)
-                pc.set_alpha(0.7)
-            parts_b["cmedians"].set_color("white")
-            parts_b["cmins"].set_color(color_baseline)
-            parts_b["cmaxes"].set_color(color_baseline)
+    y_max = max(max(baseline_max), max(np.array(sim_mean) + np.array(sim_std))) if n else 1.0
+    for i, label in enumerate(pct_labels):
+        if label:
+            ax.text(
+                x[i] + width / 2,
+                y_max * 1.04,
+                label,
+                ha="center",
+                va="bottom",
+                fontsize=7,
+                color="red",
+            )
 
-        if len(sd) > 0:
-            parts_s = ax.violinplot(sd, positions=[pos_s], widths=0.8, showmedians=True)
-            for pc in parts_s["bodies"]:
-                pc.set_facecolor(color_sim)
-                pc.set_alpha(0.7)
-            parts_s["cmedians"].set_color("white")
-            parts_s["cmins"].set_color(color_sim)
-            parts_s["cmaxes"].set_color(color_sim)
-
-        if len(bd) > 0 and len(sd) > 0:
-            real_median = float(np.median(bd))
-            sim_median = float(np.median(sd))
-            if real_median > 0:
-                pct = (sim_median - real_median) / real_median * 100
-                y_top = max(float(np.max(bd)), float(np.max(sd)))
-                ax.text(
-                    pos_s,
-                    y_top * 1.03,
-                    f"{pct:+.1f}%",
-                    ha="center",
-                    va="bottom",
-                    fontsize=7,
-                    color="red",
-                )
-
-    all_positions = np.concatenate([positions_baseline, positions_sim])
-    ax.set_xticks(np.sort(all_positions))
-    tick_labels = []
     for i in range(n):
-        tick_labels.append(f"{labels[i]}\n(Base)")
-        tick_labels.append(f"{labels[i]}\n(Sim)")
-    ax.set_xticklabels(tick_labels, fontsize=7)
+        if i in _DIVIDERS_AFTER_IDX and i < n - 1:
+            ax.axvline(x[i] + 0.5, color="#999999", linestyle=":", linewidth=0.8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=7)
     ax.set_ylabel("Iteration time (ms)")
     ax.set_title("E2E Validation: Iteration Time", fontsize=10, fontweight="bold")
-
-    from matplotlib.patches import Patch
-
-    legend_elements = [
-        Patch(facecolor=color_baseline, alpha=0.7, label="Baseline"),
-        Patch(facecolor=color_sim, alpha=0.7, label="Simulated"),
-    ]
+    ax.set_ylim(0, y_max * 1.15)
     ax.legend(
-        handles=legend_elements,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.15),
+        bbox_to_anchor=(0.5, -0.12),
         ncol=2,
         frameon=False,
         handlelength=1.2,
         handletextpad=0.4,
         columnspacing=1.0,
     )
-    ax.tick_params(axis="x", rotation=0)
-
-    all_vals = df["value"].values.astype(float)
-    y_max = float(np.max(all_vals)) if len(all_vals) else 1.0
-    ax.set_ylim(0, y_max * 1.15)
 
     fig.tight_layout(rect=[0, 0, 1, 1.02])
 
@@ -259,6 +283,13 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
         df = _load_csv(csv_path)
         if df is None:
             print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
+            sys.exit(1)
+        if "source" not in df.columns:
+            print(
+                f"{csv_path} is in an incompatible format (missing 'source' column).\n"
+                "Delete it and re-run without --use-csv to pull fresh data from W&B.",
+                file=sys.stderr,
+            )
             sys.exit(1)
     else:
         df = _gather_results(base_dir)

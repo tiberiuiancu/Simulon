@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot Qwen3-32B workload-tuning grid-search results.
+"""Plot Qwen3-32B workload-tuning grid-search results as an MFU heatmap.
 
 Usage (from repo root):
     uv run python experiments/usecase_workload_tuning/plot.py
@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import sys
 from argparse import ArgumentParser
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +18,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 
 from simulon.tracking import get_trackers
 
@@ -26,22 +26,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from _plot_utils import setup_latex_style
 
 _RUN_PREFIX = "usecase-workload-tuning-"
-
-_STATUS_COLORS = {
-    "valid": "#2ca02c",
-    "oom": "#d62728",
-    "invalid": "#ff7f0e",
-    "skipped": "#9467bd",
-    "error": "#8c564b",
-}
-
-_STATUS_LABELS = {
-    "valid": "Valid",
-    "oom": "OOM",
-    "invalid": "Invalid",
-    "skipped": "Skipped",
-    "error": "Error",
-}
 
 _CSV_COLS = [
     "name",
@@ -64,6 +48,13 @@ _CSV_COLS = [
 
 _NUM_GPUS = 16
 _NUM_LAYERS = 64
+
+_ROWS: list[tuple[int, int, str]] = [
+    (1, 1, "TP=1, MBS=1"),
+    (2, 1, "TP=2, MBS=1"),
+    (4, 1, "TP=4, MBS=1"),
+    (4, 2, "TP=4, MBS=2"),
+]
 
 
 def _load_csv(csv_path: Path) -> pd.DataFrame | None:
@@ -100,9 +91,8 @@ def _status_from_row(row: pd.Series) -> str:
         return "error"
     if _truthy(row, "simulated"):
         return "valid"
-    # Fall back to the status column written by previous plot runs
     status = row.get("status")
-    if isinstance(status, str) and status in _STATUS_COLORS:
+    if isinstance(status, str) and status in ("valid", "oom", "invalid", "skipped", "error"):
         return status
     return "error"
 
@@ -125,7 +115,7 @@ def _pull_wandb_metrics(base_dir: Path) -> dict[str, dict[str, Any]]:
     return metrics_by_name
 
 
-def _vpp_options(pp: int) -> Sequence[int | None]:
+def _vpp_options(pp: int) -> list[int | None]:
     if pp == 1:
         return [None]
     layers_per_stage = _NUM_LAYERS // pp
@@ -133,9 +123,11 @@ def _vpp_options(pp: int) -> Sequence[int | None]:
 
 
 def _scan_trace_statuses(names: list[str]) -> dict[str, str]:
-    from simulon.config.resolve import resolve_gpu_spec, resolve_workload, workload_hash
-    from simulon.config.scenario import ScenarioConfig
+    """Check trace dir for .OOM / .error.log / trace files.
 
+    Reads ``traces_dir`` directly from each scenario YAML so it works
+    with the human-readable paths (no hash computation needed).
+    """
     statuses: dict[str, str] = {}
     for name in names:
         scenario_path = (
@@ -144,38 +136,39 @@ def _scan_trace_statuses(names: list[str]) -> dict[str, str]:
         if not scenario_path.exists():
             continue
         try:
-            sc = ScenarioConfig.from_yaml(str(scenario_path))
-            gpu_spec = resolve_gpu_spec(sc.datacenter)
-            gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
-        except Exception:
-            gpu_name = "default"
-        try:
-            wl = resolve_workload(str(scenario_path.parent / "workload.yaml"))
-            h = workload_hash(wl)
+            with open(scenario_path) as fh:
+                sc = yaml.safe_load(fh)
+            trace_dir_rel = sc.get("datacenter", {}).get("datacenter", {}).get("traces_dir")
+            if not trace_dir_rel:
+                continue
+            trace_dir = Path(trace_dir_rel)
         except Exception:
             continue
-        trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
+        if not trace_dir.exists():
+            continue
         if (trace_dir / ".OOM").exists():
             statuses[name] = "oom"
         elif (trace_dir / ".INVALID").exists():
             statuses[name] = "invalid"
+        elif (trace_dir / ".error.log").exists():
+            statuses[name] = "error"
+        elif (trace_dir / "workload.yaml").exists() and list(trace_dir.glob("trace_rank_*.json")):
+            statuses[name] = "traced"
     return statuses
 
 
 def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
     csv_path = base_dir / "results.csv"
-    cached_df = _load_csv(csv_path)
+    cached_df = _load_csv(csv_path) if use_csv else None
 
     if use_csv and cached_df is None:
         print("--use-csv requested but results.csv not found.", file=sys.stderr)
         sys.exit(1)
 
     records: list[dict[str, Any]] = []
-    # Generate the full grid explicitly so the status matrix is complete
-    # even if results.csv is partial from an interrupted sweep.
     for tp in [1, 2, 4]:
         for pp in [1, 2, 4]:
-            if _NUM_GPUS // tp // pp == 0:
+            if (_NUM_GPUS // tp // pp) == 0:
                 continue
             for mbs in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]:
                 for vpp in _vpp_options(pp):
@@ -190,6 +183,7 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
     extra_map: dict[str, dict[str, str]] = {}
     metric_map: dict[str, dict[str, Any]] = {}
     trace_status_map: dict[str, str] = _scan_trace_statuses(df["name"].tolist())
+
     if cached_df is not None:
         for _, row in cached_df.iterrows():
             name = str(row["name"])
@@ -198,6 +192,9 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
             if trace_status in ("oom", "invalid"):
                 status_map[name] = trace_status
                 df.loc[df["name"] == name, trace_status] = True
+            elif trace_status == "error":
+                status_map[name] = "error"
+                df.loc[df["name"] == name, "error"] = True
             else:
                 status_map[name] = csv_status
                 for col in ("oom", "skipped", "invalid", "error", "simulated"):
@@ -223,7 +220,15 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
         wandb_metrics = _pull_wandb_metrics(base_dir)
         for name, metrics in wandb_metrics.items():
             metric_map[name] = metrics
-            status_map[name] = "valid"
+            if trace_status_map.get(name) not in ("oom", "invalid", "error"):
+                status_map[name] = "valid"
+
+    for name, ts in trace_status_map.items():
+        if name not in status_map:
+            if ts == "traced":
+                status_map[name] = "valid"
+            elif ts in ("oom", "invalid", "error"):
+                status_map[name] = ts
 
     df["status"] = df["name"].map(lambda n: status_map.get(n, "error"))
     df["invalid_reason"] = df["name"].map(lambda n: extra_map.get(n, {}).get("invalid_reason", ""))
@@ -246,154 +251,184 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
     return df
 
 
-def _format_vpp(row: pd.Series) -> str:
-    vpp = row.get("vpp")
-    if vpp is None or vpp is pd.NA or (isinstance(vpp, float) and np.isnan(vpp)):
-        return "no VPP"
-    return f"VPP{int(vpp)}"
+def _col_label(pp: int, vpp: int | None) -> str:
+    if vpp is None:
+        return "PP1"
+    return f"PP{pp}\nVPP{vpp}"
 
 
-def _format_number(row: pd.Series, key: str, fmt: str) -> str:
-    value = row.get(key)
-    if value is None or (isinstance(value, float) and np.isnan(value)):
-        return "—"
-    return fmt.format(float(value))
+def _build_columns() -> list[tuple[int, int | None, str]]:
+    """X-axis columns in display order: PP1, PP2 VPP 1..32, PP4 VPP 1..16.
+
+    VPP is ordered numerically, not alphabetically.
+    """
+    cols: list[tuple[int, int | None, str]] = []
+    cols.append((1, None, _col_label(1, None)))
+    for vpp in [1, 2, 4, 8, 16, 32]:
+        cols.append((2, vpp, _col_label(2, vpp)))
+    for vpp in [1, 2, 4, 8, 16]:
+        cols.append((4, vpp, _col_label(4, vpp)))
+    return cols
 
 
-def _render_valid_table(ax, df: pd.DataFrame) -> None:
-    valid_df = df[df["status"] == "valid"].copy()
-    valid_df = valid_df.sort_values(["tp", "pp", "mbs", "vpp"])
+def _find_config(df: pd.DataFrame, tp: int, mbs: int, pp: int, vpp: int | None) -> pd.Series | None:
+    mask = (df["tp"] == tp) & (df["mbs"] == mbs) & (df["pp"] == pp)
+    mask = mask & df["vpp"].isna() if vpp is None else mask & (df["vpp"] == vpp)
+    matches = df[mask]
+    if matches.empty:
+        return None
+    return matches.iloc[0]
 
-    columns = [
-        "Config",
-        "TP",
-        "PP",
-        "MBS",
-        "VPP",
-        "Throughput\n(tokens/s)",
-        "MFU\n(%)",
-        "Iteration\n(ms)",
+
+def _render_heatmap(ax, df: pd.DataFrame) -> None:
+    all_cols = _build_columns()
+    all_rows = _ROWS
+
+    n_rows_all = len(all_rows)
+    n_cols_all = len(all_cols)
+
+    mfu_full = np.full((n_rows_all, n_cols_all), np.nan)
+    status_full: list[str | None] = [None] * (n_rows_all * n_cols_all)
+
+    for i, (tp, mbs, _label) in enumerate(all_rows):
+        for j, (pp, vpp, _col_label) in enumerate(all_cols):
+            row = _find_config(df, tp, mbs, pp, vpp)
+            if row is None:
+                continue
+            status = str(row["status"])
+            status_full[i * n_cols_all + j] = status
+            if status == "valid":
+                mfu = row.get("mfu_pct")
+                if mfu is not None and not (isinstance(mfu, float) and np.isnan(mfu)):
+                    mfu_full[i, j] = float(mfu)
+
+    def _is_gray(status: str | None) -> bool:
+        return status in ("oom", "error", "invalid", None)
+
+    keep_rows = [
+        i
+        for i in range(n_rows_all)
+        if not all(_is_gray(status_full[i * n_cols_all + j]) for j in range(n_cols_all))
     ]
-    rows: list[list[str]] = []
-    for _, row in valid_df.iterrows():
-        label = f"TP{int(row['tp'])} PP{int(row['pp'])} MBS{int(row['mbs'])} {_format_vpp(row)}"
-        rows.append(
-            [
-                label,
-                str(int(row["tp"])),
-                str(int(row["pp"])),
-                str(int(row["mbs"])),
-                str(int(row["vpp"])) if pd.notna(row.get("vpp")) else "—",
-                _format_number(row, "throughput_tps", "{:,.0f}"),
-                _format_number(row, "mfu_pct", "{:.1f}"),
-                _format_number(row, "iteration_time_ms", "{:.1f}"),
-            ]
-        )
+    keep_cols = [
+        j
+        for j in range(n_cols_all)
+        if not all(_is_gray(status_full[i * n_cols_all + j]) for i in range(n_rows_all))
+    ]
 
-    ax.axis("off")
-    if not rows:
-        ax.text(
-            0.5, 0.5, "No valid configurations", ha="center", va="center", transform=ax.transAxes
-        )
-        return
+    rows = [all_rows[i] for i in keep_rows]
+    cols = [all_cols[j] for j in keep_cols]
+    n_rows = len(rows)
+    n_cols = len(cols)
 
-    table = ax.table(cellText=rows, colLabels=columns, loc="center", cellLoc="center")
-    table.auto_set_font_size(False)
-    table.set_fontsize(7)
-    table.scale(1.0, 1.6)
+    mfu_matrix = np.full((n_rows, n_cols), np.nan)
+    status_matrix: list[str | None] = [None] * (n_rows * n_cols)
+    for di, i in enumerate(keep_rows):
+        for dj, j in enumerate(keep_cols):
+            status_matrix[di * n_cols + dj] = status_full[i * n_cols_all + j]
+            mfu_matrix[di, dj] = mfu_full[i, j]
 
-    for key, cell in table.get_celld().items():
-        row, _col = key
-        if row == 0:
-            cell.set_text_props(fontweight="bold")
-            cell.set_facecolor("#e6e6e6")
-        cell.set_edgecolor("#666666")
-
-    ax.set_title("Valid configurations (simulated)", fontweight="bold", fontsize=9)
-
-
-def _pp_vpp_label(r: pd.Series) -> str:
-    vpp = r.get("vpp")
-    if vpp is None or vpp is pd.NA or (isinstance(vpp, float) and np.isnan(vpp)):
-        vpp_label = "—"
-    else:
-        vpp_label = str(int(vpp))
-    return f"PP{r['pp']}\nVPP{vpp_label}"
-
-
-def _render_status_matrix(ax, df: pd.DataFrame) -> None:
-    sub = df[df["mbs"] == 1].copy()
-    sub["pp_vpp"] = sub.apply(_pp_vpp_label, axis=1)
-
-    tps = sorted(int(x) for x in sub["tp"].unique())
-    cols = sorted(
-        {str(x) for x in sub["pp_vpp"].unique()},
-        key=lambda s: (int(s.split("\n")[0].replace("PP", "")), s.split("\n")[1]),
+    max_mfu = np.nanmax(mfu_matrix) if np.any(np.isfinite(mfu_matrix)) else 1.0
+    if max_mfu <= 0:
+        max_mfu = 1.0
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        "green_mfu", ["#e8f5e9", "#a5d6a7", "#66bb6a", "#388e3c"], N=256
     )
+    norm = mcolors.Normalize(vmin=0, vmax=max_mfu)
 
-    status_to_num = {status: i for i, status in enumerate(_STATUS_COLORS)}
-    matrix = np.full((len(tps), len(cols)), np.nan)
-    for i, tp in enumerate(tps):
-        for j, col in enumerate(cols):
-            matches = sub[(sub["tp"] == tp) & (sub["pp_vpp"] == col)]
-            if len(matches) > 0:
-                matrix[i, j] = status_to_num[str(matches.iloc[0]["status"])]
+    ax.set_facecolor("#f5f5f5")
+    for i in range(n_rows):
+        for j in range(n_cols):
+            ax.add_patch(
+                plt.Rectangle(
+                    (j - 0.5, i - 0.5),
+                    1,
+                    1,
+                    facecolor="#f5f5f5",
+                    edgecolor="#cccccc",
+                    linewidth=0.5,
+                )
+            )
 
-    ax.imshow(
-        matrix,
-        cmap=mcolors.ListedColormap(list(_STATUS_COLORS.values())),
-        vmin=-0.5,
-        vmax=len(_STATUS_COLORS) - 0.5,
-    )
-    ax.set_xticks(np.arange(len(cols)))
-    ax.set_yticks(np.arange(len(tps)))
-    ax.set_xticklabels(cols, fontsize=7)
-    ax.set_yticklabels([f"TP{tp}" for tp in tps], fontsize=7)
+    for i in range(n_rows):
+        for j in range(n_cols):
+            status = status_matrix[i * n_cols + j]
+            if status == "valid" and np.isfinite(mfu_matrix[i, j]):
+                color = cmap(norm(mfu_matrix[i, j]))
+                ax.add_patch(
+                    plt.Rectangle(
+                        (j - 0.5, i - 0.5),
+                        1,
+                        1,
+                        facecolor=color,
+                        edgecolor="#999999",
+                        linewidth=0.5,
+                    )
+                )
+            elif status in ("oom", "error", "invalid"):
+                ax.add_patch(
+                    plt.Rectangle(
+                        (j - 0.5, i - 0.5),
+                        1,
+                        1,
+                        facecolor="#e0e0e0",
+                        edgecolor="#bdbdbd",
+                        linewidth=0.5,
+                    )
+                )
+
+    ax.set_xlim(-0.5, n_cols - 0.5)
+    ax.set_ylim(-0.5, n_rows - 0.5)
+    ax.invert_yaxis()
+    ax.grid(False)
+
+    ax.set_xticks(np.arange(n_cols))
+    ax.set_yticks(np.arange(n_rows))
+    ax.set_xticklabels([c[2] for c in cols], fontsize=7)
+    ax.set_yticklabels([r[2] for r in rows], fontsize=7)
     ax.set_xlabel("Pipeline / virtual pipeline", fontsize=8)
-    ax.set_ylabel("Tensor parallelism", fontsize=8)
-    ax.set_title("Grid-search status (MBS=1)", fontweight="bold", fontsize=9)
+    ax.set_ylabel("Configuration", fontsize=8)
+    ax.set_title("Qwen3-32B MFU heatmap", fontweight="bold", fontsize=9)
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False, length=0)
 
-    for i in range(len(tps)):
-        for j in range(len(cols)):
-            if not np.isnan(matrix[i, j]):
-                status = list(_STATUS_COLORS)[int(matrix[i, j])]
-                label = _STATUS_LABELS[status]
+    max_mfu_val = np.nanmax(mfu_matrix) if np.any(np.isfinite(mfu_matrix)) else None
+
+    for i in range(n_rows):
+        for j in range(n_cols):
+            status = status_matrix[i * n_cols + j]
+            if status == "valid" and np.isfinite(mfu_matrix[i, j]):
+                val = mfu_matrix[i, j]
+                is_max = max_mfu_val is not None and abs(val - max_mfu_val) < 1e-9
                 ax.text(
                     j,
                     i,
-                    label,
+                    f"{val:.1f}",
                     ha="center",
                     va="center",
-                    color="white",
                     fontsize=7,
-                    fontweight="bold",
+                    fontweight="bold" if is_max else "normal",
+                    color="#1b5e20",
                 )
 
-    from matplotlib.patches import Patch
+    for i in range(n_rows + 1):
+        ax.axhline(i - 0.5, color="#bbbbbb", linewidth=0.4)
+    for j in range(n_cols + 1):
+        ax.axvline(j - 0.5, color="#bbbbbb", linewidth=0.4)
 
-    legend_elements = [
-        Patch(facecolor=color, edgecolor="black", label=_STATUS_LABELS[status])
-        for status, color in _STATUS_COLORS.items()
-    ]
-    ax.legend(
-        handles=legend_elements,
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.22),
-        ncol=len(_STATUS_COLORS),
-        frameon=False,
-        fontsize=7,
-    )
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, fraction=0.025, pad=0.02)
+    cbar.set_label("MFU (%)", fontsize=7)
+    cbar.ax.tick_params(labelsize=6)
 
 
 def _render_plot(output: Path | None, df: pd.DataFrame) -> None:
     setup_latex_style()
 
-    fig, axes = plt.subplots(2, 1, figsize=(3.5, 5.0))
-    _render_status_matrix(axes[0], df)
-    _render_valid_table(axes[1], df)
+    fig, ax = plt.subplots(1, 1, figsize=(5.0, 3.2))
+    _render_heatmap(ax, df)
 
-    fig.suptitle("Qwen3-32B Workload Tuning", fontsize=10, fontweight="bold", y=1.02)
-    fig.tight_layout(rect=(0, 0, 1, 1.0))
+    fig.tight_layout()
 
     if output:
         fig.savefig(output, bbox_inches="tight", dpi=300)

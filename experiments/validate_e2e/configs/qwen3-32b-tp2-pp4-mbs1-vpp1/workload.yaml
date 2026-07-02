@@ -9,8 +9,8 @@ config:
   add-qkv-bias: false
   bias-gelu-fusion: false
   data-parallel-sharding-strategy: no_shard
-  tensor-model-parallel-size: 4
-  pipeline-model-parallel-size: 1
+  tensor-model-parallel-size: 2
+  pipeline-model-parallel-size: 4
   sequence-parallel: true
   context-parallel-size: 1
   micro-batch-size: 1
@@ -59,3 +59,4 @@ config:
   distributed-timeout-minutes: 30
   eval-interval: 999999
   eval-iters: 0
+  num-virtual-stages-per-pipeline-rank: 1

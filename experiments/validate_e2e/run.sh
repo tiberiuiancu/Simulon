@@ -5,7 +5,40 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 EXCLUDE=(__pycache__ configs)
-BASELINE_EXCLUDE=(qwen3-32b)
+DRY_RUN=false
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+    esac
+done
+
+if [ -f "$REPO_ROOT/.tracking.env" ]; then
+    set -a
+    . "$REPO_ROOT/.tracking.env"
+    set +a
+fi
+
+check_wandb_exists() {
+    local model="$1"
+    local prefix="validate-e2e-baseline-${model}-"
+    uv run python3 -c "
+import os, sys, wandb
+api = wandb.Api()
+entity = os.environ.get('WANDB_ENTITY')
+project = os.environ.get('WANDB_PROJECT', 'simulon')
+path = f'{entity}/{project}' if entity else project
+runs = api.runs(path, filters={'state': 'finished', 'display_name': {'\$regex': r'^${prefix}'}})
+for r in runs:
+    rest = r.display_name[len('${prefix}'):]
+    if rest and rest != 'local':
+        try:
+            int(rest)
+            sys.exit(0)
+        except ValueError:
+            pass
+sys.exit(1)
+" 2>/dev/null
+}
 
 TOTAL_BASELINES=0
 for dir in "$SCRIPT_DIR/configs"/*/; do
@@ -20,19 +53,24 @@ for dir in "$SCRIPT_DIR/configs"/*/; do
     fi
     scenario_rel="${scenario#$REPO_ROOT/}"
 
-    if printf '%s\n' "${BASELINE_EXCLUDE[@]}" | grep -qx "$model"; then
+    if check_wandb_exists "$model"; then
+        echo "Skipping baseline for $model: already tracked in W&B"
         continue
     fi
 
     echo "Submitting baseline job for $model ($scenario_rel)"
-    bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
+    if [ "$DRY_RUN" = false ]; then
+        bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
+    fi
     TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
 done
 
-NUM_SIM_JOBS=30
+NUM_SIM_JOBS=5
 echo "Submitting $NUM_SIM_JOBS simulation sweep jobs"
-for i in $(seq 1 "$NUM_SIM_JOBS"); do
-    bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm'"
-done
+if [ "$DRY_RUN" = false ]; then
+    for i in $(seq 1 "$NUM_SIM_JOBS"); do
+        bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm'"
+    done
+fi
 
 echo "Submitted $TOTAL_BASELINES baseline job(s) + $NUM_SIM_JOBS simulation sweep jobs."
