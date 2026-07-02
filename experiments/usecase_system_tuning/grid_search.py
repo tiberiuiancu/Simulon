@@ -14,6 +14,7 @@ import csv
 import os
 import shutil
 import subprocess
+import sys
 from argparse import ArgumentParser
 from dataclasses import dataclass
 from pathlib import Path
@@ -306,7 +307,9 @@ def _run_simulate(scenario_path: Path, run_name: str) -> dict[str, Any] | None:
                 with contextlib.suppress(Exception):
                     metrics["cost_per_run"] = float(line.split("$")[-1].split()[0].replace(",", ""))
         return metrics
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
+        msg = exc.stderr or exc.stdout or "(no output)"
+        print(f"Simulate failed for {run_name}: {msg}", file=sys.stderr)
         return None
 
 
