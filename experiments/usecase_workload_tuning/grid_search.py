@@ -14,6 +14,7 @@ import csv
 import os
 import shutil
 import subprocess
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
@@ -256,7 +257,11 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
                 with contextlib.suppress(Exception):
                     metrics["co2eq_g"] = float(line.split("CO2eq:")[-1].split()[0])
         return metrics
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"Simulate failed for {name}: {exc.stderr or exc.stdout or '(no output)'}",
+            file=sys.stderr,
+        )
         return None
 
 
