@@ -186,7 +186,7 @@ def main() -> None:
         subprocess.run(cmd, check=True)
     finally:
         if os.path.isdir(save_dir):
-            shutil.rmtree(save_dir)
+            shutil.rmtree(save_dir, ignore_errors=True)
             print(f"Removed local output directory: {save_dir}")  # noqa: T201
 
 
