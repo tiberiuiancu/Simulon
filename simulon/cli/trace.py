@@ -436,12 +436,32 @@ def sync_traces(
                     gpu_name = "default"
                 h = workload_hash(workload)
                 trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
-            referenced.add(trace_dir)
 
             if not trace_dir.exists():
-                typer.echo(f"No local trace for {scenario_path} -> {trace_dir}")
-                missing += 1
-                continue
+                parent = trace_dir.parent
+                base_name = trace_dir.name
+                if parent.exists():
+                    candidates = sorted(
+                        (
+                            d
+                            for d in parent.iterdir()
+                            if d.is_dir()
+                            and d.name.startswith(f"{base_name}-")
+                            and d.name[len(base_name) + 1 :].isdigit()
+                        ),
+                        reverse=True,
+                    )
+                    if candidates:
+                        trace_dir = candidates[0]
+                    else:
+                        typer.echo(f"No local trace for {scenario_path} -> {trace_dir}")
+                        missing += 1
+                        continue
+                else:
+                    typer.echo(f"No local trace for {scenario_path} -> {trace_dir}")
+                    missing += 1
+                    continue
+            referenced.add(trace_dir)
 
             cmd = ["git", "add", "-f", str(trace_dir)]
             if dry_run:
