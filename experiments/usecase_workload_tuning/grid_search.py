@@ -267,7 +267,7 @@ def _run_simulate(path: Path) -> dict[str, Any] | None:
 
 def _grid() -> list[tuple[int, int, int, int | None]]:
     combos: list[tuple[int, int, int, int | None]] = []
-    tps = [1, 2, 4]
+    tps = [1, 2, 4, 8]
     pps = [1, 2, 4]
     mbss = _mbs_values()
     for tp in tps:

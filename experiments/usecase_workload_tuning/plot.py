@@ -54,6 +54,17 @@ _ROWS: list[tuple[int, int, str]] = [
     (2, 1, "TP=2, MBS=1"),
     (4, 1, "TP=4, MBS=1"),
     (4, 2, "TP=4, MBS=2"),
+    (8, 1, "TP=8, MBS=1"),
+    (8, 2, "TP=8, MBS=2"),
+    (8, 4, "TP=8, MBS=4"),
+    (8, 8, "TP=8, MBS=8"),
+    (8, 16, "TP=8, MBS=16"),
+    (8, 32, "TP=8, MBS=32"),
+    (8, 64, "TP=8, MBS=64"),
+    (8, 128, "TP=8, MBS=128"),
+    (8, 256, "TP=8, MBS=256"),
+    (8, 512, "TP=8, MBS=512"),
+    (8, 1024, "TP=8, MBS=1024"),
 ]
 
 
@@ -166,7 +177,7 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
         sys.exit(1)
 
     records: list[dict[str, Any]] = []
-    for tp in [1, 2, 4]:
+    for tp in [1, 2, 4, 8]:
         for pp in [1, 2, 4]:
             if (_NUM_GPUS // tp // pp) == 0:
                 continue
@@ -384,12 +395,11 @@ def _render_heatmap(ax, df: pd.DataFrame) -> None:
 
     ax.set_xticks(np.arange(n_cols))
     ax.set_yticks(np.arange(n_rows))
-    ax.set_xticklabels([c[2] for c in cols], fontsize=7)
-    ax.set_yticklabels([r[2] for r in rows], fontsize=7)
-    ax.set_xlabel("Pipeline / virtual pipeline", fontsize=8)
-    ax.set_ylabel("Configuration", fontsize=8)
-    ax.set_title("Qwen3-32B MFU heatmap", fontweight="bold", fontsize=9)
+    ax.set_xticklabels([c[2] for c in cols], fontsize=9)
+    ax.set_yticklabels([r[2] for r in rows], fontsize=9)
+    ax.set_title("Qwen3-32B MFU by configuration", fontweight="bold", fontsize=9)
     ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False, length=0)
+    ax.set_aspect("equal")
 
     max_mfu_val = np.nanmax(mfu_matrix) if np.any(np.isfinite(mfu_matrix)) else None
 
@@ -399,13 +409,16 @@ def _render_heatmap(ax, df: pd.DataFrame) -> None:
             if status == "valid" and np.isfinite(mfu_matrix[i, j]):
                 val = mfu_matrix[i, j]
                 is_max = max_mfu_val is not None and abs(val - max_mfu_val) < 1e-9
+                label = f"{val:.1f}"
+                if is_max:
+                    label = f"{val:.1f} *"
                 ax.text(
                     j,
                     i,
-                    f"{val:.1f}",
+                    label,
                     ha="center",
                     va="center",
-                    fontsize=7,
+                    fontsize=9,
                     fontweight="bold" if is_max else "normal",
                     color="#1b5e20",
                 )
@@ -417,15 +430,15 @@ def _render_heatmap(ax, df: pd.DataFrame) -> None:
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = plt.colorbar(sm, ax=ax, fraction=0.025, pad=0.02)
-    cbar.set_label("MFU (%)", fontsize=7)
-    cbar.ax.tick_params(labelsize=6)
+    cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04, aspect=n_rows)
+    cbar.set_label("MFU (%)", fontsize=9)
+    cbar.ax.tick_params(labelsize=9)
 
 
 def _render_plot(output: Path | None, df: pd.DataFrame) -> None:
     setup_latex_style()
 
-    fig, ax = plt.subplots(1, 1, figsize=(5.0, 3.2))
+    fig, ax = plt.subplots(1, 1, figsize=(6.5, 3.5))
     _render_heatmap(ax, df)
 
     fig.tight_layout()
