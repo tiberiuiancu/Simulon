@@ -29,6 +29,20 @@ for dir in "$CONFIGS_DIR"/*/; do
     run_name="validate-e2e-$model"
     trace_dir="templates/gpu/h100/traces/validate-e2e-$model-$JOB_ID"
 
+    # Reuse existing traces from a previous job if available
+    trace_base="templates/gpu/h100/traces/validate-e2e-$model"
+    existing_trace_dir=""
+    if [ -d "$trace_base" ]; then
+        existing_trace_dir="$trace_base"
+    else
+        for d in "$REPO_ROOT/templates/gpu/h100/traces/"validate-e2e-"$model"-*/; do
+            if [ -d "$d" ]; then
+                existing_trace_dir="${d%/}"
+                break
+            fi
+        done
+    fi
+
     echo ""
     echo "============================================================"
     echo "Config: $model"
@@ -53,11 +67,16 @@ sys.exit(1)
         continue
     fi
 
-    echo "[trace] $model"
-    if SIMULON_TRACES_DIR="$trace_dir" bash "$REPO_ROOT/scripts/apptainer-trace.sh" "$scenario_rel"; then
-        echo "[trace] $model: OK"
+    if [ -n "$existing_trace_dir" ] && ls "$existing_trace_dir"/trace_rank_*.json >/dev/null 2>&1; then
+        echo "[trace] $model: reusing existing traces from $existing_trace_dir"
+        trace_dir="$existing_trace_dir"
     else
-        echo "[trace] $model: FAILED (exit code $?)" >&2
+        echo "[trace] $model"
+        if SIMULON_TRACES_DIR="$trace_dir" bash "$REPO_ROOT/scripts/apptainer-trace.sh" "$scenario_rel"; then
+            echo "[trace] $model: OK"
+        else
+            echo "[trace] $model: FAILED (exit code $?)" >&2
+        fi
     fi
 
     echo "[simulate] $model"
