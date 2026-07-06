@@ -130,7 +130,7 @@ def plot(
             ax.tick_params(axis="x", rotation=45, labelsize=7)
             ax.tick_params(axis="y", labelsize=7)
             ax.grid(True, which="major", linestyle=":", alpha=0.5)
-            ax.set_ylim(0, 350)
+            ax.set_ylim(0, 200)
 
             # Titles and labels
             if row == 0:
