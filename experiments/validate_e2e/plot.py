@@ -104,7 +104,7 @@ def _pull_baseline_iteration_times(config: str) -> list[float]:
                 continue
             val = row["iteration-time"]
             if pd.notna(val):
-                values.append(float(val))
+                values.append(float(val) * 1000.0)
     return values
 
 
@@ -127,7 +127,7 @@ def _pull_simulated_iteration_times(config: str) -> list[float]:
         summary = dict(run.summary)
         val = summary.get("total_time_ms")
         if val is not None:
-            values.append(float(val) / 1000.0)
+            values.append(float(val))
     return values
 
 
@@ -173,6 +173,7 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     setup_latex_style()
 
     df = df.copy()
+    df["value"] = df["value"] / 1000.0
     available = set(df["model"].unique())
     models = [model for model, _label in _PLOT_ORDER if model in available]
     labels = [label for model, label in _PLOT_ORDER if model in available]
