@@ -24,7 +24,13 @@
 set -euo pipefail
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    REPO_ROOT="$SLURM_SUBMIT_DIR"
+else
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
+cd "$REPO_ROOT"
+SCRIPT_DIR="$REPO_ROOT/experiments/validate_simccl"
 NCCL_TESTS_DIR="${SCRIPT_DIR}/nccl-tests"
 RESULT_DIR="${SCRIPT_DIR}/results"
 mkdir -p "${RESULT_DIR}"
@@ -74,7 +80,7 @@ declare -A BINARY=(
 for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     BIN="${NCCL_TESTS_DIR}/build/${BINARY[$COLLECTIVE]}"
     CNAME_LOWER=$(echo "$COLLECTIVE" | tr '[:upper:]' '[:lower:]')
-    OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}.json"
+    OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}_snellius.json"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
     srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
