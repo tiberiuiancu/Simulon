@@ -41,6 +41,7 @@ sys.exit(1)
 }
 
 TOTAL_BASELINES=0
+TOTAL_SIMS=0
 for dir in "$SCRIPT_DIR/configs"/*/; do
     model="$(basename "$dir")"
     if printf '%s\n' "${EXCLUDE[@]}" | grep -qx "$model"; then
@@ -55,22 +56,19 @@ for dir in "$SCRIPT_DIR/configs"/*/; do
 
     if check_wandb_exists "$model"; then
         echo "Skipping baseline for $model: already tracked in W&B"
-        continue
+    else
+        echo "Submitting baseline job for $model ($scenario_rel)"
+        if [ "$DRY_RUN" = false ]; then
+            bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
+        fi
+        TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
     fi
 
-    echo "Submitting baseline job for $model ($scenario_rel)"
+    echo "Submitting sim job for $model ($scenario_rel)"
     if [ "$DRY_RUN" = false ]; then
-        bash -c "sbatch '$SCRIPT_DIR/run_baseline.slurm' '$scenario_rel'"
+        bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm' '$scenario_rel'"
     fi
-    TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
+    TOTAL_SIMS=$((TOTAL_SIMS + 1))
 done
 
-NUM_SIM_JOBS=5
-echo "Submitting $NUM_SIM_JOBS simulation sweep jobs"
-if [ "$DRY_RUN" = false ]; then
-    for i in $(seq 1 "$NUM_SIM_JOBS"); do
-        bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm'"
-    done
-fi
-
-echo "Submitted $TOTAL_BASELINES baseline job(s) + $NUM_SIM_JOBS simulation sweep jobs."
+echo "Submitted $TOTAL_BASELINES baseline job(s) + $TOTAL_SIMS simulation job(s)."
