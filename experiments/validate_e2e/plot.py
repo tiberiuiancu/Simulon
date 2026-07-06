@@ -260,11 +260,10 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
             error_kw={"ecolor": "#333333", "elinewidth": 1.0},
         )
         ax.bar(x + width / 2, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
-        ax.bar(x + width / 2, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
 
         sec_y_max = (
             max(
-                max(sec_baseline_median) if sec_baseline_median else 0,
+                max(sec_baseline_max) if sec_baseline_max else 0,
                 max(sec_sim_val) if sec_sim_val else 0,
             )
             if sec_n
