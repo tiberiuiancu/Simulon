@@ -36,7 +36,6 @@ _PLOT_ORDER = [
     ("gptoss-bf16-1nic", "GPT-OSS 20B\n(25% BW)"),
     ("gptoss-bf16", "GPT-OSS 20B\n(BF16)"),
     ("gptoss-fp8", "GPT-OSS 20B\n(FP8)"),
-    ("qwen3-32b", "Qwen3-32B\n(TP4 PP1)"),
     ("qwen3-32b-tp4-pp2-mbs2-vpp8", "Qwen3-32B\n(TP4 PP2 VPP8)"),
     ("qwen3-32b-tp2-pp4-mbs1-vpp1", "Qwen3-32B\n(TP2 PP4)"),
 ]
@@ -166,7 +165,7 @@ def _gather_results(base_dir: Path) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-_QWEN_MODELS = {"qwen3-32b", "qwen3-32b-tp4-pp2-mbs2-vpp8", "qwen3-32b-tp2-pp4-mbs1-vpp1"}
+_QWEN_MODELS = {"qwen3-32b-tp4-pp2-mbs2-vpp8", "qwen3-32b-tp2-pp4-mbs1-vpp1"}
 
 
 def _plot(df: pd.DataFrame, output: Path | None) -> None:

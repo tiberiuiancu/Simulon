@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
-EXCLUDE=(__pycache__ configs)
+EXCLUDE=(__pycache__ configs qwen3-32b)
 DRY_RUN=false
 for arg in "$@"; do
     case "$arg" in

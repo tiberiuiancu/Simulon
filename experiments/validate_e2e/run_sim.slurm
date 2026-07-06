@@ -21,9 +21,13 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 JOB_ID="${SLURM_JOB_ID:-local}"
 CONFIGS_DIR="$REPO_ROOT/experiments/validate_e2e/configs"
+EXCLUDE=(__pycache__ qwen3-32b)
 
 for dir in "$CONFIGS_DIR"/*/; do
     model="$(basename "$dir")"
+    if printf '%s\n' "${EXCLUDE[@]}" | grep -qx "$model"; then
+        continue
+    fi
     scenario="$dir/scenario.yaml"
     scenario_rel="${scenario#$REPO_ROOT/}"
     run_name="validate-e2e-$model"
