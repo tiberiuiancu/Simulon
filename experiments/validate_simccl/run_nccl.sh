@@ -62,6 +62,7 @@ fi
 
 export LD_LIBRARY_PATH=$MPI_HOME/lib:$LD_LIBRARY_PATH
 export NCCL_DEBUG=INFO
+export NCCL_ALGO=Ring
 
 # ── Benchmark parameters ───────────────────────────────────────────────────
 MIN_BYTES="8M"
