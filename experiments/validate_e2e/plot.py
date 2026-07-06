@@ -296,9 +296,9 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         else:
             ax.set_title("Qwen3-32B", fontsize=10, fontweight="bold")
 
-    axes[-1].legend(
+    fig.legend(
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.12),
+        bbox_to_anchor=(0.5, -0.02),
         ncol=2,
         frameon=False,
         handlelength=1.2,
@@ -306,7 +306,7 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         columnspacing=1.0,
     )
 
-    fig.tight_layout(rect=[0, 0, 1, 1.02])
+    fig.tight_layout(rect=[0, 0.03, 1, 1.02])
 
     if output:
         fig.savefig(output, bbox_inches="tight", dpi=300)
