@@ -17,8 +17,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --exclusive
 #SBATCH --partition=gpu_h100
-#SBATCH --output=experiments/validate_simccl/results/nccl_slurm_%j.log
-#SBATCH --error=experiments/validate_simccl/results/nccl_slurm_%j.err
+#SBATCH --output=nccl_slurm_%j.log
+#SBATCH --error=nccl_slurm_%j.err
 # ──────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
