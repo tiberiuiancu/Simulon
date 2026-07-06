@@ -40,6 +40,23 @@ sys.exit(1)
 " 2>/dev/null
 }
 
+check_sim_wandb_exists() {
+    local model="$1"
+    local run_name="validate-e2e-${model}"
+    uv run python3 -c "
+import os, sys, wandb
+api = wandb.Api()
+entity = os.environ.get('WANDB_ENTITY')
+project = os.environ.get('WANDB_PROJECT', 'simulon')
+path = f'{entity}/{project}' if entity else project
+runs = api.runs(path, filters={'state': 'finished', 'display_name': '${run_name}'})
+for r in runs:
+    if r.display_name == '${run_name}':
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null
+}
+
 TOTAL_BASELINES=0
 TOTAL_SIMS=0
 for dir in "$SCRIPT_DIR/configs"/*/; do
@@ -64,11 +81,15 @@ for dir in "$SCRIPT_DIR/configs"/*/; do
         TOTAL_BASELINES=$((TOTAL_BASELINES + 1))
     fi
 
-    echo "Submitting sim job for $model ($scenario_rel)"
-    if [ "$DRY_RUN" = false ]; then
-        bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm' '$scenario_rel'"
+    if check_sim_wandb_exists "$model"; then
+        echo "Skipping sim for $model: already tracked in W&B"
+    else
+        echo "Submitting sim job for $model ($scenario_rel)"
+        if [ "$DRY_RUN" = false ]; then
+            bash -c "sbatch '$SCRIPT_DIR/run_sim.slurm' '$scenario_rel'"
+        fi
+        TOTAL_SIMS=$((TOTAL_SIMS + 1))
     fi
-    TOTAL_SIMS=$((TOTAL_SIMS + 1))
 done
 
 echo "Submitted $TOTAL_BASELINES baseline job(s) + $TOTAL_SIMS simulation job(s)."
