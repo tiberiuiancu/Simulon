@@ -183,6 +183,8 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     n = len(models)
 
     baseline_median = []
+    baseline_min = []
+    baseline_max = []
     sim_val = []
     pct_labels = []
 
@@ -191,9 +193,13 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         sd = df[(df["model"] == m) & (df["source"] == "Simulated")]["value"].values.astype(float)
 
         b_med = float(np.median(bd)) if len(bd) else 0.0
+        b_min = float(np.min(bd)) if len(bd) else 0.0
+        b_max = float(np.max(bd)) if len(bd) else 0.0
         s = float(sd[0]) if len(sd) else 0.0
 
         baseline_median.append(b_med)
+        baseline_min.append(b_min)
+        baseline_max.append(b_max)
         sim_val.append(s)
 
         if b_med > 0 and s > 0:
@@ -231,6 +237,8 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         ax = axes[section]
         sec_n = len(idxs)
         sec_baseline_median = [baseline_median[i] for i in idxs]
+        sec_baseline_min = [baseline_min[i] for i in idxs]
+        sec_baseline_max = [baseline_max[i] for i in idxs]
         sec_sim_val = [sim_val[i] for i in idxs]
         sec_pct = [pct_labels[i] for i in idxs]
 
@@ -241,10 +249,17 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
             x - width / 2,
             sec_baseline_median,
             width,
+            yerr=[
+                np.array(sec_baseline_median) - np.array(sec_baseline_min),
+                np.array(sec_baseline_max) - np.array(sec_baseline_median),
+            ],
+            capsize=3,
             color=color_baseline,
             alpha=0.8,
             label="Baseline",
+            error_kw={"ecolor": "#333333", "elinewidth": 1.0},
         )
+        ax.bar(x + width / 2, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
         ax.bar(x + width / 2, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
 
         sec_y_max = (
