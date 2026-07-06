@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot simulon vs nccl-tests bus bandwidth: 3×3 grid (rows=GPU count, cols=collective).
+"""Plot simulon vs nccl-tests bus bandwidth: 3×4 grid (rows=GPU count, cols=collective).
 
 Loads JSON files from a results directory:
   sim_<collective>_<config>_<cluster>.json      — simulon predictions (from sim_ccl.py)
@@ -10,27 +10,31 @@ Loads JSON files from a results directory:
 All files are optional; missing ones are silently skipped.
 
 Usage (from repo root):
-    uv run python experiments/validate_simccl/plot.py
-    uv run python experiments/validate_simccl/plot.py --cluster jupiter
-    uv run python experiments/validate_simccl/plot.py --results-dir /path/to/results --output plot.pdf
+    uv run python experiments/validate_simccl/plot.py --output plot.pdf
+    uv run python experiments/validate_simccl/plot.py --cluster jupiter --output plot.pdf
+    uv run python experiments/validate_simccl/plot.py --simai --output plot.pdf
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from _plot_utils import setup_latex_style
+
 # ── Layout ─────────────────────────────────────────────────────────────────
 
 COLLECTIVES = ["AllReduce", "AllGather", "ReduceScatter", "AllToAll"]
 CONFIGS = [
-    {"label": "1n4g", "ngpus": 4, "title": "4 GPUs (1 node)"},
-    {"label": "2n4g", "ngpus": 8, "title": "8 GPUs (2 nodes)"},
-    {"label": "4n4g", "ngpus": 16, "title": "16 GPUs (4 nodes)"},
+    {"label": "1n4g", "ngpus": 4, "title": "4 GPUs\n(1 node)"},
+    {"label": "2n4g", "ngpus": 8, "title": "8 GPUs\n(2 nodes)"},
+    {"label": "4n4g", "ngpus": 16, "title": "16 GPUs\n(4 nodes)"},
 ]
 
 
@@ -53,9 +57,13 @@ def _load(path: Path) -> tuple[list[float], list[float]] | None:
 # ── Plotting ───────────────────────────────────────────────────────────────
 
 
-def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> None:
+def plot(
+    results_dir: Path, output: Path | None, cluster: str = "snellius", simai: bool = False
+) -> None:
+    setup_latex_style()
+
     fig, axes = plt.subplots(
-        nrows=len(CONFIGS), ncols=len(COLLECTIVES), figsize=(18, 10), sharex=True
+        nrows=len(CONFIGS), ncols=len(COLLECTIVES), figsize=(3.5, 4.5), sharex=True
     )
 
     # Track which series appear (for a shared legend)
@@ -70,15 +78,26 @@ def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> N
             series = [
                 ("nccl-tests", f"nccl_{cname_lower}_{label}_{cluster}.json", "#ff7f0e", "s", "--"),
                 ("simulon", f"sim_{cname_lower}_{label}_{cluster}.json", "#1f77b4", "o", "-"),
-                (
-                    "SimAI analytical",
-                    f"simai_analytical_{cname_lower}_{label}.json",
-                    "#2ca02c",
-                    "^",
-                    "-",
-                ),
-                ("SimAI NS3", f"simai_ns3_{cname_lower}_{label}.json", "#9467bd", "D", "-."),
             ]
+            if simai:
+                series.extend(
+                    [
+                        (
+                            "SimAI analytical",
+                            f"simai_analytical_{cname_lower}_{label}.json",
+                            "#2ca02c",
+                            "^",
+                            "-",
+                        ),
+                        (
+                            "SimAI NS3",
+                            f"simai_ns3_{cname_lower}_{label}.json",
+                            "#9467bd",
+                            "D",
+                            "-.",
+                        ),
+                    ]
+                )
 
             for sname, fname, color, marker, ls in series:
                 data = _load(results_dir / fname)
@@ -89,8 +108,8 @@ def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> N
                     sizes,
                     bws,
                     marker=marker,
-                    markersize=4,
-                    linewidth=1.5,
+                    markersize=2.5,
+                    linewidth=1.0,
                     color=color,
                     linestyle=ls,
                     label=sname,
@@ -106,43 +125,47 @@ def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> N
                 )
             )
             ax.set_xlim(left=8, right=8192)
-            ax.tick_params(axis="x", rotation=45)
+            ax.tick_params(axis="x", rotation=45, labelsize=6)
+            ax.tick_params(axis="y", labelsize=6)
             ax.grid(True, which="major", linestyle=":", alpha=0.5)
             ax.set_ylim(bottom=0)
 
             # Titles and labels
             if row == 0:
-                ax.set_title(collective, fontsize=11, fontweight="bold")
+                ax.set_title(collective, fontsize=8, fontweight="bold")
             if col == 0:
-                ax.set_ylabel(f"{cfg['title']}\nBus BW (GB/s)", fontsize=9)
+                ax.set_ylabel(f"{cfg['title']}\nBus BW (GB/s)", fontsize=7)
             if row == len(CONFIGS) - 1:
-                ax.set_xlabel("Message size", fontsize=9)
+                ax.set_xlabel("Message size", fontsize=7)
 
     cluster_labels = {
         "snellius": "H100 · NVSwitch 4 · quad-rail NDR200",
         "jupiter": "GH200 · NVLink 4 · quad-rail HDR",
     }
     cluster_desc = cluster_labels.get(cluster, cluster)
-    fig.suptitle(
-        f"Collective Bus Bandwidth: simulon vs nccl-tests vs SimAI\n({cluster_desc})",
-        fontsize=13,
-        y=1.01,
-    )
+    title = "Collective Bus Bandwidth: simulon vs nccl-tests"
+    if simai:
+        title += " vs SimAI"
+    fig.suptitle(f"{title}\n({cluster_desc})", fontsize=8, y=0.99)
 
     if legend_handles:
         fig.legend(
             handles=list(legend_handles.values()),
             labels=list(legend_handles.keys()),
-            loc="upper left",
-            ncol=1,
-            fontsize=9,
-            frameon=True,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.94),
+            ncol=len(legend_handles),
+            fontsize=6,
+            frameon=False,
+            handlelength=1.5,
+            handletextpad=0.4,
+            columnspacing=1.0,
         )
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
 
     if output is not None:
-        fig.savefig(output, bbox_inches="tight", dpi=150)
+        fig.savefig(output, bbox_inches="tight")
         print(f"Saved: {output}")  # noqa: T201
     else:
         plt.show()
@@ -152,7 +175,7 @@ def plot(results_dir: Path, output: Path | None, cluster: str = "snellius") -> N
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     parser.add_argument(
         "--cluster",
         default="snellius",
@@ -170,8 +193,11 @@ def main() -> None:
         default=None,
         help="Save figure to file (PDF/PNG/SVG). If omitted, show interactively.",
     )
+    parser.add_argument(
+        "--simai", action="store_true", help="Include SimAI analytical and NS3 results in the plot."
+    )
     args = parser.parse_args()
-    plot(args.results_dir, args.output, args.cluster)
+    plot(args.results_dir, args.output, args.cluster, simai=args.simai)
 
 
 if __name__ == "__main__":
