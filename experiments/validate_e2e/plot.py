@@ -166,6 +166,9 @@ def _gather_results(base_dir: Path) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+_QWEN_MODELS = {"qwen3-32b", "qwen3-32b-tp4-pp2-mbs2-vpp8", "qwen3-32b-tp2-pp4-mbs1-vpp1"}
+
+
 def _plot(df: pd.DataFrame, output: Path | None) -> None:
     setup_latex_style()
 
@@ -204,60 +207,102 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         else:
             pct_labels.append("")
 
-    x = np.arange(n)
-    width = 0.35
+    gptoss_idx = [i for i, m in enumerate(models) if m not in _QWEN_MODELS]
+    qwen_idx = [i for i, m in enumerate(models) if m in _QWEN_MODELS]
 
-    fig, ax = plt.subplots(figsize=(max(7.0, 1.1 * n), 3.5))
+    n_gptoss = len(gptoss_idx)
+    n_qwen = len(qwen_idx)
+
+    if n_qwen == 0:
+        fig, ax = plt.subplots(1, 1, figsize=(max(7.0, 1.1 * n), 3.5))
+        axes = [ax]
+        section_indices = [(list(range(n)), models, labels)]
+    else:
+        fig, axes = plt.subplots(
+            1,
+            2,
+            figsize=(max(7.0, 1.1 * n_gptoss) + max(4.0, 1.1 * n_qwen), 3.5),
+            gridspec_kw={"width_ratios": [max(1, n_gptoss), max(1, n_qwen)]},
+        )
+        axes = list(axes)
+        section_indices = [
+            (gptoss_idx, [models[i] for i in gptoss_idx], [labels[i] for i in gptoss_idx]),
+            (qwen_idx, [models[i] for i in qwen_idx], [labels[i] for i in qwen_idx]),
+        ]
 
     color_baseline = "#4c72b0"
     color_sim = "#dd8452"
 
-    ax.bar(
-        x - width / 2,
-        baseline_min,
-        width,
-        yerr=[np.zeros(n), np.array(baseline_max) - np.array(baseline_min)],
-        capsize=3,
-        color=color_baseline,
-        alpha=0.8,
-        label="Baseline (min)",
-        error_kw={"ecolor": "#333333", "elinewidth": 1.0},
-    )
-    ax.bar(
-        x + width / 2,
-        sim_mean,
-        width,
-        yerr=sim_std,
-        capsize=3,
-        color=color_sim,
-        alpha=0.8,
-        label="Simulated (mean)",
-        error_kw={"ecolor": "#333333", "elinewidth": 1.0},
-    )
+    for section, (idxs, _sec_models, sec_labels) in enumerate(section_indices):
+        ax = axes[section]
+        sec_n = len(idxs)
+        sec_baseline_min = [baseline_min[i] for i in idxs]
+        sec_baseline_max = [baseline_max[i] for i in idxs]
+        sec_sim_mean = [sim_mean[i] for i in idxs]
+        sec_sim_std = [sim_std[i] for i in idxs]
+        sec_pct = [pct_labels[i] for i in idxs]
 
-    y_max = max(max(baseline_max), max(np.array(sim_mean) + np.array(sim_std))) if n else 1.0
-    for i, label in enumerate(pct_labels):
-        if label:
-            ax.text(
-                x[i] + width / 2,
-                y_max * 1.04,
-                label,
-                ha="center",
-                va="bottom",
-                fontsize=7,
-                color="red",
+        x = np.arange(sec_n)
+        width = 0.35
+
+        ax.bar(
+            x - width / 2,
+            sec_baseline_min,
+            width,
+            yerr=[np.zeros(sec_n), np.array(sec_baseline_max) - np.array(sec_baseline_min)],
+            capsize=3,
+            color=color_baseline,
+            alpha=0.8,
+            label="Baseline (min)",
+            error_kw={"ecolor": "#333333", "elinewidth": 1.0},
+        )
+        ax.bar(
+            x + width / 2,
+            sec_sim_mean,
+            width,
+            yerr=sec_sim_std,
+            capsize=3,
+            color=color_sim,
+            alpha=0.8,
+            label="Simulated (mean)",
+            error_kw={"ecolor": "#333333", "elinewidth": 1.0},
+        )
+
+        sec_y_max = (
+            max(
+                max(sec_baseline_max) if sec_baseline_max else 0,
+                max(np.array(sec_sim_mean) + np.array(sec_sim_std)) if sec_sim_mean else 0,
             )
+            if sec_n
+            else 1.0
+        )
+        for i, label in enumerate(sec_pct):
+            if label:
+                ax.text(
+                    x[i] + width / 2,
+                    sec_y_max * 1.04,
+                    label,
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                    color="red",
+                )
 
-    for i in range(n):
-        if i in _DIVIDERS_AFTER_IDX and i < n - 1:
-            ax.axvline(x[i] + 0.5, color="#999999", linestyle=":", linewidth=0.8)
+        sec_dividers = {1, 5, 7}
+        for i in range(sec_n):
+            if i in sec_dividers and i < sec_n - 1:
+                ax.axvline(x[i] + 0.5, color="#999999", linestyle=":", linewidth=0.8)
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=7)
-    ax.set_ylabel("Iteration time (ms)")
-    ax.set_title("E2E Validation: Iteration Time", fontsize=10, fontweight="bold")
-    ax.set_ylim(0, y_max * 1.15)
-    ax.legend(
+        ax.set_xticks(x)
+        ax.set_xticklabels(sec_labels, fontsize=7)
+        ax.set_ylabel("Iteration time (ms)")
+        ax.set_ylim(0, sec_y_max * 1.15)
+        if section == 0:
+            ax.set_title("GPT-OSS 20B", fontsize=10, fontweight="bold")
+        else:
+            ax.set_title("Qwen3-32B", fontsize=10, fontweight="bold")
+
+    axes[-1].legend(
         loc="upper center",
         bbox_to_anchor=(0.5, -0.12),
         ncol=2,
