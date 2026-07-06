@@ -182,28 +182,22 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     labels.extend(label_for_model(m) for m in extras)
     n = len(models)
 
-    baseline_min = []
-    baseline_max = []
-    sim_mean = []
-    sim_std = []
+    baseline_median = []
+    sim_val = []
     pct_labels = []
 
     for m in models:
         bd = df[(df["model"] == m) & (df["source"] == "Baseline")]["value"].values.astype(float)
         sd = df[(df["model"] == m) & (df["source"] == "Simulated")]["value"].values.astype(float)
 
-        b_min = float(np.min(bd)) if len(bd) else 0.0
-        b_max = float(np.max(bd)) if len(bd) else 0.0
-        s_mean = float(np.mean(sd)) if len(sd) else 0.0
-        s_std = float(np.std(sd)) if len(sd) else 0.0
+        b_med = float(np.median(bd)) if len(bd) else 0.0
+        s = float(sd[0]) if len(sd) else 0.0
 
-        baseline_min.append(b_min)
-        baseline_max.append(b_max)
-        sim_mean.append(s_mean)
-        sim_std.append(s_std)
+        baseline_median.append(b_med)
+        sim_val.append(s)
 
-        if b_min > 0 and s_mean > 0:
-            pct_labels.append(f"{(s_mean - b_min) / b_min * 100:+.1f}%")
+        if b_med > 0 and s > 0:
+            pct_labels.append(f"{(s - b_med) / b_med * 100:+.1f}%")
         else:
             pct_labels.append("")
 
@@ -236,10 +230,8 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     for section, (idxs, _sec_models, sec_labels) in enumerate(section_indices):
         ax = axes[section]
         sec_n = len(idxs)
-        sec_baseline_min = [baseline_min[i] for i in idxs]
-        sec_baseline_max = [baseline_max[i] for i in idxs]
-        sec_sim_mean = [sim_mean[i] for i in idxs]
-        sec_sim_std = [sim_std[i] for i in idxs]
+        sec_baseline_median = [baseline_median[i] for i in idxs]
+        sec_sim_val = [sim_val[i] for i in idxs]
         sec_pct = [pct_labels[i] for i in idxs]
 
         x = np.arange(sec_n)
@@ -247,31 +239,18 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
 
         ax.bar(
             x - width / 2,
-            sec_baseline_min,
+            sec_baseline_median,
             width,
-            yerr=[np.zeros(sec_n), np.array(sec_baseline_max) - np.array(sec_baseline_min)],
-            capsize=3,
             color=color_baseline,
             alpha=0.8,
-            label="Baseline (min)",
-            error_kw={"ecolor": "#333333", "elinewidth": 1.0},
+            label="Baseline",
         )
-        ax.bar(
-            x + width / 2,
-            sec_sim_mean,
-            width,
-            yerr=sec_sim_std,
-            capsize=3,
-            color=color_sim,
-            alpha=0.8,
-            label="Simulated (mean)",
-            error_kw={"ecolor": "#333333", "elinewidth": 1.0},
-        )
+        ax.bar(x + width / 2, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
 
         sec_y_max = (
             max(
-                max(sec_baseline_max) if sec_baseline_max else 0,
-                max(np.array(sec_sim_mean) + np.array(sec_sim_std)) if sec_sim_mean else 0,
+                max(sec_baseline_median) if sec_baseline_median else 0,
+                max(sec_sim_val) if sec_sim_val else 0,
             )
             if sec_n
             else 1.0
