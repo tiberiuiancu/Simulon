@@ -295,7 +295,8 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
 
         ax.set_xticks(x)
         ax.set_xticklabels(sec_labels, fontsize=7)
-        ax.set_ylabel("Iteration time (ms)")
+        if section == 0:
+            ax.set_ylabel("Iteration time (ms)")
         ax.set_ylim(0, sec_y_max * 1.15)
         if section == 0:
             ax.set_title("GPT-OSS 20B", fontsize=10, fontweight="bold")
