@@ -63,7 +63,7 @@ def plot(
     setup_latex_style()
 
     fig, axes = plt.subplots(
-        nrows=len(CONFIGS), ncols=len(COLLECTIVES), figsize=(3.5, 4.5), sharex=True
+        nrows=len(CONFIGS), ncols=len(COLLECTIVES), figsize=(7, 4.5), sharex=True
     )
 
     # Track which series appear (for a shared legend)
@@ -76,8 +76,8 @@ def plot(
             cname_lower = collective.lower()
 
             series = [
-                ("nccl-tests", f"nccl_{cname_lower}_{label}_{cluster}.json", "#ff7f0e", "s", "--"),
                 ("simulon", f"sim_{cname_lower}_{label}_{cluster}.json", "#1f77b4", "o", "-"),
+                ("nccl-tests", f"nccl_{cname_lower}_{label}_{cluster}.json", "#ff7f0e", "s", "--"),
             ]
             if simai:
                 series.extend(
@@ -104,12 +104,14 @@ def plot(
                 if data is None:
                     continue
                 sizes, bws = data
+                lw = 1.5 if ls == "--" else 1.0
+                ms = 4 if ls == "--" else 3
                 (line,) = ax.plot(
                     sizes,
                     bws,
                     marker=marker,
-                    markersize=2.5,
-                    linewidth=1.0,
+                    markersize=ms,
+                    linewidth=lw,
                     color=color,
                     linestyle=ls,
                     label=sname,
@@ -125,18 +127,18 @@ def plot(
                 )
             )
             ax.set_xlim(left=8, right=8192)
-            ax.tick_params(axis="x", rotation=45, labelsize=6)
-            ax.tick_params(axis="y", labelsize=6)
+            ax.tick_params(axis="x", rotation=45, labelsize=7)
+            ax.tick_params(axis="y", labelsize=7)
             ax.grid(True, which="major", linestyle=":", alpha=0.5)
-            ax.set_ylim(bottom=0)
+            ax.set_ylim(0, 350 if row == 0 else 125)
 
             # Titles and labels
             if row == 0:
-                ax.set_title(collective, fontsize=8, fontweight="bold")
+                ax.set_title(collective, fontsize=9, fontweight="bold")
             if col == 0:
-                ax.set_ylabel(f"{cfg['title']}\nBus BW (GB/s)", fontsize=7)
-            if row == len(CONFIGS) - 1:
-                ax.set_xlabel("Message size", fontsize=7)
+                ax.set_ylabel(f"{cfg['title']}\nBus BW (GB/s)", fontsize=8)
+
+    fig.text(0.5, 0.02, "Message size", ha="center", fontsize=8)
 
     cluster_labels = {
         "snellius": "H100 · NVSwitch 4 · quad-rail NDR200",
@@ -146,7 +148,7 @@ def plot(
     title = "Collective Bus Bandwidth: simulon vs nccl-tests"
     if simai:
         title += " vs SimAI"
-    fig.suptitle(f"{title}\n({cluster_desc})", fontsize=8, y=0.99)
+    fig.suptitle(f"{title}\n({cluster_desc})", fontsize=9, y=0.99)
 
     if legend_handles:
         fig.legend(
@@ -155,7 +157,7 @@ def plot(
             loc="upper center",
             bbox_to_anchor=(0.5, 0.94),
             ncol=len(legend_handles),
-            fontsize=6,
+            fontsize=7,
             frameon=False,
             handlelength=1.5,
             handletextpad=0.4,
