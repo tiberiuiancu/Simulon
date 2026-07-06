@@ -104,7 +104,7 @@ def _pull_baseline_iteration_times(config: str) -> list[float]:
                 continue
             val = row["iteration-time"]
             if pd.notna(val):
-                values.append(float(val) * 1000.0)
+                values.append(float(val))
     return values
 
 
@@ -127,7 +127,7 @@ def _pull_simulated_iteration_times(config: str) -> list[float]:
         summary = dict(run.summary)
         val = summary.get("total_time_ms")
         if val is not None:
-            values.append(float(val))
+            values.append(float(val) / 1000.0)
     return values
 
 
@@ -296,7 +296,7 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         ax.set_xticks(x)
         ax.set_xticklabels(sec_labels, fontsize=7)
         if section == 0:
-            ax.set_ylabel("Iteration time (ms)")
+            ax.set_ylabel("Iteration time (s)")
         ax.set_ylim(0, sec_y_max * 1.15)
         if section == 0:
             ax.set_title("GPT-OSS 20B", fontsize=10, fontweight="bold")
