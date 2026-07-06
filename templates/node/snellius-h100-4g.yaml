@@ -17,7 +17,7 @@ scale_up:
 nccl:
   name: snellius-h100-4g
   gpus_per_node: 4
-  launch_latency_ms: 1.0
+  launch_latency_ms: 0.2
   AllReduce:
     ring:
       - {size_bytes:      8388608, bus_bw_GBps: 199.822}
