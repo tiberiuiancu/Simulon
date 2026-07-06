@@ -15,6 +15,7 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
 #SBATCH --time=00:30:00
+#SBATCH --switches=1
 #SBATCH --exclusive
 #SBATCH --partition=gpu_h100
 #SBATCH --output=nccl_slurm_%j.log
