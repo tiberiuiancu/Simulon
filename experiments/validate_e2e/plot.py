@@ -327,8 +327,6 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
 
     if use_csv:
         df = _load_csv(csv_path)
-        if df is not None:
-            df["value"] = df["value"] / 1000.0
         if df is None:
             print(f"--use-csv requested but {csv_path} not found.", file=sys.stderr)
             sys.exit(1)
