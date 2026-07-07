@@ -78,6 +78,8 @@ def _build_torchrun_cmd(
     derived_args["--log-timers-to-tensorboard"] = True
     derived_args["--timing-log-level"] = 2
     derived_args["--save"] = save_dir
+    derived_args["--tensorboard-dir"] = f"{save_dir}/tensorboard"
+    derived_args["--profile"] = True
     derived_args["--use-pytorch-profiler"] = True
     derived_args["--profile-step-start"] = warmup_iters + 1
     derived_args["--profile-step-end"] = warmup_iters + 2
