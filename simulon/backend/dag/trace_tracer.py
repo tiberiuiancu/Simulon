@@ -779,6 +779,7 @@ def _create_pp_send(
     slot_entry_node: dict,
     next_slot_by_key: dict | None,
     sync_send: bool,
+    dst_prev_node: int | None = None,
 ) -> None:
     pp_send = CommNode(
         node_id=node_id[0],
@@ -800,6 +801,13 @@ def _create_pp_send(
             next_node = slot_entry_node.get(next_key)
             if next_node is not None:
                 dag.add_edge(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=next_node))
+    # In synchronous P2P mode, the destination rank must finish its current
+    # compute before it can post the recv. Without this edge the PP_Send
+    # (which represents the combined send+recv) can be scheduled concurrently
+    # with compute on the destination rank, which is physically impossible
+    # when batch_p2p_comm=True (the GPU is blocked on the recv call).
+    if sync_send and dst_prev_node is not None:
+        dag.add_edge(DAGEdge(src_node_id=dst_prev_node, dst_node_id=pp_send.node_id))
     node_id[0] += 1
     flow_id[0] += 1
 
@@ -831,6 +839,9 @@ def _wire_pp_transfers(
     next_slot_by_key: dict | None,
     sync_send: bool,
 ) -> tuple[int, int]:
+    prev_slot_by_key: dict = {}
+    if sync_send and next_slot_by_key:
+        prev_slot_by_key = {v: k for k, v in next_slot_by_key.items()}
     seen: set[tuple[int, int, int, str]] = set()
     with log_progress("  wiring PP transfers", len(pending), logger) as advance:
         for record in pending:
@@ -860,6 +871,13 @@ def _wire_pp_transfers(
                     continue
                 if _should_skip_pp_pair(src_stage, dst_stage, record.direction):
                     continue
+                dst_prev_node: int | None = None
+                if sync_send and prev_slot_by_key:
+                    dst_key = (dst, record.microbatch_id, record.direction)
+                    if dst_node is not None and dst_key in slot_entry_node:
+                        prev_key = prev_slot_by_key.get(dst_key)
+                        if prev_key is not None:
+                            dst_prev_node = slot_last_node.get(prev_key)
                 _create_pp_send(
                     src,
                     dst,
@@ -872,6 +890,7 @@ def _wire_pp_transfers(
                     slot_entry_node,
                     next_slot_by_key,
                     sync_send,
+                    dst_prev_node,
                 )
             advance()
     return node_id[0], flow_id[0]
