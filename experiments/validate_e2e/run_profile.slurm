@@ -19,6 +19,7 @@ fi
 
 MODEL_NAME="$(basename "$(dirname "$INPUT_PATH")")"
 PROFILE_DIR="/scratch-shared/tiberiui/profile-${MODEL_NAME}-${SLURM_JOB_ID:-local}"
+mkdir -p "$PROFILE_DIR"
 
 if [ -z "${APPTAINER_CONTAINER:-}" ] && [ -z "${SINGULARITY_CONTAINER:-}" ]; then
     if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
