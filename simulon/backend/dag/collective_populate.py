@@ -222,16 +222,29 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
     pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
     with log_progress("  populating PP_Send durations", len(pp_sends), logger) as advance:
         for comm_node in pp_sends:
-            bw, latency_ms = _get_link_params(
-                comm_node.src_gpu,
-                comm_node.dst_gpu,
-                gpus_per_node,
-                intra_bw,
-                intra_latency,
-                inter_bw,
-                inter_latency,
-            )
-            comm_node.duration_ms = latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+            src_node_id = comm_node.src_gpu
+            dst_node_id = comm_node.dst_gpu
+            is_intra = (src_node_id // gpus_per_node) == (dst_node_id // gpus_per_node)
+            if is_intra:
+                bw, latency_ms = _get_link_params(
+                    src_node_id,
+                    dst_node_id,
+                    gpus_per_node,
+                    intra_bw,
+                    intra_latency,
+                    inter_bw,
+                    inter_latency,
+                )
+                comm_node.duration_ms = latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+            else:
+                from simulon.collective.calbusbw import _nic_efficiency
+
+                eff = _nic_efficiency(comm_node.bytes, 2)
+                effective_bw = inter_bw * eff
+                comm_node.duration_ms = inter_latency + (
+                    comm_node.bytes / effective_bw if effective_bw > 0 else 0.0
+                )
+            comm_node.duration_ms += launch_latency_ms
             advance()
 
     return dag
