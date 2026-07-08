@@ -505,6 +505,7 @@ def _add_non_pp_collective(
     slot_node_ids: list,
     tracer_cfg: DAGTracerConfig,
     _collective_registry: dict,
+    last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode] | None = None,
 ) -> None:
     collective_type = str(event.metadata.get("collective_type", ""))
     group_ranks_raw = event.metadata.get("group_ranks", [])
@@ -551,14 +552,26 @@ def _add_non_pp_collective(
             DAGEdge(src_node_id=last_node_by_rank[rank].node_id, dst_node_id=collective_id)
         )
 
+    if rank in (last_async_collective_by_rank or {}):
+        dag.add_edge(
+            DAGEdge(
+                src_node_id=last_async_collective_by_rank[rank].node_id, dst_node_id=collective_id
+            )
+        )
+
     async_op = bool(event.metadata.get("async_op", False))
     if async_op and tracer_cfg.overlap_async_collectives:
         # Async collectives launch on a separate CUDA stream and don't block
         # subsequent compute on this rank. Keep the predecessor edge (collective
         # waits for prior work) but don't make this collective the new "last
         # node" — the next compute node will chain from the previous one instead.
+        # Track it separately so the next collective still waits for this one.
+        if last_async_collective_by_rank is not None:
+            last_async_collective_by_rank[rank] = collective
         return
 
+    if last_async_collective_by_rank is not None:
+        last_async_collective_by_rank.pop(rank, None)
     last_node_by_rank[rank] = collective
     slot_node_ids.append(collective_id)
 
@@ -615,6 +628,7 @@ def _handle_event_gap(
     pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
+    last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode] | None = None,
     flops_multiplier: float = 1.0,
 ) -> None:
     duration_ms = (next_event.timestamp_ms - event.timestamp_ms) / flops_multiplier
@@ -657,6 +671,7 @@ def _handle_event_gap(
                 slot_node_ids,
                 tracer_cfg,
                 _collective_registry,
+                last_async_collective_by_rank,
             )
             _add_compute_node(
                 dag,
@@ -700,6 +715,7 @@ def _add_trace_to_dag(
     pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
+    last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode],
     flops_multiplier: float = 1.0,
 ) -> None:
     events = sorted(trace.events, key=lambda e: e.timestamp_ms)
@@ -746,6 +762,7 @@ def _add_trace_to_dag(
                 pending_pp_transfers,
                 last_node_by_rank,
                 _collective_registry,
+                last_async_collective_by_rank,
                 flops_multiplier,
             )
 
@@ -977,6 +994,7 @@ class MegatronDagTracer(DAGTracer):
         slot_last_timestamp: dict = {}
         pending_pp_transfers: list = []
         last_node_by_rank: dict[int, CollectiveNode | ComputeNode] = {}
+        last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode] = {}
 
         node_id = [0]
         flow_id = [0]
@@ -1015,6 +1033,7 @@ class MegatronDagTracer(DAGTracer):
                     pending_pp_transfers,
                     last_node_by_rank,
                     _collective_registry,
+                    last_async_collective_by_rank,
                     flops_multiplier,
                 )
                 advance()
