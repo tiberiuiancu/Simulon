@@ -11,6 +11,7 @@ from simulon.config.dc import DatacenterConfig
 class DAGTracerConfig:
     num_channels: int = 1
     algorithm: str = "ring"  # ring | tree | collnet_direct | collnet_chain | nvls | nvls_tree
+    overlap_async_collectives: bool = False
 
 
 class DAGTracer(ABC):

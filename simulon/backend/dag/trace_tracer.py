@@ -550,6 +550,15 @@ def _add_non_pp_collective(
         dag.add_edge(
             DAGEdge(src_node_id=last_node_by_rank[rank].node_id, dst_node_id=collective_id)
         )
+
+    async_op = bool(event.metadata.get("async_op", False))
+    if async_op and tracer_cfg.overlap_async_collectives:
+        # Async collectives launch on a separate CUDA stream and don't block
+        # subsequent compute on this rank. Keep the predecessor edge (collective
+        # waits for prior work) but don't make this collective the new "last
+        # node" — the next compute node will chain from the previous one instead.
+        return
+
     last_node_by_rank[rank] = collective
     slot_node_ids.append(collective_id)
 
