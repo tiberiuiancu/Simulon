@@ -51,6 +51,11 @@ def simulate(
     no_tracking: bool = typer.Option(
         False, "--no-tracking", help="Disable experiment tracking (W&B, MLflow)"
     ),
+    overlap_async_collectives: bool = typer.Option(
+        False,
+        "--overlap-async-collectives",
+        help="Allow async (async_op=True) collectives to overlap with subsequent compute",
+    ),
     skip_if_tracked: bool = typer.Option(
         False,
         "--skip-if-tracked",
@@ -113,7 +118,11 @@ def simulate(
         except Exception:
             gpu_spec = None
 
-        dag, result = run_simulation(sc, network_simulation=network_simulation)
+        dag, result = run_simulation(
+            sc,
+            network_simulation=network_simulation,
+            overlap_async_collectives=overlap_async_collectives,
+        )
 
         if trackers:
             params = extract_params(sc)
