@@ -1,0 +1,20 @@
+rank=0
+returncode=1
+cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py --tensor-model-parallel-size 2 --pipeline-model-parallel-size 4 --micro-batch-size 1 --global-batch-size 64 --seq-length 4096 --num-layers 64 --hidden-size 5120 --num-attention-heads 64 --ffn-hidden-size 25600 --max-position-embeddings 4096 --tokenizer-type NullTokenizer --mock-data --vocab-size 262144 --padded-vocab-size 262144 --sequence-parallel --context-parallel-size 1 --lr 0.0006 --seed 1234 --init-method-std 0.02 --swiglu --num-query-groups 8 --group-query-attention --attention-softmax-in-fp32 --use-flash-attn --attention-backend auto --position-embedding-type rope --rotary-base 10000 --rotary-percent 1.0 --untie-embeddings-and-output-weights --normalization RMSNorm --norm-epsilon 1e-05 --qk-layernorm --bf16 --attention-dropout 0.0 --hidden-dropout 0.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-08 --clip-grad 1.0 --weight-decay 0.05 --min-lr 0.0 --lr-decay-style WSD --lr-wsd-decay-style linear --lr-warmup-iters 0 --lr-decay-iters 1 --lr-wsd-decay-iters 1 --use-distributed-optimizer --distributed-backend nccl --distributed-timeout-minutes 30 --eval-interval 999999 --eval-iters 0 --num-virtual-stages-per-pipeline-rank 1 --save-interval 1000000 --log-interval 1 --no-masked-softmax-fusion --no-bias-swiglu-fusion --train-iters 4 --trace-warmup-iters 3 --eval-global-batch-size 27648 --fake-process-group --rank 0 --trace-dir /home/tiberiui/simulon_validate/templates/gpu/h100/traces/validate-e2e-qwen3-32b-tp2-pp4-mbs1-vpp1
+
+--- stderr ---
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Traceback (most recent call last):
+  File "/opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py", line 24, in <module>
+    from gpt_builders import gpt_builder
+  File "/opt/simulon/vendor/Megatron-LM-traced/gpt_builders.py", line 3, in <module>
+    from megatron.core.models.gpt import GPTModel
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/__init__.py", line 6, in <module>
+    from megatron.core.distributed import DistributedDataParallel
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/distributed/__init__.py", line 8, in <module>
+    from .distributed_data_parallel import DistributedDataParallel
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/distributed/distributed_data_parallel.py", line 513
+    )
+    ^
+SyntaxError: unmatched ')'

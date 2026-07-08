@@ -6,7 +6,7 @@
   "events": [
     {
       "type": "slot_begin",
-      "timestamp_ms": 7.890528202056885,
+      "timestamp_ms": 7.898015975952148,
       "metadata": {
         "microbatch_id": 0,
         "direction": "fwd",
@@ -15,11 +15,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 8.7608642578125,
+      "timestamp_ms": 8.217503547668457,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 8.220224380493164,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 8.223008155822754,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 8.271136283874512,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 8.311871528625488,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -30,7 +90,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 66.80089569091797,
+      "timestamp_ms": 66.53651428222656,
       "metadata": {
         "microbatch_id": 0,
         "direction": "fwd",
@@ -39,181 +99,361 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 66.80361938476562,
+      "timestamp_ms": 66.53929901123047,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          4
-        ],
-        "microbatch_id": 0,
-        "direction": "fwd"
-      }
-    },
-    {
-      "type": "slot_begin",
-      "timestamp_ms": 66.9327392578125,
-      "metadata": {
-        "microbatch_id": 1,
-        "direction": "fwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 68.20825958251953,
-      "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
-      "type": "slot_end",
-      "timestamp_ms": 124.78050994873047,
-      "metadata": {
-        "microbatch_id": 1,
-        "direction": "fwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 124.78323364257812,
-      "metadata": {
-        "name": "send_forward",
-        "collective_type": "PP_Send",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          4
-        ],
-        "microbatch_id": 1,
-        "direction": "fwd"
-      }
-    },
-    {
-      "type": "slot_begin",
-      "timestamp_ms": 124.91343688964844,
-      "metadata": {
-        "microbatch_id": 2,
-        "direction": "fwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 126.18243408203125,
-      "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
-      "type": "slot_end",
-      "timestamp_ms": 182.40354919433594,
-      "metadata": {
-        "microbatch_id": 2,
-        "direction": "fwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 182.40623474121094,
-      "metadata": {
-        "name": "send_forward",
-        "collective_type": "PP_Send",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          4
-        ],
-        "microbatch_id": 2,
-        "direction": "fwd"
-      }
-    },
-    {
-      "type": "slot_begin",
-      "timestamp_ms": 182.53543090820312,
-      "metadata": {
-        "microbatch_id": 3,
-        "direction": "fwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 183.77647399902344,
-      "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
-      "type": "slot_end",
-      "timestamp_ms": 239.81939697265625,
-      "metadata": {
-        "microbatch_id": 3,
-        "direction": "fwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 239.82464599609375,
-      "metadata": {
-        "name": "send_forward",
-        "collective_type": "PP_Send",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          4
-        ],
-        "microbatch_id": 3,
-        "direction": "fwd"
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 239.82733154296875,
-      "metadata": {
-        "name": "recv_backward",
-        "collective_type": "PP_Recv",
         "bytes": 20971520,
         "group_ranks": [
           0,
           4
         ],
         "microbatch_id": 0,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 66.66569519042969,
+      "metadata": {
+        "microbatch_id": 1,
+        "direction": "fwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 67.52671813964844,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 67.52947235107422,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 67.5322265625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 67.56572723388672,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 67.59516906738281,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 124.31993865966797,
+      "metadata": {
+        "microbatch_id": 1,
+        "direction": "fwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 124.32262420654297,
+      "metadata": {
+        "name": "send_forward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          0,
+          4
+        ],
+        "microbatch_id": 1,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 124.45053100585938,
+      "metadata": {
+        "microbatch_id": 2,
+        "direction": "fwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 125.28546905517578,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 125.28822326660156,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 125.29097747802734,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 125.32489776611328,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 125.35388946533203,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 181.88006591796875,
+      "metadata": {
+        "microbatch_id": 2,
+        "direction": "fwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 181.88275146484375,
+      "metadata": {
+        "name": "send_forward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          0,
+          4
+        ],
+        "microbatch_id": 2,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 182.0121612548828,
+      "metadata": {
+        "microbatch_id": 3,
+        "direction": "fwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 182.82672119140625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 182.8294677734375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 182.83226013183594,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 182.8717498779297,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 182.9036102294922,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 239.35987854003906,
+      "metadata": {
+        "microbatch_id": 3,
+        "direction": "fwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 239.3651580810547,
+      "metadata": {
+        "name": "send_forward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          0,
+          4
+        ],
+        "microbatch_id": 3,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 239.3678436279297,
+      "metadata": {
+        "name": "recv_backward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          0,
+          4
+        ],
+        "microbatch_id": 0,
         "direction": "bwd"
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 239.8957061767578,
+      "timestamp_ms": 239.4365692138672,
       "metadata": {
         "microbatch_id": 0,
         "direction": "bwd",
@@ -221,23 +461,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 352.8394470214844,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 357.3316650390625,
+      "timestamp_ms": 359.0122375488281,
       "metadata": {
         "microbatch_id": 0,
         "direction": "bwd",
@@ -246,7 +471,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 357.33453369140625,
+      "timestamp_ms": 359.0149230957031,
       "metadata": {
         "microbatch_id": 4,
         "direction": "fwd",
@@ -255,11 +480,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 358.6338806152344,
+      "timestamp_ms": 359.32879638671875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 359.3315734863281,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 359.3343505859375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 359.47625732421875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 359.569580078125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -270,7 +555,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 414.84527587890625,
+      "timestamp_ms": 416.991455078125,
       "metadata": {
         "microbatch_id": 4,
         "direction": "fwd",
@@ -279,7 +564,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 414.8507080078125,
+      "timestamp_ms": 416.99652099609375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -294,7 +579,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 414.8533935546875,
+      "timestamp_ms": 416.9991760253906,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -309,7 +594,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 414.92572021484375,
+      "timestamp_ms": 417.0748596191406,
       "metadata": {
         "microbatch_id": 1,
         "direction": "bwd",
@@ -317,23 +602,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 528.006103515625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 532.5083618164062,
+      "timestamp_ms": 534.999267578125,
       "metadata": {
         "microbatch_id": 1,
         "direction": "bwd",
@@ -342,7 +612,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 532.5111083984375,
+      "timestamp_ms": 535.0018920898438,
       "metadata": {
         "microbatch_id": 5,
         "direction": "fwd",
@@ -351,11 +621,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 533.8342895507812,
+      "timestamp_ms": 535.319091796875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 535.3218383789062,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 535.3245849609375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 535.4542236328125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 535.5396118164062,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -366,7 +696,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 590.0564575195312,
+      "timestamp_ms": 592.5580444335938,
       "metadata": {
         "microbatch_id": 5,
         "direction": "fwd",
@@ -375,7 +705,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 590.0619506835938,
+      "timestamp_ms": 592.5631713867188,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -390,7 +720,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 590.0646362304688,
+      "timestamp_ms": 592.5658569335938,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -405,7 +735,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 590.140869140625,
+      "timestamp_ms": 592.6434936523438,
       "metadata": {
         "microbatch_id": 2,
         "direction": "bwd",
@@ -413,23 +743,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 703.171875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 707.6467895507812,
+      "timestamp_ms": 710.2098999023438,
       "metadata": {
         "microbatch_id": 2,
         "direction": "bwd",
@@ -438,7 +753,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 707.6494750976562,
+      "timestamp_ms": 710.2127075195312,
       "metadata": {
         "microbatch_id": 6,
         "direction": "fwd",
@@ -447,11 +762,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 708.9773559570312,
+      "timestamp_ms": 710.5291748046875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 710.5320434570312,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 710.5347290039062,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 710.6657104492188,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 710.7506103515625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -462,7 +837,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 765.1959228515625,
+      "timestamp_ms": 767.8272705078125,
       "metadata": {
         "microbatch_id": 6,
         "direction": "fwd",
@@ -471,7 +846,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 765.201171875,
+      "timestamp_ms": 767.8323364257812,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -486,7 +861,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 765.203857421875,
+      "timestamp_ms": 767.8349609375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -501,7 +876,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 765.28076171875,
+      "timestamp_ms": 767.916748046875,
       "metadata": {
         "microbatch_id": 3,
         "direction": "bwd",
@@ -509,23 +884,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 878.304931640625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 882.756103515625,
+      "timestamp_ms": 885.5844116210938,
       "metadata": {
         "microbatch_id": 3,
         "direction": "bwd",
@@ -534,7 +894,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 882.7587890625,
+      "timestamp_ms": 885.5870971679688,
       "metadata": {
         "microbatch_id": 7,
         "direction": "fwd",
@@ -543,11 +903,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 884.0748901367188,
+      "timestamp_ms": 885.9054565429688,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 885.908203125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 885.910888671875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 886.042236328125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 886.1301879882812,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -558,7 +978,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 940.2515869140625,
+      "timestamp_ms": 943.2097778320312,
       "metadata": {
         "microbatch_id": 7,
         "direction": "fwd",
@@ -567,7 +987,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 940.2568359375,
+      "timestamp_ms": 943.2152099609375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -582,7 +1002,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 940.259521484375,
+      "timestamp_ms": 943.2178955078125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -597,7 +1017,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 940.3339233398438,
+      "timestamp_ms": 943.2952270507812,
       "metadata": {
         "microbatch_id": 4,
         "direction": "bwd",
@@ -605,23 +1025,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 1053.3466796875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 1057.7501220703125,
+      "timestamp_ms": 1060.9224853515625,
       "metadata": {
         "microbatch_id": 4,
         "direction": "bwd",
@@ -630,7 +1035,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1057.7528076171875,
+      "timestamp_ms": 1060.9251708984375,
       "metadata": {
         "microbatch_id": 8,
         "direction": "fwd",
@@ -639,11 +1044,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1059.0736083984375,
+      "timestamp_ms": 1061.2413330078125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1061.244140625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1061.246826171875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1061.400146484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1061.4918212890625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -654,7 +1119,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 1115.244873046875,
+      "timestamp_ms": 1118.564208984375,
       "metadata": {
         "microbatch_id": 8,
         "direction": "fwd",
@@ -663,7 +1128,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1115.2501220703125,
+      "timestamp_ms": 1118.569580078125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -678,7 +1143,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1115.2528076171875,
+      "timestamp_ms": 1118.572265625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -693,7 +1158,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1115.334716796875,
+      "timestamp_ms": 1118.6507568359375,
       "metadata": {
         "microbatch_id": 5,
         "direction": "bwd",
@@ -701,23 +1166,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 1228.35888671875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 1232.7716064453125,
+      "timestamp_ms": 1236.22509765625,
       "metadata": {
         "microbatch_id": 5,
         "direction": "bwd",
@@ -726,7 +1176,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1232.7742919921875,
+      "timestamp_ms": 1236.227783203125,
       "metadata": {
         "microbatch_id": 9,
         "direction": "fwd",
@@ -735,11 +1185,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1234.111572265625,
+      "timestamp_ms": 1236.5419921875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1236.5447998046875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1236.5474853515625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1236.6842041015625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1236.7705078125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -750,7 +1260,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 1290.2901611328125,
+      "timestamp_ms": 1293.7982177734375,
       "metadata": {
         "microbatch_id": 9,
         "direction": "fwd",
@@ -759,7 +1269,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1290.2952880859375,
+      "timestamp_ms": 1293.803466796875,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -774,7 +1284,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1290.2979736328125,
+      "timestamp_ms": 1293.80615234375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -789,7 +1299,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1290.3861083984375,
+      "timestamp_ms": 1293.88623046875,
       "metadata": {
         "microbatch_id": 6,
         "direction": "bwd",
@@ -797,23 +1307,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 1403.3797607421875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 1407.8380126953125,
+      "timestamp_ms": 1411.4951171875,
       "metadata": {
         "microbatch_id": 6,
         "direction": "bwd",
@@ -822,7 +1317,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1407.8406982421875,
+      "timestamp_ms": 1411.497802734375,
       "metadata": {
         "microbatch_id": 10,
         "direction": "fwd",
@@ -831,11 +1326,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1409.1612548828125,
+      "timestamp_ms": 1411.81689453125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1411.8197021484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1411.822509765625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1411.9654541015625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1412.0521240234375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -846,7 +1401,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 1465.3310546875,
+      "timestamp_ms": 1469.111083984375,
       "metadata": {
         "microbatch_id": 10,
         "direction": "fwd",
@@ -855,7 +1410,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1465.3363037109375,
+      "timestamp_ms": 1469.1162109375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -870,7 +1425,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1465.3389892578125,
+      "timestamp_ms": 1469.1187744140625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -885,7 +1440,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1465.4210205078125,
+      "timestamp_ms": 1469.1959228515625,
       "metadata": {
         "microbatch_id": 7,
         "direction": "bwd",
@@ -893,23 +1448,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 1578.3758544921875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 1582.83984375,
+      "timestamp_ms": 1586.8157958984375,
       "metadata": {
         "microbatch_id": 7,
         "direction": "bwd",
@@ -918,7 +1458,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1582.842529296875,
+      "timestamp_ms": 1586.8184814453125,
       "metadata": {
         "microbatch_id": 11,
         "direction": "fwd",
@@ -927,11 +1467,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1584.1466064453125,
+      "timestamp_ms": 1587.133056640625,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1587.1357421875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1587.1385498046875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1587.2794189453125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1587.3681640625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -942,7 +1542,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 1640.3358154296875,
+      "timestamp_ms": 1644.429931640625,
       "metadata": {
         "microbatch_id": 11,
         "direction": "fwd",
@@ -951,7 +1551,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1640.341064453125,
+      "timestamp_ms": 1644.4354248046875,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -966,7 +1566,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1640.34375,
+      "timestamp_ms": 1644.4381103515625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -981,7 +1581,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1640.427978515625,
+      "timestamp_ms": 1644.5177001953125,
       "metadata": {
         "microbatch_id": 8,
         "direction": "bwd",
@@ -989,23 +1589,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 1753.4202880859375,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 1757.9114990234375,
+      "timestamp_ms": 1762.1859130859375,
       "metadata": {
         "microbatch_id": 8,
         "direction": "bwd",
@@ -1014,7 +1599,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1757.9141845703125,
+      "timestamp_ms": 1762.1885986328125,
       "metadata": {
         "microbatch_id": 12,
         "direction": "fwd",
@@ -1023,11 +1608,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1759.22900390625,
+      "timestamp_ms": 1762.5042724609375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1762.5072021484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1762.510009765625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1762.646484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1762.7333984375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1038,7 +1683,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 1815.42626953125,
+      "timestamp_ms": 1819.7623291015625,
       "metadata": {
         "microbatch_id": 12,
         "direction": "fwd",
@@ -1047,7 +1692,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1815.431396484375,
+      "timestamp_ms": 1819.767333984375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1062,7 +1707,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1815.4342041015625,
+      "timestamp_ms": 1819.77001953125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1077,7 +1722,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1815.512451171875,
+      "timestamp_ms": 1819.84814453125,
       "metadata": {
         "microbatch_id": 9,
         "direction": "bwd",
@@ -1085,23 +1730,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 1928.4830322265625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 1932.9268798828125,
+      "timestamp_ms": 1939.1214599609375,
       "metadata": {
         "microbatch_id": 9,
         "direction": "bwd",
@@ -1110,7 +1740,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1932.9295654296875,
+      "timestamp_ms": 1939.1240234375,
       "metadata": {
         "microbatch_id": 13,
         "direction": "fwd",
@@ -1119,11 +1749,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1934.2760009765625,
+      "timestamp_ms": 1939.4390869140625,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1939.4417724609375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1939.444580078125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1939.581298828125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1939.6683349609375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1134,7 +1824,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 1990.4659423828125,
+      "timestamp_ms": 1997.3404541015625,
       "metadata": {
         "microbatch_id": 13,
         "direction": "fwd",
@@ -1143,7 +1833,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1990.4710693359375,
+      "timestamp_ms": 1997.345703125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1158,7 +1848,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 1990.473876953125,
+      "timestamp_ms": 1997.348388671875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1173,7 +1863,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 1990.5506591796875,
+      "timestamp_ms": 1997.4210205078125,
       "metadata": {
         "microbatch_id": 10,
         "direction": "bwd",
@@ -1181,23 +1871,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 2103.524169921875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 2107.9833984375,
+      "timestamp_ms": 2115.526123046875,
       "metadata": {
         "microbatch_id": 10,
         "direction": "bwd",
@@ -1206,7 +1881,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2107.986083984375,
+      "timestamp_ms": 2115.52880859375,
       "metadata": {
         "microbatch_id": 14,
         "direction": "fwd",
@@ -1215,11 +1890,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2109.326416015625,
+      "timestamp_ms": 2115.8486328125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2115.851318359375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2115.85400390625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2115.994384765625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2116.079833984375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1230,7 +1965,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 2165.473876953125,
+      "timestamp_ms": 2173.115966796875,
       "metadata": {
         "microbatch_id": 14,
         "direction": "fwd",
@@ -1239,7 +1974,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2165.479248046875,
+      "timestamp_ms": 2173.121337890625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1254,7 +1989,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2165.48193359375,
+      "timestamp_ms": 2173.1240234375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1269,7 +2004,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2165.558349609375,
+      "timestamp_ms": 2173.1962890625,
       "metadata": {
         "microbatch_id": 11,
         "direction": "bwd",
@@ -1277,23 +2012,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 2278.637939453125,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 2283.073486328125,
+      "timestamp_ms": 2291.239501953125,
       "metadata": {
         "microbatch_id": 11,
         "direction": "bwd",
@@ -1302,7 +2022,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2283.076171875,
+      "timestamp_ms": 2291.2421875,
       "metadata": {
         "microbatch_id": 15,
         "direction": "fwd",
@@ -1311,11 +2031,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2284.378662109375,
+      "timestamp_ms": 2291.56298828125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2291.565673828125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2291.568359375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2291.703857421875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2291.791748046875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1326,7 +2106,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 2340.522216796875,
+      "timestamp_ms": 2348.833984375,
       "metadata": {
         "microbatch_id": 15,
         "direction": "fwd",
@@ -1335,7 +2115,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2340.527587890625,
+      "timestamp_ms": 2348.839111328125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1350,7 +2130,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2340.5302734375,
+      "timestamp_ms": 2348.841796875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1365,7 +2145,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2340.6005859375,
+      "timestamp_ms": 2348.92236328125,
       "metadata": {
         "microbatch_id": 12,
         "direction": "bwd",
@@ -1373,23 +2153,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 2453.590576171875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 2458.088623046875,
+      "timestamp_ms": 2467.04443359375,
       "metadata": {
         "microbatch_id": 12,
         "direction": "bwd",
@@ -1398,7 +2163,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2458.09130859375,
+      "timestamp_ms": 2467.047119140625,
       "metadata": {
         "microbatch_id": 16,
         "direction": "fwd",
@@ -1407,11 +2172,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2459.396484375,
+      "timestamp_ms": 2467.3642578125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2467.366943359375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2467.36962890625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2467.499755859375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2467.5869140625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1422,7 +2247,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 2515.549072265625,
+      "timestamp_ms": 2524.64013671875,
       "metadata": {
         "microbatch_id": 16,
         "direction": "fwd",
@@ -1431,7 +2256,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2515.554443359375,
+      "timestamp_ms": 2524.64501953125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1446,7 +2271,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2515.55712890625,
+      "timestamp_ms": 2524.647705078125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1461,7 +2286,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2515.632568359375,
+      "timestamp_ms": 2524.728759765625,
       "metadata": {
         "microbatch_id": 13,
         "direction": "bwd",
@@ -1469,23 +2294,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 2628.60693359375,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 2633.088623046875,
+      "timestamp_ms": 2642.629150390625,
       "metadata": {
         "microbatch_id": 13,
         "direction": "bwd",
@@ -1494,7 +2304,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2633.09130859375,
+      "timestamp_ms": 2642.6318359375,
       "metadata": {
         "microbatch_id": 17,
         "direction": "fwd",
@@ -1503,11 +2313,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2634.432861328125,
+      "timestamp_ms": 2642.9462890625,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2642.94921875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2642.951904296875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2643.087158203125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2643.17333984375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1518,7 +2388,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 2690.609619140625,
+      "timestamp_ms": 2700.2109375,
       "metadata": {
         "microbatch_id": 17,
         "direction": "fwd",
@@ -1527,7 +2397,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2690.61474609375,
+      "timestamp_ms": 2700.21630859375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1542,7 +2412,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2690.617431640625,
+      "timestamp_ms": 2700.218994140625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1557,7 +2427,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2690.694580078125,
+      "timestamp_ms": 2700.2939453125,
       "metadata": {
         "microbatch_id": 14,
         "direction": "bwd",
@@ -1565,23 +2435,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 2803.66259765625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 2808.118896484375,
+      "timestamp_ms": 2818.279296875,
       "metadata": {
         "microbatch_id": 14,
         "direction": "bwd",
@@ -1590,7 +2445,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2808.12158203125,
+      "timestamp_ms": 2818.281982421875,
       "metadata": {
         "microbatch_id": 18,
         "direction": "fwd",
@@ -1599,11 +2454,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2809.439453125,
+      "timestamp_ms": 2818.599365234375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2818.60205078125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2818.604736328125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2818.7275390625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2818.816650390625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1614,7 +2529,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 2865.612548828125,
+      "timestamp_ms": 2875.876953125,
       "metadata": {
         "microbatch_id": 18,
         "direction": "fwd",
@@ -1623,7 +2538,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2865.61767578125,
+      "timestamp_ms": 2875.882080078125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1638,7 +2553,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2865.620361328125,
+      "timestamp_ms": 2875.884765625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1653,7 +2568,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2865.6982421875,
+      "timestamp_ms": 2875.96337890625,
       "metadata": {
         "microbatch_id": 15,
         "direction": "bwd",
@@ -1661,23 +2576,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 2978.739501953125,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 2983.176513671875,
+      "timestamp_ms": 2994.021728515625,
       "metadata": {
         "microbatch_id": 15,
         "direction": "bwd",
@@ -1686,7 +2586,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 2983.17919921875,
+      "timestamp_ms": 2994.0244140625,
       "metadata": {
         "microbatch_id": 19,
         "direction": "fwd",
@@ -1695,11 +2595,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 2984.48876953125,
+      "timestamp_ms": 2994.34033203125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2994.343017578125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2994.345703125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2994.475341796875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2994.562255859375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1710,7 +2670,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 3040.6552734375,
+      "timestamp_ms": 3051.626220703125,
       "metadata": {
         "microbatch_id": 19,
         "direction": "fwd",
@@ -1719,7 +2679,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3040.66064453125,
+      "timestamp_ms": 3051.63134765625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1734,7 +2694,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3040.663330078125,
+      "timestamp_ms": 3051.634033203125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1749,7 +2709,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3040.738525390625,
+      "timestamp_ms": 3051.7138671875,
       "metadata": {
         "microbatch_id": 16,
         "direction": "bwd",
@@ -1757,23 +2717,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 3153.784423828125,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 3158.224853515625,
+      "timestamp_ms": 3169.73046875,
       "metadata": {
         "microbatch_id": 16,
         "direction": "bwd",
@@ -1782,7 +2727,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3158.2275390625,
+      "timestamp_ms": 3169.733154296875,
       "metadata": {
         "microbatch_id": 20,
         "direction": "fwd",
@@ -1791,11 +2736,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3159.540771484375,
+      "timestamp_ms": 3170.04833984375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3170.051025390625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3170.0537109375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3170.187255859375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3170.277099609375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1806,7 +2811,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 3215.695556640625,
+      "timestamp_ms": 3227.339599609375,
       "metadata": {
         "microbatch_id": 20,
         "direction": "fwd",
@@ -1815,7 +2820,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3215.70068359375,
+      "timestamp_ms": 3227.3447265625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1830,7 +2835,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3215.703369140625,
+      "timestamp_ms": 3227.347412109375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1845,7 +2850,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3215.78564453125,
+      "timestamp_ms": 3227.421142578125,
       "metadata": {
         "microbatch_id": 17,
         "direction": "bwd",
@@ -1853,23 +2858,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 3328.79541015625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 3333.240966796875,
+      "timestamp_ms": 3345.42529296875,
       "metadata": {
         "microbatch_id": 17,
         "direction": "bwd",
@@ -1878,7 +2868,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3333.24365234375,
+      "timestamp_ms": 3345.427978515625,
       "metadata": {
         "microbatch_id": 21,
         "direction": "fwd",
@@ -1887,11 +2877,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3334.5546875,
+      "timestamp_ms": 3345.74169921875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3345.744384765625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3345.7470703125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3345.886962890625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3345.9765625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1902,7 +2952,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 3390.71826171875,
+      "timestamp_ms": 3403.023681640625,
       "metadata": {
         "microbatch_id": 21,
         "direction": "fwd",
@@ -1911,7 +2961,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3390.7236328125,
+      "timestamp_ms": 3403.029052734375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1926,7 +2976,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3390.726318359375,
+      "timestamp_ms": 3403.03173828125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -1941,7 +2991,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3390.805419921875,
+      "timestamp_ms": 3403.1083984375,
       "metadata": {
         "microbatch_id": 18,
         "direction": "bwd",
@@ -1949,23 +2999,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 3503.831787109375,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 3508.33154296875,
+      "timestamp_ms": 3522.515869140625,
       "metadata": {
         "microbatch_id": 18,
         "direction": "bwd",
@@ -1974,7 +3009,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3508.33447265625,
+      "timestamp_ms": 3522.518798828125,
       "metadata": {
         "microbatch_id": 22,
         "direction": "fwd",
@@ -1983,11 +3018,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3509.692138671875,
+      "timestamp_ms": 3522.83544921875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3522.838134765625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3522.841064453125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3522.959228515625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3523.044921875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -1998,7 +3093,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 3565.8369140625,
+      "timestamp_ms": 3580.87158203125,
       "metadata": {
         "microbatch_id": 22,
         "direction": "fwd",
@@ -2007,7 +3102,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3565.842041015625,
+      "timestamp_ms": 3580.87646484375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2022,7 +3117,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3565.8447265625,
+      "timestamp_ms": 3580.879150390625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2037,7 +3132,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3565.923095703125,
+      "timestamp_ms": 3580.95947265625,
       "metadata": {
         "microbatch_id": 19,
         "direction": "bwd",
@@ -2045,23 +3140,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 3679.27783203125,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 3683.696044921875,
+      "timestamp_ms": 3699.537353515625,
       "metadata": {
         "microbatch_id": 19,
         "direction": "bwd",
@@ -2070,7 +3150,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3683.69873046875,
+      "timestamp_ms": 3699.5400390625,
       "metadata": {
         "microbatch_id": 23,
         "direction": "fwd",
@@ -2079,11 +3159,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3685.01220703125,
+      "timestamp_ms": 3699.86083984375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3699.863525390625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3699.8662109375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3700.003662109375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3700.087890625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2094,7 +3234,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 3741.156982421875,
+      "timestamp_ms": 3757.102294921875,
       "metadata": {
         "microbatch_id": 23,
         "direction": "fwd",
@@ -2103,7 +3243,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3741.162353515625,
+      "timestamp_ms": 3757.107421875,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2118,7 +3258,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3741.1650390625,
+      "timestamp_ms": 3757.110107421875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2133,7 +3273,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3741.240966796875,
+      "timestamp_ms": 3757.182861328125,
       "metadata": {
         "microbatch_id": 20,
         "direction": "bwd",
@@ -2141,23 +3281,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 3854.92138671875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 3859.348876953125,
+      "timestamp_ms": 3875.197998046875,
       "metadata": {
         "microbatch_id": 20,
         "direction": "bwd",
@@ -2166,7 +3291,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3859.351806640625,
+      "timestamp_ms": 3875.20068359375,
       "metadata": {
         "microbatch_id": 24,
         "direction": "fwd",
@@ -2175,11 +3300,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3860.680908203125,
+      "timestamp_ms": 3875.51806640625,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3875.520751953125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3875.5234375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3875.659423828125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3875.747802734375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2190,7 +3375,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 3917.045166015625,
+      "timestamp_ms": 3932.774169921875,
       "metadata": {
         "microbatch_id": 24,
         "direction": "fwd",
@@ -2199,7 +3384,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3917.05029296875,
+      "timestamp_ms": 3932.779052734375,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2214,7 +3399,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 3917.052978515625,
+      "timestamp_ms": 3932.78173828125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2229,7 +3414,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 3917.133056640625,
+      "timestamp_ms": 3932.85693359375,
       "metadata": {
         "microbatch_id": 21,
         "direction": "bwd",
@@ -2237,23 +3422,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 4030.91259765625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 4035.358642578125,
+      "timestamp_ms": 4050.8955078125,
       "metadata": {
         "microbatch_id": 21,
         "direction": "bwd",
@@ -2262,7 +3432,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4035.361328125,
+      "timestamp_ms": 4050.898193359375,
       "metadata": {
         "microbatch_id": 25,
         "direction": "fwd",
@@ -2271,11 +3441,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4036.672119140625,
+      "timestamp_ms": 4051.2119140625,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4051.21484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4051.217529296875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4051.369140625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4051.46044921875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2286,7 +3516,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 4093.048095703125,
+      "timestamp_ms": 4108.51318359375,
       "metadata": {
         "microbatch_id": 25,
         "direction": "fwd",
@@ -2295,7 +3525,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4093.053466796875,
+      "timestamp_ms": 4108.5185546875,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2310,7 +3540,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4093.05615234375,
+      "timestamp_ms": 4108.521484375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2325,7 +3555,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4093.128173828125,
+      "timestamp_ms": 4108.59765625,
       "metadata": {
         "microbatch_id": 22,
         "direction": "bwd",
@@ -2333,23 +3563,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 4206.921875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 4211.35302734375,
+      "timestamp_ms": 4226.896484375,
       "metadata": {
         "microbatch_id": 22,
         "direction": "bwd",
@@ -2358,7 +3573,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4211.35595703125,
+      "timestamp_ms": 4226.89892578125,
       "metadata": {
         "microbatch_id": 26,
         "direction": "fwd",
@@ -2367,11 +3582,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4212.67236328125,
+      "timestamp_ms": 4227.2177734375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4227.220703125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4227.2236328125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4227.35791015625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4227.44970703125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2382,7 +3657,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 4269.0478515625,
+      "timestamp_ms": 4284.70654296875,
       "metadata": {
         "microbatch_id": 26,
         "direction": "fwd",
@@ -2391,7 +3666,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4269.05322265625,
+      "timestamp_ms": 4284.7119140625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2406,7 +3681,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4269.0556640625,
+      "timestamp_ms": 4284.71435546875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2421,7 +3696,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4269.1298828125,
+      "timestamp_ms": 4284.79296875,
       "metadata": {
         "microbatch_id": 23,
         "direction": "bwd",
@@ -2429,23 +3704,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 4382.80908203125,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 4387.2119140625,
+      "timestamp_ms": 4403.14453125,
       "metadata": {
         "microbatch_id": 23,
         "direction": "bwd",
@@ -2454,7 +3714,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4387.21484375,
+      "timestamp_ms": 4403.14697265625,
       "metadata": {
         "microbatch_id": 27,
         "direction": "fwd",
@@ -2463,11 +3723,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4388.55126953125,
+      "timestamp_ms": 4403.46484375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4403.46728515625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4403.47021484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4403.60546875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4403.693359375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2478,7 +3798,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 4445.01806640625,
+      "timestamp_ms": 4460.94873046875,
       "metadata": {
         "microbatch_id": 27,
         "direction": "fwd",
@@ -2487,7 +3807,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4445.0234375,
+      "timestamp_ms": 4460.9541015625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2502,7 +3822,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4445.02587890625,
+      "timestamp_ms": 4460.95654296875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2517,7 +3837,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4445.10009765625,
+      "timestamp_ms": 4461.0341796875,
       "metadata": {
         "microbatch_id": 24,
         "direction": "bwd",
@@ -2525,23 +3845,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 4558.880859375,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 4563.32275390625,
+      "timestamp_ms": 4579.40380859375,
       "metadata": {
         "microbatch_id": 24,
         "direction": "bwd",
@@ -2550,7 +3855,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4563.32568359375,
+      "timestamp_ms": 4579.40673828125,
       "metadata": {
         "microbatch_id": 28,
         "direction": "fwd",
@@ -2559,11 +3864,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4564.66552734375,
+      "timestamp_ms": 4579.724609375,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4579.7275390625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4579.72998046875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4579.86376953125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4579.955078125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2574,7 +3939,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 4621.0751953125,
+      "timestamp_ms": 4637.24560546875,
       "metadata": {
         "microbatch_id": 28,
         "direction": "fwd",
@@ -2583,7 +3948,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4621.08056640625,
+      "timestamp_ms": 4637.25048828125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2598,7 +3963,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4621.08349609375,
+      "timestamp_ms": 4637.25341796875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2613,7 +3978,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4621.15966796875,
+      "timestamp_ms": 4637.330078125,
       "metadata": {
         "microbatch_id": 25,
         "direction": "bwd",
@@ -2621,23 +3986,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 4735.0615234375,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 4739.49951171875,
+      "timestamp_ms": 4756.98388671875,
       "metadata": {
         "microbatch_id": 25,
         "direction": "bwd",
@@ -2646,7 +3996,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4739.50244140625,
+      "timestamp_ms": 4756.98681640625,
       "metadata": {
         "microbatch_id": 29,
         "direction": "fwd",
@@ -2655,11 +4005,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4740.82080078125,
+      "timestamp_ms": 4757.30078125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4757.30322265625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4757.30615234375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4757.439453125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4757.53076171875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2670,7 +4080,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 4797.228515625,
+      "timestamp_ms": 4815.20654296875,
       "metadata": {
         "microbatch_id": 29,
         "direction": "fwd",
@@ -2679,7 +4089,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4797.23388671875,
+      "timestamp_ms": 4815.2119140625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2694,7 +4104,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4797.23681640625,
+      "timestamp_ms": 4815.21484375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2709,7 +4119,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4797.318359375,
+      "timestamp_ms": 4815.2939453125,
       "metadata": {
         "microbatch_id": 26,
         "direction": "bwd",
@@ -2717,23 +4127,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 4911.11572265625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 4915.572265625,
+      "timestamp_ms": 4933.83984375,
       "metadata": {
         "microbatch_id": 26,
         "direction": "bwd",
@@ -2742,7 +4137,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4915.5751953125,
+      "timestamp_ms": 4933.8427734375,
       "metadata": {
         "microbatch_id": 30,
         "direction": "fwd",
@@ -2751,11 +4146,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4916.8779296875,
+      "timestamp_ms": 4934.16357421875,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4934.166015625,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4934.1689453125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4934.302734375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4934.39453125,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2766,7 +4221,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 4973.2587890625,
+      "timestamp_ms": 4991.65869140625,
       "metadata": {
         "microbatch_id": 30,
         "direction": "fwd",
@@ -2775,7 +4230,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4973.26416015625,
+      "timestamp_ms": 4991.66357421875,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2790,7 +4245,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 4973.2666015625,
+      "timestamp_ms": 4991.66650390625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2805,7 +4260,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 4973.3515625,
+      "timestamp_ms": 4991.744140625,
       "metadata": {
         "microbatch_id": 27,
         "direction": "bwd",
@@ -2813,23 +4268,8 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 5086.9501953125,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
       "type": "slot_end",
-      "timestamp_ms": 5091.45751953125,
+      "timestamp_ms": 5110.0751953125,
       "metadata": {
         "microbatch_id": 27,
         "direction": "bwd",
@@ -2838,7 +4278,7 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 5091.46044921875,
+      "timestamp_ms": 5110.07763671875,
       "metadata": {
         "microbatch_id": 31,
         "direction": "fwd",
@@ -2847,11 +4287,71 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5092.79052734375,
+      "timestamp_ms": 5110.39111328125,
       "metadata": {
-        "name": "_reduce_scatter_along_first_dim",
-        "collective_type": "ReduceScatter",
-        "bytes": 41943040,
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5110.3935546875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5110.396484375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5110.52734375,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0,
+          1
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5110.61279296875,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
         "group_ranks": [
           0,
           1
@@ -2862,7 +4362,7 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 5149.16796875,
+      "timestamp_ms": 5167.84619140625,
       "metadata": {
         "microbatch_id": 31,
         "direction": "fwd",
@@ -2871,7 +4371,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5149.17333984375,
+      "timestamp_ms": 5167.8515625,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2886,7 +4386,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5149.17578125,
+      "timestamp_ms": 5167.8544921875,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2901,7 +4401,16 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 5149.25537109375,
+      "timestamp_ms": 5167.93505859375,
+      "metadata": {
+        "microbatch_id": 28,
+        "direction": "bwd",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5286.3046875,
       "metadata": {
         "microbatch_id": 28,
         "direction": "bwd",
@@ -2910,31 +4419,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5263.0400390625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
-      }
-    },
-    {
-      "type": "slot_end",
-      "timestamp_ms": 5267.48681640625,
-      "metadata": {
-        "microbatch_id": 28,
-        "direction": "bwd",
-        "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 5267.4892578125,
+      "timestamp_ms": 5286.30712890625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2949,31 +4434,16 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 5267.59130859375,
+      "timestamp_ms": 5286.404296875,
       "metadata": {
         "microbatch_id": 29,
         "direction": "bwd",
         "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 5381.94677734375,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 5386.37451171875,
+      "timestamp_ms": 5405.27197265625,
       "metadata": {
         "microbatch_id": 29,
         "direction": "bwd",
@@ -2982,7 +4452,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5386.37744140625,
+      "timestamp_ms": 5405.27490234375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2997,31 +4467,16 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 5386.4775390625,
+      "timestamp_ms": 5405.373046875,
       "metadata": {
         "microbatch_id": 30,
         "direction": "bwd",
         "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 5500.79150390625,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 5505.2255859375,
+      "timestamp_ms": 5524.2373046875,
       "metadata": {
         "microbatch_id": 30,
         "direction": "bwd",
@@ -3030,7 +4485,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5505.228515625,
+      "timestamp_ms": 5524.23974609375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -3045,31 +4500,16 @@
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 5505.314453125,
+      "timestamp_ms": 5524.33349609375,
       "metadata": {
         "microbatch_id": 31,
         "direction": "bwd",
         "pipeline_stage": 0
-      }
-    },
-    {
-      "type": "collective",
-      "timestamp_ms": 5619.71044921875,
-      "metadata": {
-        "name": "_gather_along_first_dim",
-        "collective_type": "AllGather",
-        "bytes": 20971520,
-        "group_ranks": [
-          0,
-          1
-        ],
-        "microbatch_id": null,
-        "direction": null
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 5624.17724609375,
+      "timestamp_ms": 5643.2333984375,
       "metadata": {
         "microbatch_id": 31,
         "direction": "bwd",
@@ -3078,9 +4518,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 5640.20458984375,
+      "timestamp_ms": 5659.265625,
       "metadata": {
-        "name": "finalize_grads_tp",
+        "name": "all_reduce",
         "collective_type": "AllReduce",
         "bytes": 1320960,
         "group_ranks": [
@@ -3092,19 +4532,10 @@
       }
     },
     {
-      "type": "slot_begin",
-      "timestamp_ms": 5640.68896484375,
-      "metadata": {
-        "microbatch_id": 0,
-        "direction": "step",
-        "pipeline_stage": 0
-      }
-    },
-    {
       "type": "collective",
-      "timestamp_ms": 5646.61669921875,
+      "timestamp_ms": 5659.62255859375,
       "metadata": {
-        "name": "clip_grads_norm_2_mp",
+        "name": "all_reduce",
         "collective_type": "AllReduce",
         "bytes": 4,
         "group_ranks": [
@@ -3130,15 +4561,38 @@
       }
     },
     {
-      "type": "collective",
-      "timestamp_ms": 5692.49072265625,
+      "type": "slot_begin",
+      "timestamp_ms": 5659.7890625,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
-        "collective_type": "AllGather",
-        "bytes": 8578936832,
+        "microbatch_id": 0,
+        "direction": "step",
+        "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5665.83935546875,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
         "group_ranks": [
           0,
-          2
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
         ],
         "microbatch_id": null,
         "direction": null
@@ -3146,15 +4600,57 @@
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 5696.42236328125,
+      "timestamp_ms": 5715.529296875,
       "metadata": {
         "microbatch_id": 0,
         "direction": "step",
         "pipeline_stage": 0
       }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5715.623046875,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          1,
+          4,
+          5,
+          8,
+          9,
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5715.8056640625,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          1,
+          4,
+          5,
+          8,
+          9,
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
     }
   ],
   "total_flops": 4.974190604058624e+16,
-  "energy_kwh": 0.0008991763569048616,
-  "co2eq_kg": 0.00024063937498759288
+  "energy_kwh": 0.0009055939168236231,
+  "co2eq_kg": 0.0002423568552081717
 }
