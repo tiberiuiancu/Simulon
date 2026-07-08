@@ -1,0 +1,5095 @@
+{
+  "trace_format_version": "1.0",
+  "rank": 12,
+  "world_size": 16,
+  "pipeline_stage": 3,
+  "events": [
+    {
+      "type": "collective",
+      "timestamp_ms": 7.87007999420166,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 0,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 7.909855842590332,
+      "metadata": {
+        "microbatch_id": 0,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 65.73414611816406,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 74.7984619140625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 79.90969848632812,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 79.91212463378906,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 82.18182373046875,
+      "metadata": {
+        "microbatch_id": 0,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 82.18685150146484,
+      "metadata": {
+        "microbatch_id": 0,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 85.82764434814453,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 91.73487854003906,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 213.08370971679688,
+      "metadata": {
+        "microbatch_id": 0,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 213.08639526367188,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 0,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 213.0891571044922,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 1,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 213.1900177001953,
+      "metadata": {
+        "microbatch_id": 1,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 270.5668029785156,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 279.51470947265625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 284.6246032714844,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 284.626953125,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 286.8783874511719,
+      "metadata": {
+        "microbatch_id": 1,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 286.8832092285156,
+      "metadata": {
+        "microbatch_id": 1,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 290.5229797363281,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 296.2635192871094,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 416.8136901855469,
+      "metadata": {
+        "microbatch_id": 1,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 416.81640625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 1,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 416.819091796875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 2,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 416.9198913574219,
+      "metadata": {
+        "microbatch_id": 2,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 474.43426513671875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 483.3812561035156,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 488.4989013671875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 488.5015869140625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 490.752685546875,
+      "metadata": {
+        "microbatch_id": 2,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 490.7576599121094,
+      "metadata": {
+        "microbatch_id": 2,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 494.3943786621094,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 500.1484375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 620.5752563476562,
+      "metadata": {
+        "microbatch_id": 2,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 620.5779418945312,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 2,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 620.5806274414062,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 3,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 620.6770629882812,
+      "metadata": {
+        "microbatch_id": 3,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 678.1405029296875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 687.0816650390625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 692.1956787109375,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 692.198486328125,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 694.450927734375,
+      "metadata": {
+        "microbatch_id": 3,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 694.4559326171875,
+      "metadata": {
+        "microbatch_id": 3,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 698.0906372070312,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 703.8901977539062,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 824.300537109375,
+      "metadata": {
+        "microbatch_id": 3,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 824.30322265625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 3,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 824.305908203125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 4,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 824.4110107421875,
+      "metadata": {
+        "microbatch_id": 4,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 881.9373168945312,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 890.876953125,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 895.9856567382812,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 895.988037109375,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 898.2388305664062,
+      "metadata": {
+        "microbatch_id": 4,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 898.243896484375,
+      "metadata": {
+        "microbatch_id": 4,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 901.8812866210938,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 907.697998046875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1028.1705322265625,
+      "metadata": {
+        "microbatch_id": 4,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1028.1732177734375,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 4,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1028.1759033203125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 5,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1028.3424072265625,
+      "metadata": {
+        "microbatch_id": 5,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1085.94873046875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1094.894775390625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1100.0054931640625,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1100.0076904296875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1102.2630615234375,
+      "metadata": {
+        "microbatch_id": 5,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1102.26806640625,
+      "metadata": {
+        "microbatch_id": 5,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1105.907958984375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1111.7215576171875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1232.1756591796875,
+      "metadata": {
+        "microbatch_id": 5,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1232.1783447265625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 5,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1232.1810302734375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 6,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1232.282470703125,
+      "metadata": {
+        "microbatch_id": 6,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1289.812744140625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1298.7578125,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1303.86572265625,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1303.868408203125,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1306.1195068359375,
+      "metadata": {
+        "microbatch_id": 6,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1306.1246337890625,
+      "metadata": {
+        "microbatch_id": 6,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1309.7607421875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1315.5146484375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1435.9134521484375,
+      "metadata": {
+        "microbatch_id": 6,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1435.9161376953125,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 6,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1435.9188232421875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 7,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1436.0186767578125,
+      "metadata": {
+        "microbatch_id": 7,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1493.5177001953125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1502.4644775390625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1507.5753173828125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1507.5780029296875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1509.8304443359375,
+      "metadata": {
+        "microbatch_id": 7,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1509.83544921875,
+      "metadata": {
+        "microbatch_id": 7,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1513.4686279296875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1519.23095703125,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1639.847900390625,
+      "metadata": {
+        "microbatch_id": 7,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1639.8505859375,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 7,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1639.853271484375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 8,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1639.9541015625,
+      "metadata": {
+        "microbatch_id": 8,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1697.63525390625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1706.6002197265625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1711.7138671875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1711.71630859375,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1713.966552734375,
+      "metadata": {
+        "microbatch_id": 8,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1713.9716796875,
+      "metadata": {
+        "microbatch_id": 8,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1717.614501953125,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1723.4664306640625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1844.3031005859375,
+      "metadata": {
+        "microbatch_id": 8,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1844.3057861328125,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 8,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1844.3084716796875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 9,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1844.41796875,
+      "metadata": {
+        "microbatch_id": 9,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1901.9547119140625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1910.9190673828125,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1916.026611328125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1916.029052734375,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 1918.2845458984375,
+      "metadata": {
+        "microbatch_id": 9,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 1918.28955078125,
+      "metadata": {
+        "microbatch_id": 9,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1921.9324951171875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 1927.7923583984375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2048.603759765625,
+      "metadata": {
+        "microbatch_id": 9,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2048.6064453125,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 9,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2048.609130859375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 10,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2048.728759765625,
+      "metadata": {
+        "microbatch_id": 10,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2106.389892578125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2115.358154296875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2120.47021484375,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2120.472900390625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2122.73046875,
+      "metadata": {
+        "microbatch_id": 10,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2122.7353515625,
+      "metadata": {
+        "microbatch_id": 10,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2126.370849609375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2132.231689453125,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2253.2060546875,
+      "metadata": {
+        "microbatch_id": 10,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2253.208984375,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 10,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2253.211669921875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 11,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2253.312255859375,
+      "metadata": {
+        "microbatch_id": 11,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2311.111083984375,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2320.0732421875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2325.1845703125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2325.187255859375,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2327.445556640625,
+      "metadata": {
+        "microbatch_id": 11,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2327.450439453125,
+      "metadata": {
+        "microbatch_id": 11,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2331.0888671875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2336.861572265625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2457.5595703125,
+      "metadata": {
+        "microbatch_id": 11,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2457.562255859375,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 11,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2457.56494140625,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 12,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2457.662353515625,
+      "metadata": {
+        "microbatch_id": 12,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2515.322998046875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2524.2861328125,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2529.398681640625,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2529.401123046875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2531.655029296875,
+      "metadata": {
+        "microbatch_id": 12,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2531.660400390625,
+      "metadata": {
+        "microbatch_id": 12,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2535.2958984375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2541.067626953125,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2661.7236328125,
+      "metadata": {
+        "microbatch_id": 12,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2661.726318359375,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 12,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2661.729248046875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 13,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2661.82763671875,
+      "metadata": {
+        "microbatch_id": 13,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2719.515625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2728.4853515625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2733.59765625,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2733.60009765625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2735.853515625,
+      "metadata": {
+        "microbatch_id": 13,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2735.858642578125,
+      "metadata": {
+        "microbatch_id": 13,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2739.497314453125,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2745.26611328125,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2865.927978515625,
+      "metadata": {
+        "microbatch_id": 13,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2865.9306640625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 13,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2865.933349609375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 14,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2866.038330078125,
+      "metadata": {
+        "microbatch_id": 14,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2923.6982421875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2932.6650390625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2937.779296875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2937.781982421875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 2940.0341796875,
+      "metadata": {
+        "microbatch_id": 14,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 2940.039306640625,
+      "metadata": {
+        "microbatch_id": 14,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2943.67919921875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 2949.48828125,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3070.252197265625,
+      "metadata": {
+        "microbatch_id": 14,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3070.2548828125,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 14,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3070.2578125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 15,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3070.376708984375,
+      "metadata": {
+        "microbatch_id": 15,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3128.054443359375,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3137.019287109375,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3142.134033203125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3142.13671875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3144.39453125,
+      "metadata": {
+        "microbatch_id": 15,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3144.399658203125,
+      "metadata": {
+        "microbatch_id": 15,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3148.039794921875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3153.90234375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3274.8046875,
+      "metadata": {
+        "microbatch_id": 15,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3274.807373046875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 15,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3274.809814453125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 16,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3274.912353515625,
+      "metadata": {
+        "microbatch_id": 16,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3332.55810546875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3341.52197265625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3346.627685546875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3346.6298828125,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3348.881591796875,
+      "metadata": {
+        "microbatch_id": 16,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3348.88671875,
+      "metadata": {
+        "microbatch_id": 16,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3352.52587890625,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3358.297119140625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3478.927978515625,
+      "metadata": {
+        "microbatch_id": 16,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3478.9306640625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 16,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3478.933349609375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 17,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3479.03369140625,
+      "metadata": {
+        "microbatch_id": 17,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3536.68798828125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3545.65625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3550.764892578125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3550.76708984375,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3553.02001953125,
+      "metadata": {
+        "microbatch_id": 17,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3553.024658203125,
+      "metadata": {
+        "microbatch_id": 17,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3556.66162109375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3562.432373046875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3683.098876953125,
+      "metadata": {
+        "microbatch_id": 17,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3683.101806640625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 17,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3683.1044921875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 18,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3683.20361328125,
+      "metadata": {
+        "microbatch_id": 18,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3740.84423828125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3749.805419921875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3754.917236328125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3754.919921875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3757.17626953125,
+      "metadata": {
+        "microbatch_id": 18,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3757.181396484375,
+      "metadata": {
+        "microbatch_id": 18,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3760.8212890625,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3766.591796875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3887.230224609375,
+      "metadata": {
+        "microbatch_id": 18,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3887.23291015625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 18,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3887.235595703125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 19,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3887.33447265625,
+      "metadata": {
+        "microbatch_id": 19,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3945.027587890625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3954.000732421875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3959.11328125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3959.115966796875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 3961.3759765625,
+      "metadata": {
+        "microbatch_id": 19,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 3961.380859375,
+      "metadata": {
+        "microbatch_id": 19,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3965.01806640625,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3970.7900390625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4091.48681640625,
+      "metadata": {
+        "microbatch_id": 19,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4091.489501953125,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 19,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4091.4921875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 20,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4091.613037109375,
+      "metadata": {
+        "microbatch_id": 20,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4149.26611328125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4158.23095703125,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4163.34375,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4163.34619140625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4165.59912109375,
+      "metadata": {
+        "microbatch_id": 20,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4165.60400390625,
+      "metadata": {
+        "microbatch_id": 20,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4169.24072265625,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4175.01123046875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4295.82373046875,
+      "metadata": {
+        "microbatch_id": 20,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4295.826171875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 20,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4295.8291015625,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 21,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4295.9287109375,
+      "metadata": {
+        "microbatch_id": 21,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4353.58984375,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4362.55810546875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4367.6669921875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4367.669921875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4369.91943359375,
+      "metadata": {
+        "microbatch_id": 21,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4369.9248046875,
+      "metadata": {
+        "microbatch_id": 21,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4373.56201171875,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4379.33154296875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4500.0361328125,
+      "metadata": {
+        "microbatch_id": 21,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4500.03857421875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 21,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4500.04150390625,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 22,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4500.14697265625,
+      "metadata": {
+        "microbatch_id": 22,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4558.14794921875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4567.1162109375,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4572.2294921875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4572.232421875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4574.4873046875,
+      "metadata": {
+        "microbatch_id": 22,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4574.4921875,
+      "metadata": {
+        "microbatch_id": 22,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4578.1298828125,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4583.8994140625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4704.578125,
+      "metadata": {
+        "microbatch_id": 22,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4704.5810546875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 22,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4704.583984375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 23,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4704.68359375,
+      "metadata": {
+        "microbatch_id": 23,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4762.35693359375,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4771.33447265625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4776.4462890625,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4776.44873046875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4778.7021484375,
+      "metadata": {
+        "microbatch_id": 23,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4778.70751953125,
+      "metadata": {
+        "microbatch_id": 23,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4782.3505859375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4788.12255859375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4908.79345703125,
+      "metadata": {
+        "microbatch_id": 23,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4908.79638671875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 23,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4908.798828125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 24,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4908.90185546875,
+      "metadata": {
+        "microbatch_id": 24,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4966.560546875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4975.52685546875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4980.64453125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4980.64697265625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 4982.89892578125,
+      "metadata": {
+        "microbatch_id": 24,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 4982.904296875,
+      "metadata": {
+        "microbatch_id": 24,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4986.54443359375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 4992.31298828125,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5113.42919921875,
+      "metadata": {
+        "microbatch_id": 24,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5113.431640625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 24,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5113.4345703125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 25,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5113.55615234375,
+      "metadata": {
+        "microbatch_id": 25,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5171.25244140625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5180.2216796875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5185.328125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5185.33056640625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5187.5830078125,
+      "metadata": {
+        "microbatch_id": 25,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5187.587890625,
+      "metadata": {
+        "microbatch_id": 25,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5191.22705078125,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5196.9951171875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5317.9130859375,
+      "metadata": {
+        "microbatch_id": 25,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5317.916015625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 25,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5317.91845703125,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 26,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5318.01806640625,
+      "metadata": {
+        "microbatch_id": 26,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5375.70166015625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5384.666015625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5389.78076171875,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5389.78369140625,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5392.037109375,
+      "metadata": {
+        "microbatch_id": 26,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5392.0419921875,
+      "metadata": {
+        "microbatch_id": 26,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5395.6767578125,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5401.4482421875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5522.3759765625,
+      "metadata": {
+        "microbatch_id": 26,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5522.37890625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 26,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5522.3818359375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 27,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5522.48583984375,
+      "metadata": {
+        "microbatch_id": 27,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5580.20751953125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5589.171875,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5594.28662109375,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5594.28955078125,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5596.5439453125,
+      "metadata": {
+        "microbatch_id": 27,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5596.548828125,
+      "metadata": {
+        "microbatch_id": 27,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5600.18505859375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5605.95849609375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5726.6484375,
+      "metadata": {
+        "microbatch_id": 27,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5726.65087890625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 27,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5726.65380859375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 28,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5726.75634765625,
+      "metadata": {
+        "microbatch_id": 28,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5784.43310546875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5793.39599609375,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5798.51025390625,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5798.5126953125,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5800.771484375,
+      "metadata": {
+        "microbatch_id": 28,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5800.7763671875,
+      "metadata": {
+        "microbatch_id": 28,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5804.4150390625,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5810.18359375,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 5930.82080078125,
+      "metadata": {
+        "microbatch_id": 28,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5930.8232421875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 28,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5930.826171875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 29,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 5930.927734375,
+      "metadata": {
+        "microbatch_id": 29,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5988.62744140625,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 5997.59765625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6002.7109375,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6002.7138671875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6004.96875,
+      "metadata": {
+        "microbatch_id": 29,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 6004.97412109375,
+      "metadata": {
+        "microbatch_id": 29,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6008.61474609375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6014.38623046875,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6135.068359375,
+      "metadata": {
+        "microbatch_id": 29,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6135.0712890625,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 29,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6135.07373046875,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 30,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 6135.1708984375,
+      "metadata": {
+        "microbatch_id": 30,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6192.86376953125,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6201.8359375,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6206.94580078125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6206.94873046875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6209.208984375,
+      "metadata": {
+        "microbatch_id": 30,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 6209.21435546875,
+      "metadata": {
+        "microbatch_id": 30,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6212.84912109375,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6218.61962890625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6339.32861328125,
+      "metadata": {
+        "microbatch_id": 30,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6339.33154296875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 30,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6339.333984375,
+      "metadata": {
+        "name": "recv_forward",
+        "collective_type": "PP_Recv",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 31,
+        "direction": "fwd"
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 6339.44189453125,
+      "metadata": {
+        "microbatch_id": 31,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6397.1279296875,
+      "metadata": {
+        "name": "sp_all_gather_fwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6406.0947265625,
+      "metadata": {
+        "name": "cross_entropy_logits_max",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6411.203125,
+      "metadata": {
+        "name": "cross_entropy_predicted_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6411.2060546875,
+      "metadata": {
+        "name": "cross_entropy_sum_exp_logits",
+        "collective_type": "AllReduce",
+        "bytes": 16384,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6413.4580078125,
+      "metadata": {
+        "microbatch_id": 31,
+        "direction": "fwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 6413.462890625,
+      "metadata": {
+        "microbatch_id": 31,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6417.1064453125,
+      "metadata": {
+        "name": "sp_all_gather_bwd",
+        "collective_type": "AllGather",
+        "bytes": 20971520,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6422.87744140625,
+      "metadata": {
+        "name": "sp_reduce_scatter_bwd",
+        "collective_type": "ReduceScatter",
+        "bytes": 41943040,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6543.5048828125,
+      "metadata": {
+        "microbatch_id": 31,
+        "direction": "bwd",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6543.50732421875,
+      "metadata": {
+        "name": "send_backward",
+        "collective_type": "PP_Send",
+        "bytes": 20971520,
+        "group_ranks": [
+          8,
+          12
+        ],
+        "microbatch_id": 31,
+        "direction": "bwd"
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6559.7041015625,
+      "metadata": {
+        "name": "finalize_grads_tp",
+        "collective_type": "AllReduce",
+        "bytes": 1341440,
+        "group_ranks": [
+          12,
+          13
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_begin",
+      "timestamp_ms": 6560.052734375,
+      "metadata": {
+        "microbatch_id": 0,
+        "direction": "step",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6565.3203125,
+      "metadata": {
+        "name": "clip_grads_norm_2_mp",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6611.041015625,
+      "metadata": {
+        "name": "DistributedDataParallel.start_param_sync",
+        "collective_type": "AllGather",
+        "bytes": 8578947072,
+        "group_ranks": [
+          12,
+          14
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    },
+    {
+      "type": "slot_end",
+      "timestamp_ms": 6614.97607421875,
+      "metadata": {
+        "microbatch_id": 0,
+        "direction": "step",
+        "pipeline_stage": 3
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 6615.52880859375,
+      "metadata": {
+        "name": "loss_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 8,
+        "group_ranks": [
+          12,
+          14
+        ],
+        "microbatch_id": null,
+        "direction": null
+      }
+    }
+  ],
+  "total_flops": 4.974190604058624e+16,
+  "energy_kwh": 0.0010404054905799184,
+  "co2eq_kg": 0.00027843539819997896
+}
