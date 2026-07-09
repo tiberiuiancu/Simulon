@@ -6,7 +6,7 @@
   "events": [
     {
       "type": "slot_begin",
-      "timestamp_ms": 3.492288112640381,
+      "timestamp_ms": 3.4773120880126953,
       "metadata": {
         "microbatch_id": 0,
         "direction": "fwd",
@@ -15,9 +15,84 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 8.625375747680664,
+      "timestamp_ms": 3.7973439693450928,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3.8001279830932617,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3.8028481006622314,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3.846816062927246,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 3.885823965072632,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 8.735136032104492,
+      "metadata": {
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -31,14 +106,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 9.452223777770996,
+      "timestamp_ms": 9.575136184692383,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -52,14 +128,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 9.540863990783691,
+      "timestamp_ms": 9.665216445922852,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -73,14 +150,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 12.48748779296875,
+      "timestamp_ms": 12.618592262268066,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -94,14 +172,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 17.482112884521484,
+      "timestamp_ms": 16.25708770751953,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -115,14 +194,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 18.243520736694336,
+      "timestamp_ms": 18.295743942260742,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -136,14 +216,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 18.323904037475586,
+      "timestamp_ms": 18.375743865966797,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -157,14 +238,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 21.248384475708008,
+      "timestamp_ms": 21.27916717529297,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -178,14 +260,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 24.132543563842773,
+      "timestamp_ms": 23.89299201965332,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -199,14 +282,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 24.83875274658203,
+      "timestamp_ms": 24.584863662719727,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -220,14 +304,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 24.92959976196289,
+      "timestamp_ms": 24.663999557495117,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -241,14 +326,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 27.81667137145996,
+      "timestamp_ms": 27.553375244140625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -262,14 +348,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 30.170015335083008,
+      "timestamp_ms": 29.83910369873047,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -283,14 +370,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 30.8687686920166,
+      "timestamp_ms": 30.524927139282227,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -304,14 +392,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 30.944992065429688,
+      "timestamp_ms": 30.601408004760742,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -325,14 +414,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 33.838497161865234,
+      "timestamp_ms": 33.49756622314453,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -346,12 +436,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 33.594974517822266,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1872,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 33.953758239746094,
+      "timestamp_ms": 33.61862564086914,
       "metadata": {
         "microbatch_id": 0,
         "direction": "fwd",
@@ -360,7 +473,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 33.959041595458984,
+      "timestamp_ms": 33.62384033203125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -370,12 +483,13 @@
           8
         ],
         "microbatch_id": 0,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 33.96156692504883,
+      "timestamp_ms": 33.62675094604492,
       "metadata": {
         "microbatch_id": 1,
         "direction": "fwd",
@@ -384,9 +498,84 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 37.925567626953125,
+      "timestamp_ms": 33.99446487426758,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 33.99728012084961,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 16777216,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 34.0,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 32768,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 34.03180694580078,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 8,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 34.06070327758789,
+      "metadata": {
+        "name": "broadcast",
+        "collective_type": "Broadcast",
+        "bytes": 0,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 37.48640060424805,
+      "metadata": {
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -400,14 +589,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 38.60838317871094,
+      "timestamp_ms": 38.18707275390625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -421,14 +611,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 38.700801849365234,
+      "timestamp_ms": 38.266239166259766,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -442,14 +633,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 41.3392333984375,
+      "timestamp_ms": 40.90012741088867,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -463,14 +655,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 44.14137649536133,
+      "timestamp_ms": 43.36713409423828,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -484,14 +677,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 44.97238540649414,
+      "timestamp_ms": 44.45622253417969,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -505,14 +699,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 45.05244827270508,
+      "timestamp_ms": 44.61337661743164,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -526,14 +721,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 48.48921585083008,
+      "timestamp_ms": 47.97564697265625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -547,14 +743,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 52.06300735473633,
+      "timestamp_ms": 52.60243225097656,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -568,14 +765,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 52.76515197753906,
+      "timestamp_ms": 53.29529571533203,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -589,14 +787,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 52.84511947631836,
+      "timestamp_ms": 53.374176025390625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -610,14 +809,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 55.482879638671875,
+      "timestamp_ms": 56.02809524536133,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -631,14 +831,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 57.89043045043945,
+      "timestamp_ms": 58.324703216552734,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -652,14 +853,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 58.57219314575195,
+      "timestamp_ms": 59.01612854003906,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -673,14 +875,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 58.66640090942383,
+      "timestamp_ms": 59.09455871582031,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -694,14 +897,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 61.31382369995117,
+      "timestamp_ms": 61.73392105102539,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -715,12 +919,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 61.82979202270508,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1872,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 61.428321838378906,
+      "timestamp_ms": 61.85465621948242,
       "metadata": {
         "microbatch_id": 1,
         "direction": "fwd",
@@ -729,7 +956,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 61.43328094482422,
+      "timestamp_ms": 61.85993576049805,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -739,12 +966,13 @@
           8
         ],
         "microbatch_id": 1,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 61.43580627441406,
+      "timestamp_ms": 61.86275100708008,
       "metadata": {
         "name": "recv_forward",
         "collective_type": "PP_Recv",
@@ -754,12 +982,13 @@
           0
         ],
         "microbatch_id": 2,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 61.43833541870117,
+      "timestamp_ms": 61.865440368652344,
       "metadata": {
         "microbatch_id": 2,
         "direction": "fwd",
@@ -768,9 +997,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 64.98873901367188,
+      "timestamp_ms": 65.21116638183594,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -784,14 +1013,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 65.69964599609375,
+      "timestamp_ms": 65.91129302978516,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -805,14 +1035,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 65.77734375,
+      "timestamp_ms": 65.99171447753906,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -826,14 +1057,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 68.6783676147461,
+      "timestamp_ms": 69.01702117919922,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -847,14 +1079,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 71.20368194580078,
+      "timestamp_ms": 71.34236907958984,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -868,14 +1101,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 71.90467071533203,
+      "timestamp_ms": 72.04838562011719,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -889,14 +1123,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 71.98365020751953,
+      "timestamp_ms": 72.12723541259766,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -910,14 +1145,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 74.86688232421875,
+      "timestamp_ms": 75.0195541381836,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -931,14 +1167,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 77.18045043945312,
+      "timestamp_ms": 77.28956604003906,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -952,14 +1189,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 77.8884506225586,
+      "timestamp_ms": 77.98556518554688,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -973,14 +1211,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 77.96601867675781,
+      "timestamp_ms": 78.06454467773438,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -994,14 +1233,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 80.83657836914062,
+      "timestamp_ms": 80.95945739746094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1015,14 +1255,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 83.09049224853516,
+      "timestamp_ms": 83.2110366821289,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1036,14 +1277,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 83.77836608886719,
+      "timestamp_ms": 83.90748596191406,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1057,14 +1299,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 83.85657501220703,
+      "timestamp_ms": 83.98477172851562,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1078,14 +1321,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 86.74041748046875,
+      "timestamp_ms": 86.86681365966797,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1099,12 +1343,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 86.96345520019531,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1872,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 86.85539245605469,
+      "timestamp_ms": 86.9882583618164,
       "metadata": {
         "microbatch_id": 2,
         "direction": "fwd",
@@ -1113,7 +1380,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 86.86051177978516,
+      "timestamp_ms": 86.9935073852539,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1123,12 +1390,13 @@
           8
         ],
         "microbatch_id": 2,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 86.863037109375,
+      "timestamp_ms": 86.9961929321289,
       "metadata": {
         "name": "recv_forward",
         "collective_type": "PP_Recv",
@@ -1138,12 +1406,13 @@
           0
         ],
         "microbatch_id": 3,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 86.86557006835938,
+      "timestamp_ms": 86.99890899658203,
       "metadata": {
         "microbatch_id": 3,
         "direction": "fwd",
@@ -1152,9 +1421,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 90.1185302734375,
+      "timestamp_ms": 90.19999694824219,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1168,14 +1437,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 90.81587219238281,
+      "timestamp_ms": 90.91414642333984,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1189,14 +1459,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 90.89446258544922,
+      "timestamp_ms": 90.99302673339844,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1210,14 +1481,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 93.5486068725586,
+      "timestamp_ms": 93.63760375976562,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1231,14 +1503,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 95.78304290771484,
+      "timestamp_ms": 95.87321472167969,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1252,14 +1525,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 96.46009826660156,
+      "timestamp_ms": 96.54640197753906,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1273,14 +1547,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 96.53718566894531,
+      "timestamp_ms": 96.62332916259766,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1294,14 +1569,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 99.17139434814453,
+      "timestamp_ms": 99.26329803466797,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1315,14 +1591,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 101.36918640136719,
+      "timestamp_ms": 101.46147155761719,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1336,14 +1613,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 102.05039978027344,
+      "timestamp_ms": 102.13875579833984,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1357,14 +1635,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 102.12675476074219,
+      "timestamp_ms": 102.2166748046875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1378,14 +1657,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 104.74127960205078,
+      "timestamp_ms": 104.85798645019531,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1399,14 +1679,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 107.06352233886719,
+      "timestamp_ms": 107.20342254638672,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1420,14 +1701,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 107.74896240234375,
+      "timestamp_ms": 107.8947525024414,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1441,14 +1723,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 107.82653045654297,
+      "timestamp_ms": 107.97379302978516,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1462,14 +1745,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 110.44649505615234,
+      "timestamp_ms": 110.59661102294922,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1483,12 +1767,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 110.69340515136719,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1872,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 110.56143951416016,
+      "timestamp_ms": 110.7176284790039,
       "metadata": {
         "microbatch_id": 3,
         "direction": "fwd",
@@ -1497,7 +1804,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 110.56655883789062,
+      "timestamp_ms": 110.72291564941406,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1507,12 +1814,13 @@
           8
         ],
         "microbatch_id": 3,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 110.56915283203125,
+      "timestamp_ms": 110.72560119628906,
       "metadata": {
         "name": "recv_forward",
         "collective_type": "PP_Recv",
@@ -1522,12 +1830,13 @@
           0
         ],
         "microbatch_id": 4,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 110.57180786132812,
+      "timestamp_ms": 110.72828674316406,
       "metadata": {
         "microbatch_id": 4,
         "direction": "fwd",
@@ -1536,9 +1845,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 113.78617858886719,
+      "timestamp_ms": 113.96578979492188,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1552,14 +1861,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 114.47625732421875,
+      "timestamp_ms": 114.65817260742188,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1573,14 +1883,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 114.55391693115234,
+      "timestamp_ms": 114.73538970947266,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1594,14 +1905,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 117.43856048583984,
+      "timestamp_ms": 117.6082534790039,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1615,14 +1927,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 119.6448974609375,
+      "timestamp_ms": 119.8802261352539,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1636,14 +1949,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 120.32902526855469,
+      "timestamp_ms": 120.58172607421875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1657,14 +1971,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 120.40672302246094,
+      "timestamp_ms": 120.66130828857422,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1678,14 +1993,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 123.29702758789062,
+      "timestamp_ms": 123.53414154052734,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1699,14 +2015,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 125.70515441894531,
+      "timestamp_ms": 125.93536376953125,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1720,14 +2037,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 126.38377380371094,
+      "timestamp_ms": 126.62537384033203,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1741,14 +2059,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 126.46060943603516,
+      "timestamp_ms": 126.70403289794922,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1762,14 +2081,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 129.34632873535156,
+      "timestamp_ms": 129.57778930664062,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1783,14 +2103,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 131.56568908691406,
+      "timestamp_ms": 131.81674194335938,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1804,14 +2125,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 132.26698303222656,
+      "timestamp_ms": 132.5224609375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1825,14 +2147,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 132.34339904785156,
+      "timestamp_ms": 132.5999298095703,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1846,14 +2169,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 135.22476196289062,
+      "timestamp_ms": 135.4796142578125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1867,12 +2191,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 135.57594299316406,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1872,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 135.34066772460938,
+      "timestamp_ms": 135.60086059570312,
       "metadata": {
         "microbatch_id": 4,
         "direction": "fwd",
@@ -1881,7 +2228,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 135.3458251953125,
+      "timestamp_ms": 135.60614013671875,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -1891,12 +2238,13 @@
           8
         ],
         "microbatch_id": 4,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 135.348388671875,
+      "timestamp_ms": 135.60882568359375,
       "metadata": {
         "name": "recv_forward",
         "collective_type": "PP_Recv",
@@ -1906,12 +2254,13 @@
           0
         ],
         "microbatch_id": 5,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 135.35101318359375,
+      "timestamp_ms": 135.61148071289062,
       "metadata": {
         "microbatch_id": 5,
         "direction": "fwd",
@@ -1920,9 +2269,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 138.41445922851562,
+      "timestamp_ms": 138.61257934570312,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -1936,14 +2285,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 139.10208129882812,
+      "timestamp_ms": 139.29922485351562,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -1957,14 +2307,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 139.18038940429688,
+      "timestamp_ms": 139.378662109375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -1978,14 +2329,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 141.82057189941406,
+      "timestamp_ms": 142.00624084472656,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -1999,14 +2351,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 144.01852416992188,
+      "timestamp_ms": 144.35116577148438,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -2020,14 +2373,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 144.83897399902344,
+      "timestamp_ms": 145.04322814941406,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2041,14 +2395,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 144.91903686523438,
+      "timestamp_ms": 145.12112426757812,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -2062,14 +2417,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 147.5509796142578,
+      "timestamp_ms": 147.744384765625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2083,14 +2439,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 149.76905822753906,
+      "timestamp_ms": 149.9779815673828,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -2104,14 +2461,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 150.44256591796875,
+      "timestamp_ms": 150.6607666015625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2125,14 +2483,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 150.5200958251953,
+      "timestamp_ms": 150.75228881835938,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -2146,14 +2505,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 153.17059326171875,
+      "timestamp_ms": 153.37759399414062,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2167,14 +2527,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 155.3514862060547,
+      "timestamp_ms": 155.5846710205078,
       "metadata": {
-        "name": "_gather_along_first_dim",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 256,
         "group_ranks": [
@@ -2188,14 +2549,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 156.03811645507812,
+      "timestamp_ms": 156.26658630371094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2209,14 +2571,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 156.1149139404297,
+      "timestamp_ms": 156.3482208251953,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 32768,
         "group_ranks": [
@@ -2230,14 +2593,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 158.74925231933594,
+      "timestamp_ms": 158.9716796875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2251,12 +2615,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 159.06822204589844,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1872,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 158.8638458251953,
+      "timestamp_ms": 159.0928955078125,
       "metadata": {
         "microbatch_id": 5,
         "direction": "fwd",
@@ -2265,7 +2652,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 158.86886596679688,
+      "timestamp_ms": 159.09814453125,
       "metadata": {
         "name": "send_forward",
         "collective_type": "PP_Send",
@@ -2275,12 +2662,13 @@
           8
         ],
         "microbatch_id": 5,
-        "direction": "fwd"
+        "direction": "fwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 158.87139892578125,
+      "timestamp_ms": 159.100830078125,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2290,12 +2678,13 @@
           8
         ],
         "microbatch_id": 0,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 158.87391662597656,
+      "timestamp_ms": 159.103515625,
       "metadata": {
         "microbatch_id": 0,
         "direction": "bwd",
@@ -2304,9 +2693,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 158.932861328125,
+      "timestamp_ms": 159.5182647705078,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2320,14 +2709,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 162.99014282226562,
+      "timestamp_ms": 163.8533477783203,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2341,14 +2731,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 162.99267578125,
+      "timestamp_ms": 163.8560333251953,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2362,14 +2753,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 165.73167419433594,
+      "timestamp_ms": 166.58505249023438,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2383,14 +2775,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 169.67283630371094,
+      "timestamp_ms": 170.5135955810547,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2404,14 +2797,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 169.6750030517578,
+      "timestamp_ms": 170.5162811279297,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2425,14 +2819,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 171.3839111328125,
+      "timestamp_ms": 172.22647094726562,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2446,14 +2841,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 175.32467651367188,
+      "timestamp_ms": 176.16409301757812,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2467,14 +2863,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 175.32701110839844,
+      "timestamp_ms": 176.166748046875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2488,14 +2885,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 178.06930541992188,
+      "timestamp_ms": 178.90281677246094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2509,14 +2907,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 182.01516723632812,
+      "timestamp_ms": 182.8341064453125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2530,14 +2929,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 182.0177001953125,
+      "timestamp_ms": 182.83644104003906,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2551,12 +2951,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 184.47129821777344,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1248,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 183.6997833251953,
+      "timestamp_ms": 184.5166015625,
       "metadata": {
         "microbatch_id": 0,
         "direction": "bwd",
@@ -2565,7 +2988,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 183.7022705078125,
+      "timestamp_ms": 184.51925659179688,
       "metadata": {
         "name": "send_backward",
         "collective_type": "PP_Send",
@@ -2575,12 +2998,13 @@
           0
         ],
         "microbatch_id": 0,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 183.70489501953125,
+      "timestamp_ms": 184.5219268798828,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2590,12 +3014,13 @@
           8
         ],
         "microbatch_id": 1,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 183.70755004882812,
+      "timestamp_ms": 184.5247039794922,
       "metadata": {
         "microbatch_id": 1,
         "direction": "bwd",
@@ -2604,9 +3029,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 183.7670440673828,
+      "timestamp_ms": 184.58355712890625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2620,14 +3045,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 187.80662536621094,
+      "timestamp_ms": 188.60552978515625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2641,14 +3067,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 187.8089599609375,
+      "timestamp_ms": 188.60818481445312,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2662,14 +3089,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 190.60678100585938,
+      "timestamp_ms": 191.40057373046875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2683,14 +3111,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 194.6392059326172,
+      "timestamp_ms": 195.4101104736328,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2704,14 +3133,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 194.6417236328125,
+      "timestamp_ms": 195.41238403320312,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2725,14 +3155,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 196.41107177734375,
+      "timestamp_ms": 197.17762756347656,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2746,14 +3177,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 200.44073486328125,
+      "timestamp_ms": 201.18450927734375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2767,14 +3199,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 200.44326782226562,
+      "timestamp_ms": 201.18701171875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2788,14 +3221,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 203.24044799804688,
+      "timestamp_ms": 203.97398376464844,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2809,14 +3243,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 207.2782440185547,
+      "timestamp_ms": 207.9996795654297,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2830,14 +3265,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 207.28076171875,
+      "timestamp_ms": 208.00233459472656,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2851,12 +3287,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 209.69200134277344,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1248,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 209.00466918945312,
+      "timestamp_ms": 209.7389373779297,
       "metadata": {
         "microbatch_id": 1,
         "direction": "bwd",
@@ -2865,7 +3324,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 209.0072021484375,
+      "timestamp_ms": 209.74159240722656,
       "metadata": {
         "name": "send_backward",
         "collective_type": "PP_Send",
@@ -2875,12 +3334,13 @@
           0
         ],
         "microbatch_id": 1,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 209.0096893310547,
+      "timestamp_ms": 209.74435424804688,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -2890,12 +3350,13 @@
           8
         ],
         "microbatch_id": 2,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 209.0122528076172,
+      "timestamp_ms": 209.74703979492188,
       "metadata": {
         "microbatch_id": 2,
         "direction": "bwd",
@@ -2904,9 +3365,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 209.0716552734375,
+      "timestamp_ms": 209.8059539794922,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2920,14 +3381,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 213.0135955810547,
+      "timestamp_ms": 213.73190307617188,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -2941,14 +3403,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 213.01609802246094,
+      "timestamp_ms": 213.7343292236328,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -2962,14 +3425,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 215.753662109375,
+      "timestamp_ms": 216.46336364746094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -2983,14 +3447,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 219.70016479492188,
+      "timestamp_ms": 220.40159606933594,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3004,14 +3469,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 219.7026824951172,
+      "timestamp_ms": 220.40432739257812,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3025,14 +3491,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 221.4159393310547,
+      "timestamp_ms": 222.11474609375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3046,14 +3513,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 225.34349060058594,
+      "timestamp_ms": 226.03932189941406,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3067,14 +3535,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 225.3458251953125,
+      "timestamp_ms": 226.04197692871094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3088,14 +3557,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 228.0759735107422,
+      "timestamp_ms": 228.7722625732422,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3109,14 +3579,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 232.00717163085938,
+      "timestamp_ms": 232.6860809326172,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3130,14 +3601,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 232.00965881347656,
+      "timestamp_ms": 232.68838500976562,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3151,12 +3623,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 234.31607055664062,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1248,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 233.67567443847656,
+      "timestamp_ms": 234.36146545410156,
       "metadata": {
         "microbatch_id": 2,
         "direction": "bwd",
@@ -3165,7 +3660,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 233.67823791503906,
+      "timestamp_ms": 234.36416625976562,
       "metadata": {
         "name": "send_backward",
         "collective_type": "PP_Send",
@@ -3175,12 +3670,13 @@
           0
         ],
         "microbatch_id": 2,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 233.6808624267578,
+      "timestamp_ms": 234.3668212890625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -3190,12 +3686,13 @@
           8
         ],
         "microbatch_id": 3,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 233.6834259033203,
+      "timestamp_ms": 234.3695068359375,
       "metadata": {
         "microbatch_id": 3,
         "direction": "bwd",
@@ -3204,9 +3701,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 233.74281311035156,
+      "timestamp_ms": 234.42857360839844,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3220,14 +3717,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 237.75318908691406,
+      "timestamp_ms": 238.44595336914062,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3241,14 +3739,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 237.7554931640625,
+      "timestamp_ms": 238.44863891601562,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3262,14 +3761,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 240.53683471679688,
+      "timestamp_ms": 241.2310791015625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3283,14 +3783,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 244.54844665527344,
+      "timestamp_ms": 245.2362823486328,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3304,14 +3805,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 244.55101013183594,
+      "timestamp_ms": 245.23855590820312,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3325,14 +3827,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 246.30886840820312,
+      "timestamp_ms": 246.99658203125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3346,14 +3849,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 250.32943725585938,
+      "timestamp_ms": 251.01890563964844,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3367,14 +3871,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 250.33197021484375,
+      "timestamp_ms": 251.0214080810547,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3388,14 +3893,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 253.10476684570312,
+      "timestamp_ms": 253.7999725341797,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3409,14 +3915,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 257.12200927734375,
+      "timestamp_ms": 257.82080078125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3430,14 +3937,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 257.1242980957031,
+      "timestamp_ms": 257.823486328125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3451,12 +3959,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 259.50506591796875,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1248,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 258.84027099609375,
+      "timestamp_ms": 259.55120849609375,
       "metadata": {
         "microbatch_id": 3,
         "direction": "bwd",
@@ -3465,7 +3996,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 258.8427734375,
+      "timestamp_ms": 259.55389404296875,
       "metadata": {
         "name": "send_backward",
         "collective_type": "PP_Send",
@@ -3475,12 +4006,13 @@
           0
         ],
         "microbatch_id": 3,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 258.8453063964844,
+      "timestamp_ms": 259.55657958984375,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -3490,12 +4022,13 @@
           8
         ],
         "microbatch_id": 4,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 258.8479919433594,
+      "timestamp_ms": 259.55926513671875,
       "metadata": {
         "microbatch_id": 4,
         "direction": "bwd",
@@ -3504,9 +4037,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 258.9064025878906,
+      "timestamp_ms": 259.6185302734375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3520,14 +4053,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 262.83746337890625,
+      "timestamp_ms": 263.5530700683594,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3541,14 +4075,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 262.8399658203125,
+      "timestamp_ms": 263.5555419921875,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3562,14 +4097,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 265.5681457519531,
+      "timestamp_ms": 266.2917785644531,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3583,14 +4119,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 269.50341796875,
+      "timestamp_ms": 270.22119140625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3604,14 +4141,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 269.505615234375,
+      "timestamp_ms": 270.223876953125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3625,14 +4163,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 271.2106018066406,
+      "timestamp_ms": 271.93780517578125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3646,14 +4185,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 275.13970947265625,
+      "timestamp_ms": 275.8695373535156,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3667,14 +4207,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 275.14208984375,
+      "timestamp_ms": 275.8721923828125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3688,14 +4229,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 277.8682556152344,
+      "timestamp_ms": 278.59954833984375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3709,14 +4251,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 281.78875732421875,
+      "timestamp_ms": 282.53082275390625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3730,14 +4273,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 281.7912902832031,
+      "timestamp_ms": 282.5331115722656,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3751,12 +4295,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 284.166259765625,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1248,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 285.8887634277344,
+      "timestamp_ms": 286.6366271972656,
       "metadata": {
         "microbatch_id": 4,
         "direction": "bwd",
@@ -3765,7 +4332,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 285.89093017578125,
+      "timestamp_ms": 286.63897705078125,
       "metadata": {
         "name": "send_backward",
         "collective_type": "PP_Send",
@@ -3775,12 +4342,13 @@
           0
         ],
         "microbatch_id": 4,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 285.8935546875,
+      "timestamp_ms": 286.64166259765625,
       "metadata": {
         "name": "recv_backward",
         "collective_type": "PP_Recv",
@@ -3790,12 +4358,13 @@
           8
         ],
         "microbatch_id": 5,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 285.8962097167969,
+      "timestamp_ms": 286.6443176269531,
       "metadata": {
         "microbatch_id": 5,
         "direction": "bwd",
@@ -3804,9 +4373,9 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 285.9574279785156,
+      "timestamp_ms": 286.7074279785156,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3820,14 +4389,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 289.9952697753906,
+      "timestamp_ms": 290.7341613769531,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3841,14 +4411,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 289.997802734375,
+      "timestamp_ms": 290.7367248535156,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3862,14 +4433,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 292.7759094238281,
+      "timestamp_ms": 293.52252197265625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3883,14 +4455,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 296.7955017089844,
+      "timestamp_ms": 297.5440368652344,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3904,14 +4477,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 296.79803466796875,
+      "timestamp_ms": 297.5467224121094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3925,14 +4499,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 298.56329345703125,
+      "timestamp_ms": 299.3142395019531,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -3946,14 +4521,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 302.5809631347656,
+      "timestamp_ms": 303.32476806640625,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -3967,14 +4543,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 302.583251953125,
+      "timestamp_ms": 303.32745361328125,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -3988,14 +4565,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 305.3641357421875,
+      "timestamp_ms": 306.1138610839844,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 94371840,
         "group_ranks": [
@@ -4009,14 +4587,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 309.3912048339844,
+      "timestamp_ms": 310.1331787109375,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 43184,
         "group_ranks": [
@@ -4030,14 +4609,15 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 309.3937072753906,
+      "timestamp_ms": 310.1355895996094,
       "metadata": {
-        "name": "_AllToAll",
+        "name": "all_to_all_single",
         "collective_type": "AllToAll",
         "bytes": 124369920,
         "group_ranks": [
@@ -4051,12 +4631,35 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 311.81829833984375,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 1248,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 313.55859375,
+      "timestamp_ms": 314.3038024902344,
       "metadata": {
         "microbatch_id": 5,
         "direction": "bwd",
@@ -4065,7 +4668,7 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 313.56085205078125,
+      "timestamp_ms": 314.3065185546875,
       "metadata": {
         "name": "send_backward",
         "collective_type": "PP_Send",
@@ -4075,12 +4678,154 @@
           0
         ],
         "microbatch_id": 5,
-        "direction": "bwd"
+        "direction": "bwd",
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 316.08526611328125,
+      "metadata": {
+        "name": "reduce_scatter_tensor",
+        "collective_type": "ReduceScatter",
+        "bytes": 1903751168,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 317.5765075683594,
+      "metadata": {
+        "name": "reduce_scatter_tensor",
+        "collective_type": "ReduceScatter",
+        "bytes": 1592524800,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 317.98114013671875,
+      "metadata": {
+        "name": "reduce_scatter_tensor",
+        "collective_type": "ReduceScatter",
+        "bytes": 426242048,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 319.47174072265625,
+      "metadata": {
+        "name": "reduce_scatter_tensor",
+        "collective_type": "ReduceScatter",
+        "bytes": 1592524800,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 319.8768005371094,
+      "metadata": {
+        "name": "reduce_scatter_tensor",
+        "collective_type": "ReduceScatter",
+        "bytes": 426242048,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 321.3669738769531,
+      "metadata": {
+        "name": "reduce_scatter_tensor",
+        "collective_type": "ReduceScatter",
+        "bytes": 1592524800,
+        "group_ranks": [
+          0
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 321.4881286621094,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_begin",
-      "timestamp_ms": 320.8973693847656,
+      "timestamp_ms": 321.6946105957031,
       "metadata": {
         "microbatch_id": 0,
         "direction": "step",
@@ -4089,11 +4834,41 @@
     },
     {
       "type": "collective",
-      "timestamp_ms": 332.1640319824219,
+      "timestamp_ms": 326.0574035644531,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 333.04351806640625,
+      "metadata": {
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
-        "bytes": 951875584,
+        "bytes": 118984448,
         "group_ranks": [
           0,
           1,
@@ -4105,30 +4880,32 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 332.98699951171875,
+      "timestamp_ms": 333.8644714355469,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 796262400,
         "group_ranks": [
           0
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 332.989501953125,
+      "timestamp_ms": 333.8669738769531,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
-        "bytes": 213121024,
+        "bytes": 26640128,
         "group_ranks": [
           0,
           1,
@@ -4140,30 +4917,32 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 333.21417236328125,
+      "timestamp_ms": 334.0966796875,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 796262400,
         "group_ranks": [
           0
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 333.2166442871094,
+      "timestamp_ms": 334.0993347167969,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
-        "bytes": 213121024,
+        "bytes": 26640128,
         "group_ranks": [
           0,
           1,
@@ -4175,30 +4954,32 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 333.43890380859375,
+      "timestamp_ms": 334.32855224609375,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 796262400,
         "group_ranks": [
           0
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 354.2391357421875,
+      "timestamp_ms": 355.13067626953125,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
-        "bytes": 951875584,
+        "bytes": 118984448,
         "group_ranks": [
           0,
           1,
@@ -4210,30 +4991,32 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 355.06207275390625,
+      "timestamp_ms": 355.95367431640625,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 796262400,
         "group_ranks": [
           0
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 355.0645751953125,
+      "timestamp_ms": 355.9561462402344,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
-        "bytes": 213121024,
+        "bytes": 26640128,
         "group_ranks": [
           0,
           1,
@@ -4245,30 +5028,32 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 355.2907409667969,
+      "timestamp_ms": 356.1806640625,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 796262400,
         "group_ranks": [
           0
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 355.2930908203125,
+      "timestamp_ms": 356.183349609375,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
-        "bytes": 213121024,
+        "bytes": 26640128,
         "group_ranks": [
           0,
           1,
@@ -4280,34 +5065,68 @@
           7
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "collective",
-      "timestamp_ms": 355.5182189941406,
+      "timestamp_ms": 356.41265869140625,
       "metadata": {
-        "name": "DistributedDataParallel.start_param_sync",
+        "name": "all_gather_into_tensor",
         "collective_type": "AllGather",
         "bytes": 796262400,
         "group_ranks": [
           0
         ],
         "microbatch_id": null,
-        "direction": null
+        "direction": null,
+        "async_op": false
       }
     },
     {
       "type": "slot_end",
-      "timestamp_ms": 355.5207214355469,
+      "timestamp_ms": 356.4153137207031,
       "metadata": {
         "microbatch_id": 0,
         "direction": "step",
         "pipeline_stage": 0
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 356.4873352050781,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          8
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
+      }
+    },
+    {
+      "type": "collective",
+      "timestamp_ms": 356.63885498046875,
+      "metadata": {
+        "name": "all_reduce",
+        "collective_type": "AllReduce",
+        "bytes": 4,
+        "group_ranks": [
+          0,
+          8
+        ],
+        "microbatch_id": null,
+        "direction": null,
+        "async_op": false
       }
     }
   ],
   "total_flops": 1493366571270144.0,
-  "energy_kwh": 8.576163827212124e-05,
-  "co2eq_kg": 2.2951701157661633e-05
+  "energy_kwh": 8.831406426105294e-05,
+  "co2eq_kg": 2.363478650567151e-05
 }
