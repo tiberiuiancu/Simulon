@@ -87,7 +87,7 @@ for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
     srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
         "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
-                 -n "${ITERS}" -w "${WARMUP}" -g 1 \
+                 -n "${ITERS}" -w "${WARMUP}" -g 1 -I 1 \
                  -J "${OUT}"
     echo "    -> ${OUT}"
 done
