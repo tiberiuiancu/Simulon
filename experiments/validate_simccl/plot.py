@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot simulon vs nccl-tests bus bandwidth: 3×4 grid (rows=GPU count, cols=collective).
+"""Plot simulon vs. nccl-tests bus bandwidth: 3×4 grid (rows=GPU count, cols=collective).
 
 Loads JSON files from a results directory:
   sim_<collective>_<config>_<cluster>.json      — simulon predictions (from sim_ccl.py)
@@ -59,49 +59,45 @@ def _load_with_errors(
 ) -> tuple[list[float], list[float], list[float], list[float]] | None:
     """Return (sizes_MB, bus_bw_GBps, bus_bw_min, bus_bw_max) or None.
 
-    Loads the avg file (<path>) plus the _maxbw and _minbw variants
-    produced by running nccl-tests with -a 2 and -a 3. Falls back to
-    equal min=max=avg when the variant files are absent (old data).
+    Loads per-run files (<path stem>_run1.json .. _run20.json) and computes
+    the mean, min, and max bus bandwidth across runs for each message size.
+    Falls back to the single-file avg (path) when per-run files are absent.
     """
-    if not path.exists():
-        return None
-    data = json.loads(path.read_text())
-    results = data.get("results", [])
-    if not results:
+    if not path.exists() and not path.with_name(f"{path.stem}_run1{path.suffix}").exists():
         return None
 
     stem = path.stem
     suffix = path.suffix
-    maxbw_path = path.with_name(f"{stem}_maxbw{suffix}")
-    minbw_path = path.with_name(f"{stem}_minbw{suffix}")
 
-    maxbw_results: list[dict] = []
-    minbw_results: list[dict] = []
-    if maxbw_path.exists():
-        maxbw_results = json.loads(maxbw_path.read_text()).get("results", [])
-    if minbw_path.exists():
-        minbw_results = json.loads(minbw_path.read_text()).get("results", [])
+    run_files = sorted(path.parent.glob(f"{stem}_run*{suffix}"))
+    if not run_files:
+        if path.exists():
+            sizes, bws = _load(path)
+            return sizes, bws, bws, bws
+        return None
+
+    all_results: list[list[dict]] = []
+    for rf in run_files:
+        data = json.loads(rf.read_text())
+        results = data.get("results", [])
+        if results:
+            all_results.append(results)
+
+    if not all_results:
+        return None
 
     sizes_MB = []
     bus_bw = []
     bw_min = []
     bw_max = []
-    for i, r in enumerate(results):
-        oop = r["out_of_place"]
-        size = r["size"]
+    n_runs = len(all_results)
+    for i in range(len(all_results[0])):
+        size = all_results[0][i]["size"]
         sizes_MB.append(size / (1024**2))
-        avg_bw = oop["bus_bw"]
-        bus_bw.append(avg_bw)
-
-        if i < len(maxbw_results):
-            bw_max.append(maxbw_results[i]["out_of_place"]["bus_bw"])
-        else:
-            bw_max.append(avg_bw)
-
-        if i < len(minbw_results):
-            bw_min.append(minbw_results[i]["out_of_place"]["bus_bw"])
-        else:
-            bw_min.append(avg_bw)
+        bws = [all_results[r][i]["out_of_place"]["bus_bw"] for r in range(n_runs)]
+        bus_bw.append(sum(bws) / n_runs)
+        bw_min.append(min(bws))
+        bw_max.append(max(bws))
 
     return sizes_MB, bus_bw, bw_min, bw_max
 
@@ -207,9 +203,9 @@ def plot(
         "jupiter": "GH200 · NVLink 4 · quad-rail HDR",
     }
     cluster_desc = cluster_labels.get(cluster, cluster)
-    title = "Collective Bus Bandwidth: simulon vs nccl-tests"
+    title = "Collective Bus Bandwidth: simulon vs. nccl-tests"
     if simai:
-        title += " vs SimAI"
+        title += " vs. SimAI"
     fig.suptitle(f"{title}\n({cluster_desc})", fontsize=9, y=0.99)
 
     if legend_handles:

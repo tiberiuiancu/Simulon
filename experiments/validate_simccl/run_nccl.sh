@@ -68,8 +68,9 @@ export NCCL_ALGO=Ring
 MIN_BYTES="8M"
 MAX_BYTES="8192M"
 STEP_FACTOR=2
-ITERS=20
+ITERS=1
 WARMUP=5
+NUM_RUNS=20
 
 declare -A BINARY=(
     [AllReduce]=all_reduce_perf_mpi
@@ -79,27 +80,20 @@ declare -A BINARY=(
 )
 
 # ── Run all collectives for this config ────────────────────────────────────
-# Run each collective 3 times with -a 1 (avg), -a 2 (min time = max bw),
-# -a 3 (max time = min bw) to produce error bands.
 for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     BIN="${NCCL_TESTS_DIR}/build/${BINARY[$COLLECTIVE]}"
     CNAME_LOWER=$(echo "$COLLECTIVE" | tr '[:upper:]' '[:lower:]')
     BASE="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}_snellius"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
-    for AVG_MODE in 1 2 3; do
-        case $AVG_MODE in
-            1) SUFFIX="" ;;
-            2) SUFFIX="_maxbw" ;;
-            3) SUFFIX="_minbw" ;;
-        esac
-        OUT="${BASE}${SUFFIX}.json"
+    for RUN_IDX in $(seq 1 ${NUM_RUNS}); do
+        OUT="${BASE}_run${RUN_IDX}.json"
         srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
             "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
-                     -n "${ITERS}" -w "${WARMUP}" -g 1 -a "${AVG_MODE}" \
+                     -n "${ITERS}" -w "${WARMUP}" -g 1 -a 1 \
                      -J "${OUT}"
     done
-    echo "    -> ${BASE}{{,_maxbw,_minbw}}.json"
+    echo "    -> ${BASE}_run{1..${NUM_RUNS}}.json"
 done
 
 echo "Done. Results in ${RESULT_DIR}/"
