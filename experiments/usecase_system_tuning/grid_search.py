@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""System-tuning sweep: node size × link bandwidth × workload config for GPT-OSS 120B and Llama 3 70B.
+"""System-tuning sweep: node size × link bandwidth × workload config for GPT-OSS 120B, Llama 3 70B, and DeepSeek-V3.
 
 Usage (from repo root):
     uv run python experiments/usecase_system_tuning/grid_search.py
@@ -26,16 +26,17 @@ _BASE_DIR = Path(__file__).parent
 _SCENARIOS_DIR = _BASE_DIR / "scenarios"
 _REPO_ROOT = _BASE_DIR.parent.parent
 
-_NODE_SIZES = [4, 8]
+_NODE_SIZES = [4, 8, 64]
 _LINK_BWS = [100, 200, 400, 800]
-_TOTAL_GPUS = 64
+_TOTAL_GPUS = 1024
 
 _NODE_TEMPLATE_FOR_SIZE: dict[int, str] = {
     4: "templates/node/snellius-h100-4g.yaml",
     8: "templates/node/dgx-h100.yaml",
+    64: "templates/node/nvl72-h100.yaml",
 }
 
-_NODE_COST_USD: dict[int, float] = {4: 150_000, 8: 300_000}
+_NODE_COST_USD: dict[int, float] = {4: 150_000, 8: 300_000, 64: 2_000_000}
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class ModelSpec:
     pp_options: list[int]
     ep: int | None = None
     cp: int = 1
+    allow_uneven_pp: bool = False
 
 
 _MODELS: list[ModelSpec] = [
@@ -55,19 +57,30 @@ _MODELS: list[ModelSpec] = [
         name="llama3-70b",
         base_workload=_SCENARIOS_DIR / "llama3-70b" / "base_workload.yaml",
         num_layers=80,
-        gbs=512,
+        gbs=1024,
         tp_options=[1, 2, 4, 8],
-        pp_options=[1, 2, 4, 8],
+        pp_options=[1, 2, 4, 5, 8, 10, 16],
         cp=1,
     ),
     ModelSpec(
         name="gptoss-120b",
         base_workload=_SCENARIOS_DIR / "gptoss-120b" / "base_workload.yaml",
         num_layers=36,
-        gbs=1280,
-        tp_options=[1, 2],
-        pp_options=[2, 4, 8],
+        gbs=1024,
+        tp_options=[1, 2, 4],
+        pp_options=[2, 4],
         ep=None,
+    ),
+    ModelSpec(
+        name="deepseek-v3",
+        base_workload=_SCENARIOS_DIR / "deepseek-v3" / "base_workload.yaml",
+        num_layers=61,
+        gbs=8192,
+        tp_options=[2],
+        pp_options=[8],
+        ep=64,
+        cp=1,
+        allow_uneven_pp=True,
     ),
 ]
 
@@ -99,6 +112,7 @@ def _write_workload(
     cfg["config"]["pipeline-model-parallel-size"] = pp
     cfg["config"]["micro-batch-size"] = 1
     cfg["config"]["context-parallel-size"] = cp
+    cfg["config"]["num-gpus"] = _TOTAL_GPUS
     if vpp is not None:
         cfg["config"]["num-virtual-stages-per-pipeline-rank"] = vpp
     else:
@@ -313,13 +327,16 @@ def _run_simulate(scenario_path: Path, run_name: str) -> dict[str, Any] | None:
         return None
 
 
+_MAX_MODEL_PAR_GPUS = 64
+
+
 def _is_valid_llama(
     tp: int, pp: int, vpp: int | None, num_layers: int, gbs: int
 ) -> tuple[bool, str]:
     if num_layers % pp != 0:
         return False, f"num_layers={num_layers} not divisible by pp={pp}"
-    if tp * pp > _TOTAL_GPUS:
-        return False, f"tp*pp={tp * pp} exceeds total GPUs={_TOTAL_GPUS}"
+    if tp * pp > _MAX_MODEL_PAR_GPUS:
+        return False, f"tp*pp={tp * pp} exceeds max model-parallel GPUs={_MAX_MODEL_PAR_GPUS}"
     dp = _TOTAL_GPUS // (tp * pp)
     if gbs % (1 * dp) != 0:
         return False, f"global_batch_size={gbs} not divisible by dp={dp}"
@@ -333,10 +350,10 @@ def _is_valid_gptoss(
 ) -> tuple[bool, str]:
     if num_layers % pp != 0:
         return False, f"num_layers={num_layers} not divisible by pp={pp}"
-    if tp * pp > _TOTAL_GPUS:
-        return False, f"tp*pp={tp * pp} exceeds total GPUs={_TOTAL_GPUS}"
-    if pp * ep > _TOTAL_GPUS:
-        return False, f"pp*ep={pp * ep} exceeds total GPUs={_TOTAL_GPUS}"
+    if tp * pp > _MAX_MODEL_PAR_GPUS:
+        return False, f"tp*pp={tp * pp} exceeds max model-parallel GPUs={_MAX_MODEL_PAR_GPUS}"
+    if pp * ep > _MAX_MODEL_PAR_GPUS:
+        return False, f"pp*ep={pp * ep} exceeds max model-parallel GPUs={_MAX_MODEL_PAR_GPUS}"
     dp_dense = _TOTAL_GPUS // (tp * pp)
     dp_moe = _TOTAL_GPUS // (pp * ep)
     if gbs % (1 * dp_dense) != 0:
@@ -348,6 +365,22 @@ def _is_valid_gptoss(
     return True, ""
 
 
+def _is_valid_deepseek(
+    tp: int, pp: int, ep: int, vpp: int | None, num_layers: int, gbs: int
+) -> tuple[bool, str]:
+    if tp * pp > _TOTAL_GPUS:
+        return False, f"tp*pp={tp * pp} exceeds total GPUs={_TOTAL_GPUS}"
+    if pp * ep > _TOTAL_GPUS:
+        return False, f"pp*ep={pp * ep} exceeds total GPUs={_TOTAL_GPUS}"
+    dp_dense = _TOTAL_GPUS // (tp * pp)
+    dp_moe = _TOTAL_GPUS // (pp * ep)
+    if gbs % (1 * dp_dense) != 0:
+        return False, f"global_batch_size={gbs} not divisible by dense dp={dp_dense}"
+    if gbs % (1 * dp_moe) != 0:
+        return False, f"global_batch_size={gbs} not divisible by moe dp={dp_moe}"
+    return True, ""
+
+
 def _vpp_options(layers_per_stage: int) -> list[int]:
     candidates = [1, 2, 4]
     return sorted({vpp for vpp in candidates if layers_per_stage % vpp == 0})
@@ -355,18 +388,31 @@ def _vpp_options(layers_per_stage: int) -> list[int]:
 
 def _grid_for_model(model: ModelSpec) -> list[tuple[int, int, int | None, int | None]]:
     combos: list[tuple[int, int, int | None, int | None]] = []
-    valid_pp = [pp for pp in model.pp_options if model.num_layers % pp == 0]
+    valid_pp = [
+        pp for pp in model.pp_options if model.num_layers % pp == 0 or model.allow_uneven_pp
+    ]
     for tp in model.tp_options:
         for pp in valid_pp:
+            if tp * pp > _MAX_MODEL_PAR_GPUS and model.name != "deepseek-v3":
+                continue
             if tp * pp > _TOTAL_GPUS:
                 continue
-            vpps = [None] if pp == 1 else _vpp_options(model.num_layers // pp)
+            vpps = (
+                [None]
+                if pp == 1
+                else _vpp_options(model.num_layers // pp)
+                if model.num_layers % pp == 0
+                else [1, 2, 4]
+            )
             if model.name == "gptoss-120b":
                 for ep in _GPTOSS_EP_OPTIONS:
-                    if pp * ep > _TOTAL_GPUS:
+                    if pp * ep > _MAX_MODEL_PAR_GPUS:
                         continue
                     for vpp in vpps:
                         combos.append((tp, pp, vpp, ep))
+            elif model.name == "deepseek-v3":
+                for vpp in vpps:
+                    combos.append((tp, pp, vpp, model.ep))
             else:
                 for vpp in vpps:
                     combos.append((tp, pp, vpp, None))
@@ -450,6 +496,10 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
             if model.name == "gptoss-120b":
                 valid, invalid_reason = _is_valid_gptoss(
                     tp, pp, ep or 8, vpp, model.num_layers, model.gbs
+                )
+            elif model.name == "deepseek-v3":
+                valid, invalid_reason = _is_valid_deepseek(
+                    tp, pp, ep or 64, vpp, model.num_layers, model.gbs
                 )
             else:
                 valid, invalid_reason = _is_valid_llama(tp, pp, vpp, model.num_layers, model.gbs)
@@ -608,7 +658,7 @@ def _sweep_model(model: ModelSpec, paths: list[Path], trace_only: bool) -> list[
 
 
 def main() -> None:
-    parser = ArgumentParser(description=__doc__)
+    parser = ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     parser.add_argument(
         "--dry-run",
         action="store_true",
