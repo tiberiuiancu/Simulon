@@ -264,8 +264,8 @@ def _build_frame(base_dir: Path, use_csv: bool) -> pd.DataFrame:
 
 def _col_label(pp: int, vpp: int | None) -> str:
     if vpp is None:
-        return "PP1"
-    return f"PP{pp}\nVPP{vpp}"
+        return "PP=1"
+    return f"PP={pp}\nVPP={vpp}"
 
 
 def _build_columns() -> list[tuple[int, int | None, str]]:
@@ -313,19 +313,14 @@ def _render_heatmap(ax, df: pd.DataFrame) -> None:
                 if mfu is not None and not (isinstance(mfu, float) and np.isnan(mfu)):
                     mfu_full[i, j] = float(mfu)
 
-    def _is_gray(status: str | None) -> bool:
-        return status in ("oom", "error", "invalid", None)
+    def _is_gray(i: int, j: int) -> bool:
+        status = status_full[i * n_cols_all + j]
+        if status in ("oom", "error", "invalid", None):
+            return True
+        return not np.isfinite(mfu_full[i, j])
 
-    keep_rows = [
-        i
-        for i in range(n_rows_all)
-        if not all(_is_gray(status_full[i * n_cols_all + j]) for j in range(n_cols_all))
-    ]
-    keep_cols = [
-        j
-        for j in range(n_cols_all)
-        if not all(_is_gray(status_full[i * n_cols_all + j]) for i in range(n_rows_all))
-    ]
+    keep_rows = [i for i in range(n_rows_all) if not all(_is_gray(i, j) for j in range(n_cols_all))]
+    keep_cols = [j for j in range(n_cols_all) if not all(_is_gray(i, j) for i in range(n_rows_all))]
 
     rows = [all_rows[i] for i in keep_rows]
     cols = [all_cols[j] for j in keep_cols]
@@ -342,10 +337,10 @@ def _render_heatmap(ax, df: pd.DataFrame) -> None:
     max_mfu = np.nanmax(mfu_matrix) if np.any(np.isfinite(mfu_matrix)) else 1.0
     if max_mfu <= 0:
         max_mfu = 1.0
-    cmap = mcolors.LinearSegmentedColormap.from_list(
-        "green_mfu", ["#e8f5e9", "#a5d6a7", "#66bb6a", "#388e3c"], N=256
-    )
-    norm = mcolors.Normalize(vmin=0, vmax=max_mfu)
+    bounds = [20, 30, 40, 50, max(max_mfu + 1, 51)]
+    colors = ["#c8e6c9", "#81c784", "#43a047", "#1b5e20"]
+    cmap = mcolors.ListedColormap(colors)
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     ax.set_facecolor("#f5f5f5")
     for i in range(n_rows):
@@ -401,36 +396,37 @@ def _render_heatmap(ax, df: pd.DataFrame) -> None:
     ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False, length=0)
     ax.set_aspect("equal")
 
-    max_mfu_val = np.nanmax(mfu_matrix) if np.any(np.isfinite(mfu_matrix)) else None
-
-    for i in range(n_rows):
-        for j in range(n_cols):
-            status = status_matrix[i * n_cols + j]
-            if status == "valid" and np.isfinite(mfu_matrix[i, j]):
-                val = mfu_matrix[i, j]
-                is_max = max_mfu_val is not None and abs(val - max_mfu_val) < 1e-9
-                label = f"{val:.1f}"
-                if is_max:
-                    label = f"{val:.1f} *"
-                ax.text(
-                    j,
-                    i,
-                    label,
-                    ha="center",
-                    va="center",
-                    fontsize=9,
-                    fontweight="bold" if is_max else "normal",
-                    color="#1b5e20",
-                )
-
     for i in range(n_rows + 1):
         ax.axhline(i - 0.5, color="#bbbbbb", linewidth=0.4)
     for j in range(n_cols + 1):
         ax.axvline(j - 0.5, color="#bbbbbb", linewidth=0.4)
 
+    max_mfu_val = np.nanmax(mfu_matrix) if np.any(np.isfinite(mfu_matrix)) else None
+
+    if max_mfu_val is not None:
+        max_i, max_j = None, None
+        for i in range(n_rows):
+            for j in range(n_cols):
+                if np.isfinite(mfu_matrix[i, j]) and abs(mfu_matrix[i, j] - max_mfu_val) < 1e-9:
+                    max_i, max_j = i, j
+                    break
+            if max_i is not None:
+                break
+        if max_i is not None:
+            ax.scatter(
+                max_j,
+                max_i,
+                marker="*",
+                s=200,
+                color="gold",
+                edgecolors="white",
+                linewidths=0.5,
+                zorder=10,
+            )
+
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04, aspect=n_rows)
+    cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04, aspect=n_rows * 2)
     cbar.set_label("MFU (%)", fontsize=9)
     cbar.ax.tick_params(labelsize=9)
 

@@ -182,26 +182,19 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     labels.extend(label_for_model(m) for m in extras)
     n = len(models)
 
-    baseline_median = []
-    baseline_min = []
-    baseline_max = []
-    sim_val = []
-    pct_labels = []
+    baseline_data: list[list[float]] = []
+    sim_val: list[float] = []
+    pct_labels: list[str] = []
 
     for m in models:
         bd = df[(df["model"] == m) & (df["source"] == "Baseline")]["value"].values.astype(float)
         sd = df[(df["model"] == m) & (df["source"] == "Simulated")]["value"].values.astype(float)
 
-        b_med = float(np.median(bd)) if len(bd) else 0.0
-        b_min = float(np.min(bd)) if len(bd) else 0.0
-        b_max = float(np.max(bd)) if len(bd) else 0.0
+        baseline_data.append(list(bd))
         s = float(sd[0]) if len(sd) else 0.0
-
-        baseline_median.append(b_med)
-        baseline_min.append(b_min)
-        baseline_max.append(b_max)
         sim_val.append(s)
 
+        b_med = float(np.median(bd)) if len(bd) else 0.0
         if b_med > 0 and s > 0:
             pct_labels.append(f"{(s - b_med) / b_med * 100:+.1f}%")
         else:
@@ -214,14 +207,14 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     n_qwen = len(qwen_idx)
 
     if n_qwen == 0:
-        fig, ax = plt.subplots(1, 1, figsize=(max(7.0, 1.1 * n), 3.5))
+        fig, ax = plt.subplots(1, 1, figsize=(6.5, 3.0))
         axes = [ax]
         section_indices = [(list(range(n)), models, labels)]
     else:
         fig, axes = plt.subplots(
             1,
             2,
-            figsize=(max(7.0, 1.1 * n_gptoss) + max(4.0, 1.1 * n_qwen), 3.5),
+            figsize=(6.5, 3.0),
             gridspec_kw={"width_ratios": [max(1, n_gptoss), max(1, n_qwen)]},
         )
         axes = list(axes)
@@ -236,34 +229,52 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
     for section, (idxs, _sec_models, sec_labels) in enumerate(section_indices):
         ax = axes[section]
         sec_n = len(idxs)
-        sec_baseline_median = [baseline_median[i] for i in idxs]
-        sec_baseline_min = [baseline_min[i] for i in idxs]
-        sec_baseline_max = [baseline_max[i] for i in idxs]
+        sec_baseline_data = [baseline_data[i] for i in idxs]
         sec_sim_val = [sim_val[i] for i in idxs]
         sec_pct = [pct_labels[i] for i in idxs]
 
         x = np.arange(sec_n)
         width = 0.35
+        baseline_positions = x - width / 2
+        bar_positions = x + width / 2
 
-        ax.bar(
-            x - width / 2,
-            sec_baseline_median,
-            width,
-            yerr=[
-                np.array(sec_baseline_median) - np.array(sec_baseline_min),
-                np.array(sec_baseline_max) - np.array(sec_baseline_median),
-            ],
-            capsize=3,
-            color=color_baseline,
-            alpha=0.8,
-            label="Baseline",
-            error_kw={"ecolor": "#333333", "elinewidth": 1.0},
-        )
-        ax.bar(x + width / 2, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
+        for i, data in enumerate(sec_baseline_data):
+            ys = np.array(data)
+            b_med = float(np.median(ys))
+            b_mean = float(np.mean(ys))
+            q1 = float(np.percentile(ys, 25))
+            q3 = float(np.percentile(ys, 75))
+            iqr = q3 - q1
+            lo = q1 - 1.5 * iqr
+            hi = q3 + 1.5 * iqr
+            outliers = ys[(ys < lo) | (ys > hi)]
+
+            ax.bar(
+                baseline_positions[i],
+                b_med,
+                width,
+                color=color_baseline,
+                alpha=0.8,
+                label="Baseline (median)" if i == 0 else None,
+            )
+            ax.scatter(
+                np.full(len(outliers), baseline_positions[i]),
+                outliers,
+                color=color_baseline,
+                s=6,
+                alpha=0.5,
+                edgecolors="none",
+                zorder=5,
+            )
+            ax.scatter(
+                [baseline_positions[i]], [b_mean], marker="x", color="#333333", s=20, zorder=6
+            )
+
+        ax.bar(bar_positions, sec_sim_val, width, color=color_sim, alpha=0.8, label="Simulated")
 
         sec_y_max = (
             max(
-                max(sec_baseline_max) if sec_baseline_max else 0,
+                max(np.max(d) if d else 0 for d in sec_baseline_data) if sec_baseline_data else 0,
                 max(sec_sim_val) if sec_sim_val else 0,
             )
             if sec_n
@@ -272,12 +283,12 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
         for i, label in enumerate(sec_pct):
             if label:
                 ax.text(
-                    x[i] + width / 2,
+                    bar_positions[i],
                     sec_y_max * 1.04,
                     label,
                     ha="center",
                     va="bottom",
-                    fontsize=7,
+                    fontsize=8,
                     color="red",
                 )
 
@@ -287,26 +298,57 @@ def _plot(df: pd.DataFrame, output: Path | None) -> None:
                 ax.axvline(x[i] + 0.5, color="#999999", linestyle=":", linewidth=0.8)
 
         ax.set_xticks(x)
-        ax.set_xticklabels(sec_labels, fontsize=7)
+        sec_tick_labels = [
+            lbl.split("\n", 1)[-1].strip("()") if "\n" in lbl else lbl for lbl in sec_labels
+        ]
+        ax.set_xticklabels(sec_tick_labels, fontsize=8)
         if section == 0:
             ax.set_ylabel("Iteration time (s)")
         ax.set_ylim(0, sec_y_max * 1.15)
         if section == 0:
-            ax.set_title("GPT-OSS 20B", fontsize=10, fontweight="bold")
+            ax.set_title("GPT-OSS 20B (MoE)", fontsize=10, fontweight="bold")
         else:
-            ax.set_title("Qwen3-32B", fontsize=10, fontweight="bold")
+            ax.set_title("Qwen3-32B (Dense)", fontsize=10, fontweight="bold")
 
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        Patch(facecolor=color_baseline, alpha=0.8, label="Baseline (median)"),
+        Line2D(
+            [0],
+            [0],
+            marker="x",
+            color="none",
+            markerfacecolor="#333333",
+            markeredgecolor="#333333",
+            markersize=6,
+            label="Baseline mean",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="none",
+            markerfacecolor=color_baseline,
+            markeredgecolor="none",
+            markersize=4,
+            label="Baseline outliers",
+        ),
+        Patch(facecolor=color_sim, alpha=0.8, label="Simulated"),
+    ]
     fig.legend(
+        handles=legend_elements,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.02),
-        ncol=2,
+        bbox_to_anchor=(0.5, -0.01),
+        ncol=4,
         frameon=False,
         handlelength=1.2,
         handletextpad=0.4,
         columnspacing=1.0,
     )
 
-    fig.tight_layout(rect=[0, 0.03, 1, 1.02])
+    fig.tight_layout(rect=[0, 0.04, 1, 1.02])
 
     if output:
         fig.savefig(output, bbox_inches="tight", dpi=300)

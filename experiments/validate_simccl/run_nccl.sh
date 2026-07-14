@@ -79,17 +79,27 @@ declare -A BINARY=(
 )
 
 # ── Run all collectives for this config ────────────────────────────────────
+# Run each collective 3 times with -a 1 (avg), -a 2 (min time = max bw),
+# -a 3 (max time = min bw) to produce error bands.
 for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     BIN="${NCCL_TESTS_DIR}/build/${BINARY[$COLLECTIVE]}"
     CNAME_LOWER=$(echo "$COLLECTIVE" | tr '[:upper:]' '[:lower:]')
-    OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}_snellius.json"
+    BASE="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}_snellius"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
-    srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
-        "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
-                 -n "${ITERS}" -w "${WARMUP}" -g 1 -I 1 \
-                 -J "${OUT}"
-    echo "    -> ${OUT}"
+    for AVG_MODE in 1 2 3; do
+        case $AVG_MODE in
+            1) SUFFIX="" ;;
+            2) SUFFIX="_maxbw" ;;
+            3) SUFFIX="_minbw" ;;
+        esac
+        OUT="${BASE}${SUFFIX}.json"
+        srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
+            "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
+                     -n "${ITERS}" -w "${WARMUP}" -g 1 -a "${AVG_MODE}" \
+                     -J "${OUT}"
+    done
+    echo "    -> ${BASE}{{,_maxbw,_minbw}}.json"
 done
 
 echo "Done. Results in ${RESULT_DIR}/"

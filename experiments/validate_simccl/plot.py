@@ -59,9 +59,9 @@ def _load_with_errors(
 ) -> tuple[list[float], list[float], list[float], list[float]] | None:
     """Return (sizes_MB, bus_bw_GBps, bus_bw_min, bus_bw_max) or None.
 
-    min/max are derived from per-iteration timing fields (min_us, max_us)
-    written when nccl-tests is run with -I 1. Falls back to equal min=max=avg
-    when those fields are absent (old data without per-iteration timing).
+    Loads the avg file (<path>) plus the _maxbw and _minbw variants
+    produced by running nccl-tests with -a 2 and -a 3. Falls back to
+    equal min=max=avg when the variant files are absent (old data).
     """
     if not path.exists():
         return None
@@ -69,24 +69,40 @@ def _load_with_errors(
     results = data.get("results", [])
     if not results:
         return None
+
+    stem = path.stem
+    suffix = path.suffix
+    maxbw_path = path.with_name(f"{stem}_maxbw{suffix}")
+    minbw_path = path.with_name(f"{stem}_minbw{suffix}")
+
+    maxbw_results: list[dict] = []
+    minbw_results: list[dict] = []
+    if maxbw_path.exists():
+        maxbw_results = json.loads(maxbw_path.read_text()).get("results", [])
+    if minbw_path.exists():
+        minbw_results = json.loads(minbw_path.read_text()).get("results", [])
+
     sizes_MB = []
     bus_bw = []
     bw_min = []
     bw_max = []
-    for r in results:
+    for i, r in enumerate(results):
         oop = r["out_of_place"]
         size = r["size"]
         sizes_MB.append(size / (1024**2))
         avg_bw = oop["bus_bw"]
         bus_bw.append(avg_bw)
-        min_us = oop.get("min_us")
-        max_us = oop.get("max_us")
-        if min_us is not None and max_us is not None and max_us > 0:
-            bw_max.append(avg_bw * (oop["time"] / min_us) if min_us > 0 else avg_bw)
-            bw_min.append(avg_bw * (oop["time"] / max_us) if max_us > 0 else avg_bw)
+
+        if i < len(maxbw_results):
+            bw_max.append(maxbw_results[i]["out_of_place"]["bus_bw"])
+        else:
+            bw_max.append(avg_bw)
+
+        if i < len(minbw_results):
+            bw_min.append(minbw_results[i]["out_of_place"]["bus_bw"])
         else:
             bw_min.append(avg_bw)
-            bw_max.append(avg_bw)
+
     return sizes_MB, bus_bw, bw_min, bw_max
 
 
