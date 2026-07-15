@@ -115,6 +115,7 @@ def _write_workload(
     cfg["config"]["num-gpus"] = _TOTAL_GPUS
     if vpp is not None:
         cfg["config"]["num-virtual-stages-per-pipeline-rank"] = vpp
+        cfg["config"].pop("pipeline-model-parallel-layout", None)
     else:
         cfg["config"].pop("num-virtual-stages-per-pipeline-rank", None)
         cfg["config"].pop("num-layers-per-virtual-pipeline-stage", None)
@@ -411,8 +412,7 @@ def _grid_for_model(model: ModelSpec) -> list[tuple[int, int, int | None, int | 
                     for vpp in vpps:
                         combos.append((tp, pp, vpp, ep))
             elif model.name == "deepseek-v3":
-                for vpp in vpps:
-                    combos.append((tp, pp, vpp, model.ep))
+                combos.append((tp, pp, None, model.ep))
             else:
                 for vpp in vpps:
                     combos.append((tp, pp, vpp, None))

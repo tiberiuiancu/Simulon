@@ -415,11 +415,12 @@ def sync_traces(
         if not folder.exists():
             typer.echo(f"Skipping missing folder: {folder}", err=True)
             continue
-        for scenario_path in sorted(folder.rglob("scenario.yaml")):
+        for scenario_path in sorted(folder.rglob("*.yaml")):
+            if scenario_path.name == "workload.yaml":
+                continue
             try:
                 sc = ScenarioConfig.from_yaml(scenario_path)
-            except Exception as exc:
-                typer.echo(f"Failed to load {scenario_path}: {exc}", err=True)
+            except Exception:
                 continue
 
             workload = sc.workload
