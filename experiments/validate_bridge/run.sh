@@ -7,7 +7,11 @@
 #SBATCH --error=%x-%j.err
 
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -f "$SLURM_SUBMIT_DIR/experiments/validate_bridge/run.sh" ]; then
+    SCRIPT_DIR="$SLURM_SUBMIT_DIR/experiments/validate_bridge"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
