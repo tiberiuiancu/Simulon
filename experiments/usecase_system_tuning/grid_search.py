@@ -92,6 +92,12 @@ def _divisors(n: int) -> list[int]:
     return sorted(i for i in range(1, n + 1) if n % i == 0)
 
 
+def _base_vpp(base_workload: Path) -> int | None:
+    with open(base_workload) as f:
+        cfg = yaml.safe_load(f) or {}
+    return (cfg.get("config") or {}).get("num-virtual-stages-per-pipeline-rank")
+
+
 def _make_workload_dir(model: str, tp: int, pp: int, vpp: int | None, ep: int | None) -> Path:
     name = f"tp{tp}_pp{pp}"
     if vpp is not None:
@@ -115,7 +121,6 @@ def _write_workload(
     cfg["config"]["num-gpus"] = _TOTAL_GPUS
     if vpp is not None:
         cfg["config"]["num-virtual-stages-per-pipeline-rank"] = vpp
-        cfg["config"].pop("pipeline-model-parallel-layout", None)
     else:
         cfg["config"].pop("num-virtual-stages-per-pipeline-rank", None)
         cfg["config"].pop("num-layers-per-virtual-pipeline-stage", None)
@@ -412,7 +417,11 @@ def _grid_for_model(model: ModelSpec) -> list[tuple[int, int, int | None, int | 
                     for vpp in vpps:
                         combos.append((tp, pp, vpp, ep))
             elif model.name == "deepseek-v3":
-                combos.append((tp, pp, None, model.ep))
+                # DeepSeek-V3 uses a custom pipeline-model-parallel-layout that forces
+                # a fixed VPP=4; do not sweep VPP. Carry the base's VPP through by
+                # reading it from the base workload so _write_workload keeps the layout.
+                base_vpp = _base_vpp(model.base_workload)
+                combos.append((tp, pp, base_vpp, model.ep))
             else:
                 for vpp in vpps:
                     combos.append((tp, pp, vpp, None))
