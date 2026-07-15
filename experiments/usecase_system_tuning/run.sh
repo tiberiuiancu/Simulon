@@ -18,4 +18,4 @@ cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
 
-uv run python3 "$REPO_ROOT/experiments/usecase_system_tuning/grid_search.py"
+uv run python3 "$REPO_ROOT/experiments/usecase_system_tuning/grid_search.py" "$@"
