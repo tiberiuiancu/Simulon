@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#SBATCH --partition=gpu_h100
+#SBATCH --time=24:00:00
+#SBATCH --gpus=1
+#SBATCH --job-name=validate-bridge
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
