@@ -5,7 +5,7 @@ cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py
 --- stdout ---
 LANG_RL Log directory: None
 INFO:datasets:PyTorch version 2.11.0a0+eb65b36914.nv26.2 available.
-using world size: 64, data-parallel size: 64, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 1, pipeline-model-parallel size: 1
+using world size: 1024, data-parallel size: 1024, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 1, pipeline-model-parallel size: 1
 Number of virtual stages per pipeline stage: None
 using torch.bfloat16 for parameters ...
 ------------------------ arguments ------------------------
@@ -93,7 +93,7 @@ using torch.bfloat16 for parameters ...
   data_cache_path ................................. None
   data_parallel_random_init ....................... False
   data_parallel_sharding_strategy ................. optim_grads_params
-  data_parallel_size .............................. 64
+  data_parallel_size .............................. 1024
   data_path ....................................... None
   data_per_class_fraction ......................... 1.0
   data_sharding ................................... True
@@ -310,7 +310,7 @@ using torch.bfloat16 for parameters ...
   init_method_xavier_uniform ...................... False
   init_model_with_meta_device ..................... False
   initial_loss_scale .............................. 4294967296
-  inprocess_active_world_size ..................... 64
+  inprocess_active_world_size ..................... 1024
   inprocess_barrier_timeout ....................... 120
   inprocess_completion_timeout .................... 120
   inprocess_empty_cuda_cache ...................... False
@@ -748,35 +748,13 @@ using torch.bfloat16 for parameters ...
   wgrad_deferral_limit ............................ 0
   window_attn_skip_freq ........................... None
   window_size ..................................... None
-  world_size ...................................... 64
+  world_size ...................................... 1024
   yaml_cfg ........................................ None
 -------------------- end of arguments ---------------------
-INFO:megatron.core.num_microbatches_calculator:setting number of microbatches to constant 8
-INFO:megatron.core.tokenizers.utils.build_tokenizer: > padded vocab (size: 32000) with 0 dummy tokens (new size: 32000)
-WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode RerunMode.VALIDATE_RESULTS
-> initializing torch distributed ...
-> initialized tensor model parallel with size 1
-> initialized pipeline model parallel with size 1
-> setting random seeds to 1234 ...
-> compiling dataset index builder ...
-make: Entering directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
-make: Nothing to be done for 'default'.
-make: Leaving directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
->>> done with dataset index builder. Compilation time: 0.059 seconds
-time to initialize megatron (seconds): 18.852
-[after in-process setup and before initialize_megatron] datetime: 2026-07-01 11:26:51.808315 
-[after in-job setup and before initialize_megatron] datetime: 2026-07-01 11:26:51.864507 
-[before library-setup] datetime: 2026-07-01 11:26:11.447933
-[after library-setup] datetime: 2026-07-01 11:26:51.648517
-[before megatron-init] datetime: 2026-07-01 11:26:51.808314
-[after megatron is initialized] datetime: 2026-07-01 11:26:56.038696 
-building GPT model ...
 
 --- stderr ---
 /usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
   import pynvml  # type: ignore[import]
-/opt/venv/lib/python3.12/site-packages/comet_ml/error_tracking/api.py:51: UserWarning: We won't be continuing development on SDK 3.0. Please use the last stable version of the SDK to get access to the newest features and fixes. See https://github.com/getsentry/sentry-python/discussions/4955
-  sentry_sdk.init(
 Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
 /opt/venv/lib/python3.12/site-packages/modelopt/torch/__init__.py:36: UserWarning: transformers version 5.3.0 is not tested with nvidia-modelopt and may cause issues. Please install recommended version with `pip install nvidia-modelopt[hf]` if working with HF models.
   _warnings.warn(
@@ -792,3 +770,23 @@ Multiple distributions found for package modelopt. Picked distribution: nvidia-m
   warnings.warn(message)
 /opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: --tokenizer-hf-include-special-tokens argument is deprecated and will be removed soon. `include_special_tokens` is set to True by default for HF tokenizers.Use --tokenizer-hf-no-include-special-tokens if you want to disable `include_special_tokens`.
   warnings.warn(message)
+Traceback (most recent call last):
+  File "/opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py", line 414, in <module>
+    args = parse_and_validate_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 113, in parse_and_validate_args
+    set_global_variables(args)
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/global_vars.py", line 127, in set_global_variables
+    init_num_microbatches_calculator(
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/num_microbatches_calculator.py", line 105, in init_num_microbatches_calculator
+    _configure_global_num_microbatches_calculator(
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/num_microbatches_calculator.py", line 216, in _configure_global_num_microbatches_calculator
+    _GLOBAL_NUM_MICROBATCHES_CALCULATOR = _build_num_microbatches_calculator(
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/num_microbatches_calculator.py", line 284, in _build_num_microbatches_calculator
+    num_microbatches_calculator = ConstantNumMicroBatchesCalculator(
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/core/num_microbatches_calculator.py", line 381, in __init__
+    assert global_batch_size % micro_batch_times_data_parallel_size == 0, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: global batch size (512) is not divisible by micro batch size (1) times data parallel size (1024)

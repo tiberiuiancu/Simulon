@@ -5,7 +5,7 @@ cmd=/opt/venv/bin/python3 /opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py
 --- stdout ---
 LANG_RL Log directory: None
 INFO:datasets:PyTorch version 2.11.0a0+eb65b36914.nv26.2 available.
-using world size: 64, data-parallel size: 32, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 2, pipeline-model-parallel size: 1
+using world size: 1024, data-parallel size: 512, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 2, pipeline-model-parallel size: 1
 Number of virtual stages per pipeline stage: None
 using torch.bfloat16 for parameters ...
 ------------------------ arguments ------------------------
@@ -93,7 +93,7 @@ using torch.bfloat16 for parameters ...
   data_cache_path ................................. None
   data_parallel_random_init ....................... False
   data_parallel_sharding_strategy ................. optim_grads_params
-  data_parallel_size .............................. 32
+  data_parallel_size .............................. 512
   data_path ....................................... None
   data_per_class_fraction ......................... 1.0
   data_sharding ................................... True
@@ -310,7 +310,7 @@ using torch.bfloat16 for parameters ...
   init_method_xavier_uniform ...................... False
   init_model_with_meta_device ..................... False
   initial_loss_scale .............................. 4294967296
-  inprocess_active_world_size ..................... 64
+  inprocess_active_world_size ..................... 1024
   inprocess_barrier_timeout ....................... 120
   inprocess_completion_timeout .................... 120
   inprocess_empty_cuda_cache ...................... False
@@ -748,10 +748,10 @@ using torch.bfloat16 for parameters ...
   wgrad_deferral_limit ............................ 0
   window_attn_skip_freq ........................... None
   window_size ..................................... None
-  world_size ...................................... 64
+  world_size ...................................... 1024
   yaml_cfg ........................................ None
 -------------------- end of arguments ---------------------
-INFO:megatron.core.num_microbatches_calculator:setting number of microbatches to constant 16
+INFO:megatron.core.num_microbatches_calculator:setting number of microbatches to constant 1
 INFO:megatron.core.tokenizers.utils.build_tokenizer: > padded vocab (size: 32000) with 0 dummy tokens (new size: 32000)
 WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode RerunMode.VALIDATE_RESULTS
 > initializing torch distributed ...
@@ -762,14 +762,14 @@ WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode 
 make: Entering directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
 make: Nothing to be done for 'default'.
 make: Leaving directory '/opt/simulon/vendor/Megatron-LM-traced/megatron/core/datasets'
->>> done with dataset index builder. Compilation time: 0.055 seconds
-time to initialize megatron (seconds): 18.130
-[after in-process setup and before initialize_megatron] datetime: 2026-07-01 11:34:08.590972 
-[after in-job setup and before initialize_megatron] datetime: 2026-07-01 11:34:08.647548 
-[before library-setup] datetime: 2026-07-01 11:33:30.033163
-[after library-setup] datetime: 2026-07-01 11:34:08.450309
-[before megatron-init] datetime: 2026-07-01 11:34:08.590971
-[after megatron is initialized] datetime: 2026-07-01 11:34:12.612181 
+>>> done with dataset index builder. Compilation time: 0.054 seconds
+time to initialize megatron (seconds): 18.131
+[after in-process setup and before initialize_megatron] datetime: 2026-07-15 09:57:18.157036 
+[after in-job setup and before initialize_megatron] datetime: 2026-07-15 09:57:18.213300 
+[before library-setup] datetime: 2026-07-15 09:56:39.920600
+[after library-setup] datetime: 2026-07-15 09:57:18.018609
+[before megatron-init] datetime: 2026-07-15 09:57:18.157034
+[after megatron is initialized] datetime: 2026-07-15 09:57:22.323640 
 building GPT model ...
  > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 29663731712
 INFO:megatron.core.distributed.distributed_data_parallel:Setting up DistributedDataParallel with config DistributedDataParallelConfig(grad_reduce_in_fp32=False, overlap_grad_reduce=False, overlap_param_gather=False, align_param_gather=False, use_distributed_optimizer=True, num_distributed_optimizer_instances=1, check_for_nan_in_grad=False, check_for_large_grads=False, bucket_size=None, pad_buckets_for_high_nccl_busbw=False, reduce_scatter_with_fp32_accumulation=False, param_name_patterns_for_fp32_local_accumulation=(), average_in_collective=False, fp8_param_gather=False, fp4_param_gather=False, reuse_grad_buf_for_mxfp8_param_ag=False, use_megatron_fsdp=False, use_custom_fsdp=False, data_parallel_sharding_strategy='optim_grads_params', gradient_reduce_div_fusion=True, suggested_communication_unit_size=None, keep_fp8_transpose_cache=False, nccl_ub=False, fsdp_double_buffer=False, fsdp_db_use_persist_buf_on_alloc_fail=False, fsdp_all_gather_in_start_param_sync=True, outer_dp_sharding_strategy='no_shard', disable_symmetric_registration=False, fsdp_manual_registration=False, delay_wgrad_compute=False, megatron_fsdp_main_params_dtype=torch.float32, megatron_fsdp_main_grads_dtype=None, megatron_fsdp_grad_comm_dtype=torch.bfloat16, megatron_fsdp_use_decoupled_grad=False)
