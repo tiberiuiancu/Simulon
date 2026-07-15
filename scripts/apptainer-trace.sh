@@ -1,5 +1,6 @@
 apptainer exec --nv \
     --env "CUDA_DEVICE_MAX_CONNECTIONS=1" \
+    --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" \
     --env "SIMULON_TRACES_DIR=${SIMULON_TRACES_DIR:-}" \
     --bind "$(pwd)/experiments:/opt/simulon/experiments" \
     --bind "$(pwd)/examples:/opt/simulon/examples" \

@@ -147,6 +147,8 @@ def plot(
                     ]
                 )
 
+            subplot_data: dict[str, tuple[list[float], list[float]]] = {}
+
             for sname, fname, color, marker, ls in series:
                 if sname == "nccl-tests":
                     data = _load_with_errors(results_dir / fname)
@@ -158,6 +160,7 @@ def plot(
                     sizes, bws, bw_min, bw_max = data
                 else:
                     sizes, bws = data
+                subplot_data[sname] = (sizes, bws)
                 lw = 1.5 if ls == "--" else 1.0
                 ms = 4 if ls == "--" else 3
                 (line,) = ax.plot(
@@ -171,11 +174,95 @@ def plot(
                     label=sname,
                 )
                 if sname == "nccl-tests":
-                    ax.fill_between(
-                        sizes, bw_min, bw_max, color=color, alpha=0.15, linewidth=0, step="mid"
+                    lo_err = [b - m for b, m in zip(bws, bw_min, strict=False)]
+                    hi_err = [m - b for b, m in zip(bws, bw_max, strict=False)]
+                    ax.errorbar(
+                        sizes,
+                        bws,
+                        yerr=[lo_err, hi_err],
+                        fmt="none",
+                        ecolor=color,
+                        elinewidth=0.8,
+                        capsize=2,
+                        capthick=0.8,
                     )
                 if sname not in legend_handles:
                     legend_handles[sname] = line
+
+            if "simulon" in subplot_data and "nccl-tests" in subplot_data:
+                sim_sizes, sim_bws = subplot_data["simulon"]
+                nccl_sizes, nccl_bws = subplot_data["nccl-tests"]
+                size_to_nccl = dict(zip(nccl_sizes, nccl_bws, strict=False))
+                worst_pct = 0.0
+                worst_size = None
+                worst_sim = None
+                worst_nccl = None
+                for s, b in zip(sim_sizes, sim_bws, strict=False):
+                    if s in size_to_nccl:
+                        nb = size_to_nccl[s]
+                        if nb == 0:
+                            continue
+                        pct = abs(b - nb) / nb * 100
+                        if pct > worst_pct:
+                            worst_pct = pct
+                            worst_size = s
+                            worst_sim = b
+                            worst_nccl = nb
+                if worst_size is not None:
+                    upper = max(worst_sim, worst_nccl)
+                    lower = min(worst_sim, worst_nccl)
+                    ax.plot([worst_size, worst_size], [lower, upper], color="red", lw=1.0)
+                    ax.annotate(
+                        "",
+                        xy=(worst_size, upper),
+                        xytext=(0, 6),
+                        textcoords="offset points",
+                        arrowprops={
+                            "arrowstyle": "->",
+                            "color": "red",
+                            "lw": 1.0,
+                            "shrinkA": 0,
+                            "shrinkB": 0,
+                        },
+                    )
+                    ax.annotate(
+                        "",
+                        xy=(worst_size, lower),
+                        xytext=(0, -6),
+                        textcoords="offset points",
+                        arrowprops={
+                            "arrowstyle": "->",
+                            "color": "red",
+                            "lw": 1.0,
+                            "shrinkA": 0,
+                            "shrinkB": 0,
+                        },
+                    )
+                    sign = "+" if worst_sim > worst_nccl else "-"
+                    if row == 0:
+                        ax.annotate(
+                            f"{sign}{worst_pct:.1f}%",
+                            xy=(worst_size, lower),
+                            xytext=(0, -12),
+                            textcoords="offset points",
+                            fontsize=6,
+                            color="red",
+                            fontweight="bold",
+                            ha="center",
+                            va="top",
+                        )
+                    else:
+                        ax.annotate(
+                            f"{sign}{worst_pct:.1f}%",
+                            xy=(worst_size, upper),
+                            xytext=(0, 12),
+                            textcoords="offset points",
+                            fontsize=6,
+                            color="red",
+                            fontweight="bold",
+                            ha="center",
+                            va="bottom",
+                        )
 
             # Axes formatting
             ax.set_xscale("log", base=2)
