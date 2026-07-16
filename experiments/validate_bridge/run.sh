@@ -36,6 +36,7 @@ set +e
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
     scenario="$SCRIPT_DIR/$model/scenario.yaml"
+    export SIMULON_TRACES_DIR="templates/gpu/h100/traces/validate-bridge-${model}"
     bash scripts/apptainer-trace.sh "$scenario" \
         --gpu h100 --memory-snapshot oom.pickle
     trace_rc=$?
@@ -43,6 +44,7 @@ for model in "${MODELS[@]}"; do
         echo "    Warning: trace generation exited with code $trace_rc (continuing)"
     fi
 done
+unset SIMULON_TRACES_DIR
 set -e
 
 TOTAL=0
