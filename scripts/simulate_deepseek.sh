@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH --partition=rome
 #SBATCH --time=24:00:00
-#SBATCH --cpus-per-task=48
-#SBATCH --mem=0
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
 #SBATCH --job-name=deepseek-sims
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
@@ -11,6 +11,7 @@ set -euo pipefail
 
 if [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -f "$SLURM_SUBMIT_DIR/scripts/simulate_deepseek.sh" ]; then
     REPO_ROOT="$SLURM_SUBMIT_DIR"
+    SCRIPT_DIR="$REPO_ROOT/scripts"
 else
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
