@@ -35,14 +35,8 @@ echo "Selected models: ${MODELS[*]}"
 set +e
 for model in "${MODELS[@]}"; do
     echo "  TRACE: $model"
-    own_workload="$SCRIPT_DIR/$model/workload.yaml"
     scenario="$SCRIPT_DIR/$model/scenario.yaml"
-    if [ -f "$own_workload" ]; then
-        trace_input="$own_workload"
-    else
-        trace_input="$scenario"
-    fi
-    bash scripts/apptainer-trace.sh "$trace_input" \
+    bash scripts/apptainer-trace.sh "$scenario" \
         --gpu h100 --memory-snapshot oom.pickle
     trace_rc=$?
     if [ $trace_rc -ne 0 ]; then
