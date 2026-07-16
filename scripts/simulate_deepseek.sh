@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH --partition=rome
 #SBATCH --time=24:00:00
-#SBATCH --cpus-per-task=192
-#SBATCH --mem=192G
+#SBATCH --cpus-per-task=128
+#SBATCH --mem=128G
 #SBATCH --job-name=deepseek-sims
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
