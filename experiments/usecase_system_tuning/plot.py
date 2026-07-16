@@ -26,7 +26,7 @@ _NODE_SIZES = [4, 8, 64]
 _LINK_BWS = [100, 200, 400, 800]
 _MODELS = ["gptoss-120b", "llama3-70b", "deepseek-v3"]
 
-_NODE_COST_USD: dict[int, float] = {4: 120_000, 8: 250_000, 64: 3_000_000}
+_NODE_COST_USD: dict[int, float] = {4: 120_000, 8: 250_000, 64: 3_500_000}
 _NIC_COST_USD: dict[int, float] = {100: 1_000, 200: 2_000, 400: 4_000, 800: 10_000}
 _CABLING_COST_USD: dict[int, float] = {
     100: 2_000_000,
@@ -39,7 +39,7 @@ _TOTAL_GPUS = 1024
 _CSV_PATH = Path(__file__).parent / "results.csv"
 
 _RUN_NAME_RE = re.compile(
-    r"^system-tuning-(?P<model>gptoss-120b|llama3-70b|deepseek-v3)-(?P<config>.+?)-node(?P<node_size>\d+)-bw(?P<link_bw>\d+)$"
+    r"^system-tuning-(?P<model>gptoss-120b|llama3-70b|deepseek-v3)-(?P<config>.+?)-node(?P<node_size>\d+)[_-]bw(?P<link_bw>\d+)$"
 )
 
 
