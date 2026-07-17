@@ -29,6 +29,7 @@ def _find_models(base_dir: Path) -> list[Path]:
             item.is_dir()
             and (item / "reference.yaml").exists()
             and (item / "scenario.yaml").exists()
+            and not item.name.endswith("-overlap")
         ):
             models.append(item)
     return models
@@ -68,7 +69,7 @@ def _records_to_long(
         model = model_label if model_label is not None else row["model"]
         real_val = row.get("real")
         sim_val = row.get("simulated")
-        overlap_val = row.get("simulated_overlap")
+        no_comm_val = row.get("simulated_no_comm")
         if real_val is not None:
             records.append(
                 {"model": model, "metric": metric_label, "source": "Real", "value": float(real_val)}
@@ -82,20 +83,24 @@ def _records_to_long(
                     "value": float(sim_val),
                 }
             )
-        if overlap_val is not None:
+        if no_comm_val is not None:
             records.append(
                 {
                     "model": model,
                     "metric": metric_label,
-                    "source": "Simulated (overlap)",
-                    "value": float(overlap_val),
+                    "source": "Simulated (no comm)",
+                    "value": float(no_comm_val),
                 }
             )
     return records
 
 
-def _group_key(model: str) -> str:
-    return "qwen3-30b" if model == "qwen3-30b-overlap" else model
+def _derive_no_comm_tps(
+    sim_tps: float, total_time_ms: float, exposed_comm_ms: float
+) -> float | None:
+    if not sim_tps or not total_time_ms or total_time_ms <= exposed_comm_ms:
+        return None
+    return sim_tps * total_time_ms / (total_time_ms - exposed_comm_ms)
 
 
 def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = False) -> None:
@@ -131,51 +136,44 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
             for key, _label, _unit in metrics:
                 row[f"real_{key}"] = ref.get(key)
                 row[f"sim_{key}"] = sim_metrics.get(key) if sim_metrics else None
+            if model == "qwen3-30b" and sim_metrics:
+                row["total_time_ms"] = sim_metrics.get("total_time_ms")
+                row["exposed_comm_ms"] = sim_metrics.get("exposed_comm_ms")
             raw_rows.append(row)
 
-        grouped: dict[str, dict[str, float | str | None]] = {}
-        for row in raw_rows:
-            model = str(row["model"])
-            group = _group_key(model)
-            if group not in grouped:
-                grouped[group] = {"model": group}
-            for key, _label, _unit in metrics:
-                if model.endswith("-overlap"):
-                    grouped[group][f"simulated_overlap_{key}"] = row[f"sim_{key}"]
-                else:
-                    grouped[group][f"real_{key}"] = row.get(f"real_{key}")
-                    grouped[group][f"sim_{key}"] = row[f"sim_{key}"]
-
         complete_rows: list[dict[str, float | str | None]] = []
-        for group, row in grouped.items():
+        for row in raw_rows:
             has_data = any(
-                row.get(f"real_{key}") is not None
-                or row.get(f"sim_{key}") is not None
-                or row.get(f"simulated_overlap_{key}") is not None
+                row.get(f"real_{key}") is not None or row.get(f"sim_{key}") is not None
                 for key, _label, _unit in metrics
             )
             if has_data:
                 complete_rows.append(row)
             else:
-                print(f"Skipping {group}: no real or simulated results.", file=sys.stderr)
+                print(f"Skipping {row['model']}: no real or simulated results.", file=sys.stderr)
 
         records: list[dict[str, float | str]] = []
         for key, label, _unit in metrics:
-            records.extend(
-                _records_to_long(
-                    [
-                        {
-                            "model": r["model"],
-                            "real": r.get(f"real_{key}"),
-                            "simulated": r.get(f"sim_{key}"),
-                            "simulated_overlap": r.get(f"simulated_overlap_{key}"),
-                        }
-                        for r in complete_rows
-                    ],
-                    key,
-                    label,
+            derived_rows: list[dict[str, float | str | None]] = []
+            for r in complete_rows:
+                sim_val = r.get(f"sim_{key}")
+                no_comm: float | None = None
+                if r["model"] == "qwen3-30b" and sim_val is not None:
+                    total_ms = r.get("total_time_ms")
+                    exposed_ms = r.get("exposed_comm_ms")
+                    if total_ms and exposed_ms is not None:
+                        no_comm = _derive_no_comm_tps(
+                            float(sim_val), float(total_ms), float(exposed_ms)
+                        )
+                derived_rows.append(
+                    {
+                        "model": r["model"],
+                        "real": r.get(f"real_{key}"),
+                        "simulated": sim_val,
+                        "simulated_no_comm": no_comm,
+                    }
                 )
-            )
+            records.extend(_records_to_long(derived_rows, key, label))
 
         if records:
             df = pd.DataFrame(records)
@@ -191,9 +189,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
     setup_latex_style()
 
     metric_labels = df["metric"].unique()
-    fig, axes = make_figure(
-        "Megatron-Bridge Training Validation", width_in=3.5, n_panels=len(metric_labels)
-    )
+    fig, axes = make_figure("Megatron-Bridge Training Validation", n_panels=len(metric_labels))
 
     for ax, metric_label in zip(axes, metric_labels, strict=False):
         sub = df[df["metric"] == metric_label]
@@ -201,7 +197,7 @@ def plot_real_vs_simulated(output: Path | None, base_dir: Path, use_csv: bool = 
         ylabel = unit if unit else metric_label
         plot_metric_panel(ax, sub, metric_label, ylabel)
 
-    fig.tight_layout(rect=[0, 0, 1, 1.02])
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
 
     if output:
         fig.savefig(output, bbox_inches="tight", dpi=300)
