@@ -11,14 +11,14 @@ import seaborn as sns
 
 
 def setup_latex_style() -> None:
-    """Configure matplotlib for single-column LaTeX PDF figures."""
+    """Configure matplotlib for full-page-width LaTeX PDF figures."""
     plt.rcParams.update(
         {
             "font.family": "serif",
             "font.serif": ["Times New Roman", "DejaVu Serif", "serif"],
-            "font.size": 9,
+            "font.size": 8,
             "axes.titlesize": 10,
-            "axes.labelsize": 9,
+            "axes.labelsize": 8,
             "xtick.labelsize": 8,
             "ytick.labelsize": 8,
             "legend.fontsize": 8,
@@ -27,8 +27,9 @@ def setup_latex_style() -> None:
             "savefig.bbox": "tight",
             "savefig.pad_inches": 0.02,
             "axes.grid": True,
+            "axes.grid.axis": "y",
             "grid.alpha": 0.3,
-            "axes.titlepad": 8,
+            "axes.titlepad": 4,
         }
     )
 
@@ -59,66 +60,81 @@ def label_for_model(raw_name: str) -> str:
 def plot_metric_panel(
     ax, sub_df, metric_label: str, ylabel: str, palette: dict[str, str] | None = None
 ) -> None:
-    """Draw a real-vs-simulated metric panel on *ax*.
+    """Draw a real-vs-simulated metric panel on *ax* with centered bar groups.
 
-    Adds percentage-difference labels above simulated bars and places
-    the legend horizontally under the panel title.
+    Each model's bars are centered on its x-tick regardless of how many
+    sources the model has.  Percentage-difference labels are placed on top
+    of the *simulated* bar they refer to (not on the tick center).
     """
     palette = palette or {
         "Real": "#4c72b0",
         "Simulated": "#dd8452",
-        "Simulated (overlap)": "#2ca02c",
+        "Simulated (no comm)": "#2ca02c",
     }
 
-    sns.barplot(
-        data=sub_df,
-        x="model",
-        y="value",
-        hue="source",
-        hue_order=[s for s in palette if s in sub_df["source"].unique()],
-        palette=palette,
-        ax=ax,
-    )
+    all_sources = [s for s in palette if s in sub_df["source"].unique()]
+    models = list(sub_df["model"].unique())
 
+    bar_width = 0.28
     y_max = sub_df["value"].max()
-    real_by_model = {
-        model: float(
-            sub_df[(sub_df["model"] == model) & (sub_df["source"] == "Real")]["value"].iloc[0]
-        )
-        for model in sub_df["model"].unique()
-        if not sub_df[(sub_df["model"] == model) & (sub_df["source"] == "Real")]["value"].empty
-    }
-    for model_name in sub_df["model"].unique():
-        real = real_by_model.get(model_name)
-        if real is None or real == 0:
-            continue
-        for source in ["Simulated", "Simulated (overlap)"]:
-            sim_val = sub_df[(sub_df["model"] == model_name) & (sub_df["source"] == source)][
-                "value"
-            ]
-            if sim_val.empty:
-                continue
-            sim = float(sim_val.iloc[0])
-            pct = (sim - real) / real * 100
-            ax.text(
-                model_name,
-                sim + 0.02 * y_max,
-                f"{pct:+.1f}%",
-                ha="center",
-                va="bottom",
-                fontsize=6,
-                color="red",
-            )
 
+    real_by_model: dict[str, float] = {}
+    for model in models:
+        real_rows = sub_df[(sub_df["model"] == model) & (sub_df["source"] == "Real")]["value"]
+        if not real_rows.empty:
+            real_by_model[model] = float(real_rows.iloc[0])
+
+    legend_added: set[str] = set()
+    for i, model in enumerate(models):
+        model_sources = [
+            s
+            for s in all_sources
+            if not sub_df[(sub_df["model"] == model) & (sub_df["source"] == s)]["value"].empty
+        ]
+        n_bars = len(model_sources)
+        # symmetric offsets so the group is centered on x=i
+        offsets = [(j - (n_bars - 1) / 2) * bar_width for j in range(n_bars)]
+        for j, source in enumerate(model_sources):
+            val = float(
+                sub_df[(sub_df["model"] == model) & (sub_df["source"] == source)]["value"].iloc[0]
+            )
+            x_pos = i + offsets[j]
+            label = source if source not in legend_added else None
+            legend_added.add(source)
+            ax.bar(
+                x_pos,
+                val,
+                width=bar_width * 0.92,
+                color=palette[source],
+                label=label,
+                edgecolor="none",
+            )
+            # percentage label on top of simulated bars
+            if source != "Real":
+                real = real_by_model.get(model)
+                if real and real > 0:
+                    pct = (val - real) / real * 100
+                    ax.text(
+                        x_pos,
+                        val + 0.02 * y_max,
+                        f"{pct:+.1f}%",
+                        ha="center",
+                        va="bottom",
+                        fontsize=6,
+                        color="red",
+                    )
+
+    ax.set_xticks(range(len(models)))
+    ax.set_xticklabels(models)
     ax.set_ylabel(ylabel)
     ax.set_xlabel("")
     ax.tick_params(axis="x", rotation=0)
-    if not sub_df["source"].empty:
+    if legend_added:
         ax.legend(
             title="",
             loc="upper center",
-            bbox_to_anchor=(0.5, -0.22),
-            ncol=max(1, len(sub_df["source"].unique())),
+            bbox_to_anchor=(0.5, -0.18),
+            ncol=max(1, len(legend_added)),
             frameon=False,
             handlelength=1.2,
             handletextpad=0.4,
@@ -127,13 +143,13 @@ def plot_metric_panel(
     sns.despine(ax=ax, top=True, right=True)
 
 
-def make_figure(title: str, width_in: float = 3.5, n_panels: int = 1) -> tuple:
-    """Create a compact figure suitable for a single LaTeX column."""
+def make_figure(title: str, width_in: float = 6.5, n_panels: int = 1) -> tuple:
+    """Create a figure sized for full-page-width LaTeX inclusion."""
     if n_panels <= 1:
-        fig, axes = plt.subplots(1, 1, figsize=(width_in, 2.0))
+        fig, axes = plt.subplots(1, 1, figsize=(width_in, 2.2))
         axes = [axes]
     else:
         fig, axes = plt.subplots(n_panels, 1, figsize=(width_in, 2.0 * n_panels), sharey=False)
         axes = list(axes)
-    fig.suptitle(title, fontsize=10, fontweight="bold", y=1.04)
+    fig.suptitle(title, fontsize=8, fontweight="bold", y=0.98)
     return fig, axes
