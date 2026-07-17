@@ -13,7 +13,7 @@ by injecting profiling data.
    emitted by the instrumented Megatron-LM fork and builds an `ExecutionDAG`: a
    dependency graph of `ComputeNode` (kernel ops) and `CommNode` (P2P flows) records
    representing one training iteration across all GPUs. The tracer infers trace file
-   paths from the datacenter's `traces_dir` if one is configured.
+   paths from the workload's `traces_dir` if one is configured.
 
 2. **Collective decomposition** — ring AllGather, ReduceScatter, AllReduce, and AllToAll
    are decomposed into individual `P2PFlow` records with explicit `parent_flow_ids` /
@@ -54,39 +54,53 @@ simulon/
 │   ├── backend/
 │   │   ├── base.py          # Backend ABC
 │   │   ├── analytical.py    # AnalyticalBackend — dispatches MegatronDagTracer
+│   │   ├── network.py       # Network backend abstractions
 │   │   └── dag/
-│   │       ├── nodes.py          # ComputeNode, CommNode, DAGEdge, ExecutionDAG
-│   │       ├── tracer.py         # DAGTracerConfig + DAGTracer (ABC)
-│   │       ├── trace_tracer.py   # MegatronDagTracer — builds DAG from real GPU execution traces
-│   │       ├── trace_parser.py   # TraceFileParser — validates and loads trace JSON files
-│   │       ├── network_populate.py # injects GPU kernel timing and network bandwidth into DAG nodes
-│   │       ├── replayer.py       # critical-path replay → SimulationResult
-│   │       ├── chrome_trace.py   # Chrome/Perfetto trace export
-│   │       ├── goal_trace.py     # GOAL-compatible trace export
+│   │       ├── nodes.py             # ComputeNode, CommNode, DAGEdge, ExecutionDAG
+│   │       ├── tracer.py            # DAGTracerConfig + DAGTracer (ABC)
+│   │       ├── trace_tracer.py      # MegatronDagTracer — builds DAG from real GPU traces
+│   │       ├── trace_parser.py      # TraceFileParser — validates and loads trace JSON
+│   │       ├── network_populate.py  # injects GPU kernel timing and network bandwidth into DAG nodes
+│   │       ├── collective_populate.py # collective-level DAG population
 │   │       ├── collective_tracer.py # Collective-level DAG tracer
-│   │       └── _progress.py      # progress bar utility
+│   │       ├── replayer.py          # critical-path replay → SimulationResult
+│   │       ├── chrome_trace.py      # Chrome/Perfetto trace export
+│   │       ├── goal_trace.py        # GOAL-compatible trace export
+│   │       └── _progress.py         # progress bar utility
 │   ├── cli/
 │   │   ├── __init__.py      # `simulon simulate`, `simulon trace generate`
+│   │   ├── simulate.py      # Simulation sub-command
 │   │   ├── trace.py         # Trace generation sub-command
-│   │   └── install.py       # `simulon install apex` / `simulon install deepgemm`
+│   │   ├── compare.py       # Compare simulation results
+│   │   ├── install.py       # `simulon install apex` / `simulon install deepgemm`
+│   │   └── utils.py         # CLI utilities
 │   ├── cost.py              # Cost estimation
 │   ├── energy.py            # Energy estimation
-│   └── tracking/            # Experiment tracking
+│   └── tracking/            # Experiment tracking (W&B, MLflow)
+│       ├── base.py          # Tracker ABC
+│       ├── factory.py       # Tracker factory
+│       ├── wandb_tracker.py # Weights & Biases tracker
+│       ├── mlflow_tracker.py # MLflow tracker
+│       ├── params.py        # Tracking parameters
+│       └── env.py           # Environment-based tracker selection
 ├── templates/
-│   ├── gpu/                 # GPU hardware profiles (YAML)
+│   ├── gpu/                 # GPU hardware profiles (YAML) + bundled traces
 │   ├── cpu/                 # CPU profiles
 │   ├── nic/                 # NIC profiles
 │   ├── switch/              # Switch profiles
-│   └── model/               # LLM architecture profiles
+│   ├── node/                # Node templates (snellius-h100-4g, dgx-h100, nvl72-h100, ...)
+│   └── workload/            # Workload templates (inheritable Megatron-LM configs)
 ├── examples/
-│   ├── llama3_8b_training_new.yaml    # Trace-driven (framework: megatron)
-│   ├── gpt_oss_20b_training_new.yaml  # Trace-driven (framework: megatron)
-│   ├── gpt_oss_20b_training_single_node.yaml  # Trace-driven (framework: megatron)
-│   ├── deepseek_v3_training.yaml      # (framework: megatron-deprecated)
-│   ├── gpt_oss_5b_training.yaml       # (framework: megatron-deprecated)
-│   ├── gpt_oss_20b_training.yaml      # (framework: megatron-deprecated)
-│   ├── llama7b_32gpu_training.yaml    # (framework: megatron-deprecated)
-│   └── qwen3_30b_training.yaml        # (framework: megatron-deprecated)
+│   ├── llama3_8b_training.yaml       # Trace-driven (framework: megatron)
+│   ├── gpt_oss_20b_training.yaml     # Trace-driven (framework: megatron)
+│   └── collective_validation.yaml     # Collective-level validation
+├── experiments/              # Validation and use-case experiments
+│   ├── validate_e2e/        # End-to-end validation (GPT-OSS, Qwen3)
+│   ├── validate_bridge/     # Megatron-Bridge external validation
+│   ├── validate_simccl/     # SimCCL network validation
+│   ├── usecase_workload_tuning/ # Workload tuning (Qwen3-32B)
+│   ├── usecase_system_tuning/   # System tuning (node size, link BW sweep)
+│   └── usecase_energy/      # Energy estimation
 ├── docs/spec/               # Config format specifications
 └── tests/
     ├── test_collective.py       # Collective decomposition unit tests
@@ -98,8 +112,10 @@ simulon/
     ├── test_trace_refactor.py   # Trace refactoring tests
     ├── test_goal_trace.py       # GOAL trace export tests
     ├── test_replayer.py         # DAG replayer tests
+    ├── test_energy.py           # Energy model tests
     ├── test_node_template.py    # Node template tests
     ├── test_tree_nvls_calbusbw.py # Tree/NVLS bandwidth tests
+    ├── test_cli_env.py          # CLI environment tests
     └── utils.py                 # Test utilities
 ```
 
@@ -158,22 +174,33 @@ simulon install deepgemm
 
 ## Quick start
 
-The repository ships with pre-generated GPU execution traces. You can run a complete simulation using a bundled example:
+The repository ships with pre-generated GPU execution traces under `templates/gpu/h100/traces/`. You can run a simulation immediately using one of the experiment scenarios that references bundled traces:
 
 ```bash
-# Simulate Llama-3 8B (16 GPUs, TP=4, PP=4)
-simulon simulate examples/llama3_8b_training.yaml -o trace.json
+# Simulate GPT-OSS 20B (16 GPUs, TP=1, PP=4, EP=4) using a bundled trace
+simulon simulate experiments/validate_e2e/configs/gptoss-bf16/scenario.yaml -v
 ```
+
+This reads the scenario YAML, resolves the `snellius-h100-4g` node template (which includes measured NCCL bandwidth profiles), loads the compute trace from `templates/gpu/h100/traces/validate-e2e-gptoss-bf16/`, builds the execution DAG, and replays it.
 
 Output:
 ```
-Trace written to trace.json
-  GPUs: 16  |  Total: 612.4 ms
-  Load in https://ui.perfetto.dev or chrome://tracing
+Iteration wall time:  742.560 ms
+  Compute:          328.029 ms   44.2%
+  Exposed comm:     300.378 ms   40.5%
+    AllToAll:                256.058 ms
+    ReduceScatter:            26.895 ms
+    PP_Send:                  13.652 ms
+    AllGather:                11.471 ms
+    AllReduce:                 0.850 ms
+  Bubble:           114.152 ms   15.4%
+
+Throughput:           5,516.1 tokens/s
+  MFU:                12.7%
 ```
 
-Add `-v` to print per-GPU timing breakdown:
+Add `--chrome output/trace.json` to write a Chrome Trace timeline for visual inspection in [Perfetto](https://ui.perfetto.dev):
 
 ```bash
-simulon simulate examples/llama3_8b_training.yaml -v
+simulon simulate experiments/validate_e2e/configs/gptoss-bf16/scenario.yaml --chrome output/trace.json
 ```
