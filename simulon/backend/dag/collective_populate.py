@@ -35,6 +35,12 @@ from simulon.config.resolve import resolve_nccl_profile, resolve_node_spec
 logger = logging.getLogger(__name__)
 
 
+def _algo_is_empty(measurements) -> bool:
+    return not any(
+        [measurements.ring, measurements.tree, measurements.nvls, measurements.nvls_tree]
+    )
+
+
 def _single_node_duration_ms(collective_node: CollectiveNode, nccl_profile: NcclProfile) -> float:
     """Look up the measured duration from nccl-tests profile.
 
@@ -51,11 +57,16 @@ def _single_node_duration_ms(collective_node: CollectiveNode, nccl_profile: Nccl
     algorithm = collective_node.algorithm
 
     algo_measurements = getattr(nccl_profile, collective_type, None)
-    if algo_measurements is None:
-        raise ValueError(
-            f"NcclProfile has no measurements for {collective_type!r}. "
-            f"Cannot compute single-node collective duration."
-        )
+    if algo_measurements is None or _algo_is_empty(algo_measurements):
+        # Fall back to AllReduce measurements for collectives not in the
+        # nccl-tests profile (e.g. Broadcast).
+        algo_measurements = nccl_profile.AllReduce
+        if _algo_is_empty(algo_measurements):
+            raise ValueError(
+                f"NcclProfile has no measurements for {collective_type!r} "
+                f"and AllReduce fallback is also empty. "
+                f"Cannot compute single-node collective duration."
+            )
 
     if algorithm == "ring":
         bus_bw = _interp_profile(size_bytes, algo_measurements.ring)
@@ -222,16 +233,29 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
     pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
     with log_progress("  populating PP_Send durations", len(pp_sends), logger) as advance:
         for comm_node in pp_sends:
-            bw, latency_ms = _get_link_params(
-                comm_node.src_gpu,
-                comm_node.dst_gpu,
-                gpus_per_node,
-                intra_bw,
-                intra_latency,
-                inter_bw,
-                inter_latency,
-            )
-            comm_node.duration_ms = latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+            src_node_id = comm_node.src_gpu
+            dst_node_id = comm_node.dst_gpu
+            is_intra = (src_node_id // gpus_per_node) == (dst_node_id // gpus_per_node)
+            if is_intra:
+                bw, latency_ms = _get_link_params(
+                    src_node_id,
+                    dst_node_id,
+                    gpus_per_node,
+                    intra_bw,
+                    intra_latency,
+                    inter_bw,
+                    inter_latency,
+                )
+                comm_node.duration_ms = latency_ms + (comm_node.bytes / bw if bw > 0 else 0.0)
+            else:
+                from simulon.collective.calbusbw import _nic_efficiency
+
+                eff = _nic_efficiency(comm_node.bytes, 2)
+                effective_bw = inter_bw * eff
+                comm_node.duration_ms = inter_latency + (
+                    comm_node.bytes / effective_bw if effective_bw > 0 else 0.0
+                )
+            comm_node.duration_ms += launch_latency_ms
             advance()
 
     return dag

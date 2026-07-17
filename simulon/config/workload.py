@@ -24,6 +24,14 @@ class MegatronWorkload(BaseModel):
 
     framework: Literal["megatron"]
     config: dict[str, Any]
+    a2a_overlap_ratio: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of All-to-All communication time overlapped with compute. "
+        "All-to-All durations are multiplied by (1 - ratio).",
+    )
+    traces_dir: str | None = None
 
     @field_validator("config", mode="before")
     @classmethod

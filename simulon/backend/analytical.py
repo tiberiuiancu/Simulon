@@ -36,10 +36,16 @@ def _ccl_from_scenario(scenario: ScenarioConfig) -> CCLDecomposer:
     return cls()
 
 
-def _tracer_config_from_scenario(scenario: ScenarioConfig) -> DAGTracerConfig:
+def _tracer_config_from_scenario(
+    scenario: ScenarioConfig, overlap_async_collectives: bool = False
+) -> DAGTracerConfig:
     c = scenario.collective
     algorithm = c.algorithm if c.algorithm != "auto" else "ring"
-    return DAGTracerConfig(num_channels=c.num_channels, algorithm=algorithm)
+    return DAGTracerConfig(
+        num_channels=c.num_channels,
+        algorithm=algorithm,
+        overlap_async_collectives=overlap_async_collectives,
+    )
 
 
 def _nic_bw_GBps(dc: DatacenterConfig) -> tuple[float, int]:
@@ -57,10 +63,16 @@ def _nic_bw_GBps(dc: DatacenterConfig) -> tuple[float, int]:
     return 400e9 / 8 / 1e9, nics_per_node
 
 
-def run_trace(scenario: ScenarioConfig, _resolved_algorithm: str | None = None) -> ExecutionDAG:
+def run_trace(
+    scenario: ScenarioConfig,
+    _resolved_algorithm: str | None = None,
+    overlap_async_collectives: bool = False,
+) -> ExecutionDAG:
     """Build an ExecutionDAG from a scenario without populating durations."""
     if isinstance(scenario.workload, MegatronWorkload):
-        cfg = _tracer_config_from_scenario(scenario)
+        cfg = _tracer_config_from_scenario(
+            scenario, overlap_async_collectives=overlap_async_collectives
+        )
         if _resolved_algorithm is not None:
             cfg.algorithm = _resolved_algorithm
         tracer = MegatronDagTracer(cfg, ccl=_ccl_from_scenario(scenario))
@@ -83,7 +95,10 @@ def run_trace(scenario: ScenarioConfig, _resolved_algorithm: str | None = None) 
 
 
 def simulate(
-    scenario: ScenarioConfig, *, network_simulation: str = "collective"
+    scenario: ScenarioConfig,
+    *,
+    network_simulation: str = "collective",
+    overlap_async_collectives: bool = False,
 ) -> tuple[ExecutionDAG, SimulationResult]:
     """Run the full simulation pipeline.
 
@@ -157,13 +172,21 @@ def simulate(
             resolved_algorithm,
         )
 
-    dag = run_trace(scenario, _resolved_algorithm=resolved_algorithm)
+    dag = run_trace(
+        scenario,
+        _resolved_algorithm=resolved_algorithm,
+        overlap_async_collectives=overlap_async_collectives,
+    )
     logger.info(
         "  DAG built: %d compute nodes, %d collective nodes, %d edges",
         len(dag.compute_nodes),
         len(dag.collective_nodes),
         len(dag.edges),
     )
+
+    a2a_overlap_ratio = 0.0
+    if isinstance(scenario.workload, MegatronWorkload):
+        a2a_overlap_ratio = scenario.workload.a2a_overlap_ratio
 
     if network_simulation == "flow":
         decompose_collectives_in_dag(dag)
@@ -177,6 +200,18 @@ def simulate(
             bw_override_bytes_per_ms=intra_override,
             inter_bw_override_bytes_per_ms=inter_override,
         )
+        if a2a_overlap_ratio > 0.0:
+            scale = 1.0 - a2a_overlap_ratio
+            n_scaled = 0
+            for comm_node in dag.comm_nodes:
+                if comm_node.collective_type == "AllToAll" and comm_node.duration_ms is not None:
+                    comm_node.duration_ms *= scale
+                    n_scaled += 1
+            logger.info(
+                "  Applied a2a_overlap_ratio=%.2f to %d AllToAll comm nodes",
+                a2a_overlap_ratio,
+                n_scaled,
+            )
         logger.info("  Network durations resolved")
     else:  # network_simulation == "collective"
         dc = scenario.datacenter
@@ -185,6 +220,18 @@ def simulate(
             len(dag.collective_nodes),
         )
         populate_collective_network(dag, dc)
+        if a2a_overlap_ratio > 0.0:
+            scale = 1.0 - a2a_overlap_ratio
+            n_scaled = 0
+            for node in dag.collective_nodes.values():
+                if node.collective_type == "AllToAll" and node.duration_ms is not None:
+                    node.duration_ms *= scale
+                    n_scaled += 1
+            logger.info(
+                "  Applied a2a_overlap_ratio=%.2f to %d AllToAll collective nodes",
+                a2a_overlap_ratio,
+                n_scaled,
+            )
         logger.info("  Collective durations resolved")
 
     total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes) + len(dag.collective_nodes)

@@ -15,9 +15,14 @@ def _deep_merge(base: dict, overrides: dict) -> dict:
     Nested dicts are merged rather than replaced, so a partial sub-object
     override (e.g. only changing one field inside scale_up.switch) does not
     wipe sibling fields that were not explicitly overridden.
+
+    ``None`` override values are ignored so that unset fields in a partial
+    override do not clobber values inherited from the base template.
     """
     result = dict(base)
     for key, val in overrides.items():
+        if val is None:
+            continue
         if key in result and isinstance(result[key], dict) and isinstance(val, dict):
             result[key] = _deep_merge(result[key], val)
         else:

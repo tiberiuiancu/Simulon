@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import typer
@@ -47,6 +48,19 @@ def simulate(
         "--network-simulation",
         help="Network simulation backend: 'flow' (per-flow BW) or 'collective' (analytical)",
     ),
+    no_tracking: bool = typer.Option(
+        False, "--no-tracking", help="Disable experiment tracking (W&B, MLflow)"
+    ),
+    overlap_async_collectives: bool = typer.Option(
+        False,
+        "--overlap-async-collectives",
+        help="Allow async (async_op=True) collectives to overlap with subsequent compute",
+    ),
+    skip_if_tracked: bool = typer.Option(
+        False,
+        "--skip-if-tracked",
+        help="Skip simulation if a finished tracked run with the same name/hash already exists",
+    ),
 ):
     """Run simulation and print an iteration summary.
 
@@ -55,10 +69,29 @@ def simulate(
     """
     import tempfile
 
-    trackers = get_trackers(scenario)
+    trackers = [] if no_tracking else get_trackers(scenario)
     with open(scenario) as f:
         raw = yaml.safe_load(f)
     sc = ScenarioConfig.from_yaml(scenario)
+
+    if skip_if_tracked and trackers:
+        from simulon.config.resolve import resolve_gpu_spec
+
+        try:
+            gpu_spec = resolve_gpu_spec(sc.datacenter)
+        except Exception:
+            gpu_spec = None
+        try:
+            workload_hash_value = workload_hash(sc.workload)
+        except Exception:
+            workload_hash_value = None
+        run_name = os.environ.get("WANDB_RUN_NAME") or os.environ.get("MLFLOW_RUN_NAME")
+        for tracker in trackers:
+            if tracker.has_run(run_name=run_name, workload_hash=workload_hash_value):
+                typer.echo(
+                    f"Skipping {scenario}: tracked run already exists (run_name={run_name}, workload_hash={workload_hash_value})."
+                )
+                return
 
     if trace and isinstance(sc.workload, MegatronWorkload):
         from simulon.cli.trace import generate_trace
@@ -71,7 +104,8 @@ def simulate(
 
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
-    trackers = get_trackers()
+    if not trackers:
+        trackers = [] if no_tracking else get_trackers()
 
     try:
         for tracker in trackers:
@@ -84,7 +118,11 @@ def simulate(
         except Exception:
             gpu_spec = None
 
-        dag, result = run_simulation(sc, network_simulation=network_simulation)
+        dag, result = run_simulation(
+            sc,
+            network_simulation=network_simulation,
+            overlap_async_collectives=overlap_async_collectives,
+        )
 
         if trackers:
             params = extract_params(sc)

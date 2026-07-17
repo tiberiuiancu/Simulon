@@ -15,16 +15,23 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
 #SBATCH --time=00:30:00
+#SBATCH --switches=1
 #SBATCH --exclusive
 #SBATCH --partition=gpu_h100
-#SBATCH --output=experiments/validate_simccl/results/nccl_slurm_%j.log
-#SBATCH --error=experiments/validate_simccl/results/nccl_slurm_%j.err
+#SBATCH --output=nccl_slurm_%j.log
+#SBATCH --error=nccl_slurm_%j.err
 # ──────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    REPO_ROOT="$SLURM_SUBMIT_DIR"
+else
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
+cd "$REPO_ROOT"
+SCRIPT_DIR="$REPO_ROOT/experiments/validate_simccl"
 NCCL_TESTS_DIR="${SCRIPT_DIR}/nccl-tests"
 RESULT_DIR="${SCRIPT_DIR}/results"
 mkdir -p "${RESULT_DIR}"
@@ -55,13 +62,15 @@ fi
 
 export LD_LIBRARY_PATH=$MPI_HOME/lib:$LD_LIBRARY_PATH
 export NCCL_DEBUG=INFO
+export NCCL_ALGO=Ring
 
 # ── Benchmark parameters ───────────────────────────────────────────────────
 MIN_BYTES="8M"
 MAX_BYTES="8192M"
 STEP_FACTOR=2
-ITERS=20
+ITERS=1
 WARMUP=5
+NUM_RUNS=20
 
 declare -A BINARY=(
     [AllReduce]=all_reduce_perf_mpi
@@ -74,14 +83,17 @@ declare -A BINARY=(
 for COLLECTIVE in AllReduce AllGather ReduceScatter AllToAll; do
     BIN="${NCCL_TESTS_DIR}/build/${BINARY[$COLLECTIVE]}"
     CNAME_LOWER=$(echo "$COLLECTIVE" | tr '[:upper:]' '[:lower:]')
-    OUT="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}.json"
+    BASE="${RESULT_DIR}/nccl_${CNAME_LOWER}_${CONFIG_LABEL}_snellius"
 
     echo "=== ${COLLECTIVE} ${CONFIG_LABEL} ==="
-    srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
-        "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
-                 -n "${ITERS}" -w "${WARMUP}" -g 1 \
-                 -J "${OUT}"
-    echo "    -> ${OUT}"
+    for RUN_IDX in $(seq 1 ${NUM_RUNS}); do
+        OUT="${BASE}_run${RUN_IDX}.json"
+        srun --mpi=pmix --nodes="${NUM_NODES}" --ntasks="${NUM_GPUS}" --ntasks-per-node="${GPUS_PER_NODE}" --gpus-per-node="${GPUS_PER_NODE}" \
+            "${BIN}" -b "${MIN_BYTES}" -e "${MAX_BYTES}" -f "${STEP_FACTOR}" \
+                     -n "${ITERS}" -w "${WARMUP}" -g 1 -a 1 \
+                     -J "${OUT}"
+    done
+    echo "    -> ${BASE}_run{1..${NUM_RUNS}}.json"
 done
 
 echo "Done. Results in ${RESULT_DIR}/"

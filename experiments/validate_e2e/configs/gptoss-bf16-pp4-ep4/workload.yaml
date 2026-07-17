@@ -1,0 +1,9 @@
+from: gptoss-20b
+config:
+  pipeline-model-parallel-size: 4
+  expert-model-parallel-size: 4
+  num-layers-per-virtual-pipeline-stage: 3
+  bf16: true
+  fp16: false
+  seq-length: 8192
+

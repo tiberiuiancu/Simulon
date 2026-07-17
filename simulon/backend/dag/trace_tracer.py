@@ -13,6 +13,7 @@ from simulon.backend.dag.trace_parser import TraceFileParser
 from simulon.backend.dag.tracer import DAGTracer, DAGTracerConfig
 from simulon.collective import CCLDecomposer
 from simulon.config.dc import DatacenterConfig
+from simulon.config.resolve import resolve_gpu_spec
 from simulon.config.workload import MegatronWorkload
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class ParallelConfig:
     etp: int
     edp: int
     num_gpus: int
+    overlap_p2p_comm: bool = True
 
     @classmethod
     def from_workload(cls, workload: MegatronWorkload) -> ParallelConfig:
@@ -85,7 +87,21 @@ class ParallelConfig:
             )
         edp = num_gpus // expert_model_size
 
-        return cls(tp=tp, cp=cp, ep=ep, dp=dp, pp=pp, num_gpus=num_gpus, etp=etp, edp=edp)
+        overlap_p2p_comm = cfg.get("overlap-p2p-comm", True)
+        if isinstance(overlap_p2p_comm, str):
+            overlap_p2p_comm = overlap_p2p_comm.lower() in ("true", "1", "yes")
+
+        return cls(
+            tp=tp,
+            cp=cp,
+            ep=ep,
+            dp=dp,
+            pp=pp,
+            num_gpus=num_gpus,
+            etp=etp,
+            edp=edp,
+            overlap_p2p_comm=overlap_p2p_comm,
+        )
 
     @property
     def world_size(self) -> int:
@@ -253,9 +269,13 @@ class _PendingPPTransfer:
 
 def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload) -> Path:
     """Resolve the directory that contains per-rank trace files."""
-    traces_dir = datacenter.datacenter.traces_dir if datacenter and datacenter.datacenter else None
-    if traces_dir is not None:
-        return Path(traces_dir)
+    import os
+
+    env_traces_dir = os.environ.get("SIMULON_TRACES_DIR")
+    if env_traces_dir:
+        return Path(env_traces_dir)
+    if workload.traces_dir is not None:
+        return Path(workload.traces_dir)
     from simulon.config.resolve import resolve_gpu_spec, workload_hash
 
     gpu_spec = resolve_gpu_spec(datacenter)
@@ -265,7 +285,7 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
     if not p.exists():
         raise ValueError(
             f"Traces not found at {p}. "
-            "Either set traces_dir in datacenter.datacenter or ensure traces exist "
+            "Either set traces_dir in workload or ensure traces exist "
             "in the GPU-specific hashed path."
         )
     return p
@@ -484,6 +504,7 @@ def _add_non_pp_collective(
     slot_node_ids: list,
     tracer_cfg: DAGTracerConfig,
     _collective_registry: dict,
+    last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode] | None = None,
 ) -> None:
     collective_type = str(event.metadata.get("collective_type", ""))
     group_ranks_raw = event.metadata.get("group_ranks", [])
@@ -529,6 +550,27 @@ def _add_non_pp_collective(
         dag.add_edge(
             DAGEdge(src_node_id=last_node_by_rank[rank].node_id, dst_node_id=collective_id)
         )
+
+    if rank in (last_async_collective_by_rank or {}):
+        dag.add_edge(
+            DAGEdge(
+                src_node_id=last_async_collective_by_rank[rank].node_id, dst_node_id=collective_id
+            )
+        )
+
+    async_op = bool(event.metadata.get("async_op", False))
+    if async_op and tracer_cfg.overlap_async_collectives:
+        # Async collectives launch on a separate CUDA stream and don't block
+        # subsequent compute on this rank. Keep the predecessor edge (collective
+        # waits for prior work) but don't make this collective the new "last
+        # node" — the next compute node will chain from the previous one instead.
+        # Track it separately so the next collective still waits for this one.
+        if last_async_collective_by_rank is not None:
+            last_async_collective_by_rank[rank] = collective
+        return
+
+    if last_async_collective_by_rank is not None:
+        last_async_collective_by_rank.pop(rank, None)
     last_node_by_rank[rank] = collective
     slot_node_ids.append(collective_id)
 
@@ -585,8 +627,10 @@ def _handle_event_gap(
     pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
+    last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode] | None = None,
+    flops_multiplier: float = 1.0,
 ) -> None:
-    duration_ms = next_event.timestamp_ms - event.timestamp_ms
+    duration_ms = (next_event.timestamp_ms - event.timestamp_ms) / flops_multiplier
     if duration_ms <= 0:
         return
     if event.type == "collective":
@@ -626,6 +670,7 @@ def _handle_event_gap(
                 slot_node_ids,
                 tracer_cfg,
                 _collective_registry,
+                last_async_collective_by_rank,
             )
             _add_compute_node(
                 dag,
@@ -669,6 +714,8 @@ def _add_trace_to_dag(
     pending_pp_transfers: list,
     last_node_by_rank: dict[int, CollectiveNode | ComputeNode],
     _collective_registry: dict,
+    last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode],
+    flops_multiplier: float = 1.0,
 ) -> None:
     events = sorted(trace.events, key=lambda e: e.timestamp_ms)
     active_microbatch_id: list = [-1]
@@ -714,6 +761,8 @@ def _add_trace_to_dag(
                 pending_pp_transfers,
                 last_node_by_rank,
                 _collective_registry,
+                last_async_collective_by_rank,
+                flops_multiplier,
             )
 
 
@@ -731,6 +780,18 @@ def _should_skip_pp_pair(src_stage: int, dst_stage: int, direction: str) -> bool
     )
 
 
+def _compute_next_slot_by_key(slot_first_timestamp: dict) -> dict:
+    keys_by_rank: dict[int, list] = {}
+    for key in slot_first_timestamp:
+        keys_by_rank.setdefault(key[0], []).append(key)
+    next_slot: dict = {}
+    for rank_keys in keys_by_rank.values():
+        rank_keys.sort(key=lambda k: slot_first_timestamp[k])
+        for i in range(len(rank_keys) - 1):
+            next_slot[rank_keys[i]] = rank_keys[i + 1]
+    return next_slot
+
+
 def _create_pp_send(
     src: int,
     dst: int,
@@ -740,6 +801,10 @@ def _create_pp_send(
     node_id: list,
     flow_id: list,
     dag: ExecutionDAG,
+    slot_entry_node: dict,
+    next_slot_by_key: dict | None,
+    sync_send: bool,
+    dst_prev_node: int | None = None,
 ) -> None:
     pp_send = CommNode(
         node_id=node_id[0],
@@ -754,6 +819,20 @@ def _create_pp_send(
     dag.add_comm_node(pp_send)
     dag.add_edge(DAGEdge(src_node_id=src_node, dst_node_id=pp_send.node_id))
     dag.add_edge(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=dst_node))
+    if sync_send and next_slot_by_key:
+        src_key = (src, record.microbatch_id, record.direction)
+        next_key = next_slot_by_key.get(src_key)
+        if next_key:
+            next_node = slot_entry_node.get(next_key)
+            if next_node is not None:
+                dag.add_edge(DAGEdge(src_node_id=pp_send.node_id, dst_node_id=next_node))
+    # In synchronous P2P mode, the destination rank must finish its current
+    # compute before it can post the recv. Without this edge the PP_Send
+    # (which represents the combined send+recv) can be scheduled concurrently
+    # with compute on the destination rank, which is physically impossible
+    # when batch_p2p_comm=True (the GPU is blocked on the recv call).
+    if sync_send and dst_prev_node is not None:
+        dag.add_edge(DAGEdge(src_node_id=dst_prev_node, dst_node_id=pp_send.node_id))
     node_id[0] += 1
     flow_id[0] += 1
 
@@ -782,7 +861,12 @@ def _wire_pp_transfers(
     slot_last_node: dict,
     node_id: list,
     flow_id: list,
+    next_slot_by_key: dict | None,
+    sync_send: bool,
 ) -> tuple[int, int]:
+    prev_slot_by_key: dict = {}
+    if sync_send and next_slot_by_key:
+        prev_slot_by_key = {v: k for k, v in next_slot_by_key.items()}
     seen: set[tuple[int, int, int, str]] = set()
     with log_progress("  wiring PP transfers", len(pending), logger) as advance:
         for record in pending:
@@ -812,7 +896,27 @@ def _wire_pp_transfers(
                     continue
                 if _should_skip_pp_pair(src_stage, dst_stage, record.direction):
                     continue
-                _create_pp_send(src, dst, record, src_node, dst_node, node_id, flow_id, dag)
+                dst_prev_node: int | None = None
+                if sync_send and prev_slot_by_key:
+                    dst_key = (dst, record.microbatch_id, record.direction)
+                    if dst_node is not None and dst_key in slot_entry_node:
+                        prev_key = prev_slot_by_key.get(dst_key)
+                        if prev_key is not None:
+                            dst_prev_node = slot_last_node.get(prev_key)
+                _create_pp_send(
+                    src,
+                    dst,
+                    record,
+                    src_node,
+                    dst_node,
+                    node_id,
+                    flow_id,
+                    dag,
+                    slot_entry_node,
+                    next_slot_by_key,
+                    sync_send,
+                    dst_prev_node,
+                )
             advance()
     return node_id[0], flow_id[0]
 
@@ -867,6 +971,7 @@ class MegatronDagTracer(DAGTracer):
         _make_collective_groups(config)
         traces_dir = _resolve_traces_dir(datacenter, workload)
         activation_bytes = _compute_activation_bytes(workload)
+        flops_multiplier = resolve_gpu_spec(datacenter).flops_multiplier
 
         # Validate first and last stage traces exist
         if not _stage_has_exact_trace(0, traces_dir, config):
@@ -888,6 +993,7 @@ class MegatronDagTracer(DAGTracer):
         slot_last_timestamp: dict = {}
         pending_pp_transfers: list = []
         last_node_by_rank: dict[int, CollectiveNode | ComputeNode] = {}
+        last_async_collective_by_rank: dict[int, CollectiveNode | ComputeNode] = {}
 
         node_id = [0]
         flow_id = [0]
@@ -926,6 +1032,8 @@ class MegatronDagTracer(DAGTracer):
                     pending_pp_transfers,
                     last_node_by_rank,
                     _collective_registry,
+                    last_async_collective_by_rank,
+                    flops_multiplier,
                 )
                 advance()
 
@@ -935,8 +1043,17 @@ class MegatronDagTracer(DAGTracer):
             dag.co2eq_kg = total_co2eq_kg
 
         _wire_slot_edges(dag, slot_nodes)
+        next_slot_by_key = _compute_next_slot_by_key(slot_first_timestamp)
         node_id[0], flow_id[0] = _wire_pp_transfers(
-            dag, pending_pp_transfers, config, slot_entry_node, slot_last_node, node_id, flow_id
+            dag,
+            pending_pp_transfers,
+            config,
+            slot_entry_node,
+            slot_last_node,
+            node_id,
+            flow_id,
+            next_slot_by_key=next_slot_by_key,
+            sync_send=not config.overlap_p2p_comm,
         )
         _wire_cross_slot_edges(dag, slot_first_timestamp, slot_last_node, slot_entry_node)
         _wire_bwd_to_step(dag, slot_last_node, slot_entry_node, config)

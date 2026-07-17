@@ -60,7 +60,6 @@ class DatacenterCoolingSpec(BaseModel):
 class DatacenterMeta(BaseModel):
     name: str | None = None
     profiles_dir: str | None = None
-    traces_dir: str | None = None
     pue: float = 1.0
     electricity_cost_per_kwh: float | None = None
     datacenter_lifetime_years: float | None = None
@@ -119,6 +118,7 @@ class NodeSpec(BaseModel):
     scale_up: ScaleUpSpec | None = None
     scale_out: ScaleOutSpec | None = None
     nccl: NcclProfile | None = None
+    cost: CostField | None = None
 
     @model_validator(mode="after")
     def set_display_name_default(self) -> NodeSpec:

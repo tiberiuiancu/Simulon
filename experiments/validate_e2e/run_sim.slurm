@@ -1,0 +1,76 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --time=4:00:00
+#SBATCH --nodes=1
+#SBATCH --gpus-per-node=1
+#SBATCH --job-name=validate-e2e-sim
+#SBATCH --output=validate-e2e-sim-%x-%j.out
+#SBATCH --error=validate-e2e-sim-%x-%j.err
+
+set -uo pipefail
+
+INPUT_PATH="${1:-}"
+if [ -z "$INPUT_PATH" ]; then
+    echo "Usage: sbatch $0 <relative/path/to/scenario.yaml>"
+    exit 1
+fi
+
+if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    REPO_ROOT="$SLURM_SUBMIT_DIR"
+else
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
+cd "$REPO_ROOT"
+
+export PYTHONUNBUFFERED=1
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+
+model="$(basename "$(dirname "$INPUT_PATH")")"
+run_name="validate-e2e-$model"
+trace_dir="templates/gpu/h100/traces/validate-e2e-$model"
+
+echo "============================================================"
+echo "Config: $model"
+echo "Scenario: $INPUT_PATH"
+echo "Trace dir: $trace_dir"
+echo "Run name: $run_name"
+echo "============================================================"
+
+if uv run python3 -c "
+import os, sys, wandb
+api = wandb.Api()
+entity = os.environ.get('WANDB_ENTITY')
+project = os.environ.get('WANDB_PROJECT', 'simulon')
+path = f'{entity}/{project}' if entity else project
+runs = api.runs(path, filters={'state': 'finished', 'display_name': '${run_name}'})
+for r in runs:
+    if r.display_name == '${run_name}':
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
+    echo "[skip] $model: already tracked in W&B as ${run_name}"
+    exit 0
+fi
+
+if ls "$trace_dir"/trace_rank_*.json >/dev/null 2>&1; then
+    echo "[trace] $model: reusing existing traces from $trace_dir"
+else
+    echo "[trace] $model"
+    if SIMULON_TRACES_DIR="$trace_dir" bash "$REPO_ROOT/scripts/apptainer-trace.sh" "$INPUT_PATH"; then
+        echo "[trace] $model: OK"
+    else
+        echo "[trace] $model: FAILED (exit code $?)" >&2
+        exit 1
+    fi
+fi
+
+echo "[simulate] $model"
+if SIMULON_TRACES_DIR="$trace_dir" WANDB_RUN_NAME="$run_name" uv run simulon simulate \
+    --network-simulation collective \
+    --energy \
+    "$INPUT_PATH"; then
+    echo "[simulate] $model: OK"
+else
+    echo "[simulate] $model: FAILED (exit code $?)" >&2
+    exit 1
+fi

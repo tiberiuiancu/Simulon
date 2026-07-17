@@ -1,0 +1,55 @@
+name: nvl72-h100
+gpus_per_node: 64
+gpu: h100
+nics_per_node: 64
+scale_up:
+  switch:
+    port_speed: 3600Gbps
+    latency: 0.000025ms
+scale_out:
+  nic:
+    speed: 400Gbps
+    latency: 0.005ms
+  topology:
+    type: fat_tree
+    params:
+      k: 8
+nccl:
+  name: nvl72-h100
+  gpus_per_node: 72
+  AllReduce:
+    ring:
+      - {size_bytes:    536870912, bus_bw_GBps: 586.06}
+      - {size_bytes:   1073741824, bus_bw_GBps: 681.17}
+      - {size_bytes:   2147483648, bus_bw_GBps: 787.95}
+      - {size_bytes:   4294967296, bus_bw_GBps: 839.16}
+      - {size_bytes:   8589934592, bus_bw_GBps: 866.36}
+      - {size_bytes:  17179869184, bus_bw_GBps: 890.32}
+      - {size_bytes:  34359738368, bus_bw_GBps: 906.94}
+  AllGather:
+    ring:
+      - {size_bytes:    536870912, bus_bw_GBps: 586.06}
+      - {size_bytes:   1073741824, bus_bw_GBps: 681.17}
+      - {size_bytes:   2147483648, bus_bw_GBps: 787.95}
+      - {size_bytes:   4294967296, bus_bw_GBps: 839.16}
+      - {size_bytes:   8589934592, bus_bw_GBps: 866.36}
+      - {size_bytes:  17179869184, bus_bw_GBps: 890.32}
+      - {size_bytes:  34359738368, bus_bw_GBps: 906.94}
+  ReduceScatter:
+    ring:
+      - {size_bytes:    536870912, bus_bw_GBps: 586.06}
+      - {size_bytes:   1073741824, bus_bw_GBps: 681.17}
+      - {size_bytes:   2147483648, bus_bw_GBps: 787.95}
+      - {size_bytes:   4294967296, bus_bw_GBps: 839.16}
+      - {size_bytes:   8589934592, bus_bw_GBps: 866.36}
+      - {size_bytes:  17179869184, bus_bw_GBps: 890.32}
+      - {size_bytes:  34359738368, bus_bw_GBps: 906.94}
+  AllToAll:
+    ring:
+      - {size_bytes:    536870912, bus_bw_GBps: 586.06}
+      - {size_bytes:   1073741824, bus_bw_GBps: 681.17}
+      - {size_bytes:   2147483648, bus_bw_GBps: 787.95}
+      - {size_bytes:   4294967296, bus_bw_GBps: 839.16}
+      - {size_bytes:   8589934592, bus_bw_GBps: 866.36}
+      - {size_bytes:  17179869184, bus_bw_GBps: 890.32}
+      - {size_bytes:  34359738368, bus_bw_GBps: 906.94}

@@ -37,7 +37,7 @@ CollectiveConfig = Annotated[NcclConfig | RcclConfig, Field(discriminator="libra
 
 class ScenarioConfig(BaseModel):
     datacenter: Path | DatacenterConfig
-    workload: Path | WorkloadConfig
+    workload: Path | dict | WorkloadConfig
     collective: CollectiveConfig = Field(default_factory=NcclConfig)
 
     @model_validator(mode="after")
@@ -48,7 +48,7 @@ class ScenarioConfig(BaseModel):
             self.datacenter = resolve_datacenter(self.datacenter)
             if self.datacenter.node and self.datacenter.node.from_:
                 self.datacenter.node = resolve_node_spec(self.datacenter)
-        if isinstance(self.workload, Path):
+        if isinstance(self.workload, Path | dict):
             from simulon.config.resolve import resolve_workload
 
             self.workload = resolve_workload(self.workload)
