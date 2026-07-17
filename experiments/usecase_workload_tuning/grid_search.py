@@ -92,12 +92,11 @@ def _write_scenario(path: Path) -> None:
     name = path.name
     trace_name = name.replace("_", "-")
     scenario = {
-        "datacenter": {
-            "num_nodes": 4,
-            "node": "templates/node/snellius-h100-4g.yaml",
-            "datacenter": {"traces_dir": f"templates/gpu/h100/traces/workload-tuning-{trace_name}"},
+        "datacenter": {"num_nodes": 4, "node": "templates/node/snellius-h100-4g.yaml"},
+        "workload": {
+            "from": str((path / "workload.yaml").relative_to(_REPO_ROOT)),
+            "traces_dir": f"templates/gpu/h100/traces/workload-tuning-{trace_name}",
         },
-        "workload": str((path / "workload.yaml").relative_to(_REPO_ROOT)),
     }
     with open(path / "scenario.yaml", "w") as f:
         yaml.dump(scenario, f, default_flow_style=False, sort_keys=False)
@@ -108,9 +107,8 @@ def _scenario_trace_dir(path: Path) -> Path | None:
 
     try:
         sc = ScenarioConfig.from_yaml(str(path / "scenario.yaml"))
-        traces_dir = sc.datacenter.datacenter.traces_dir if sc.datacenter.datacenter else None
-        if traces_dir:
-            return Path(str(traces_dir))
+        if sc.workload.traces_dir:
+            return Path(str(sc.workload.traces_dir))
     except Exception:
         pass
     return None

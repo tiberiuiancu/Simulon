@@ -39,15 +39,17 @@ def _make_trace(
     }
 
 
-def _make_datacenter(num_gpus: int = 2, traces_dir: str | None = None) -> DatacenterConfig:
+def _make_datacenter(num_gpus: int = 2) -> DatacenterConfig:
     return DatacenterConfig(
-        datacenter=DatacenterMeta(name="test", traces_dir=traces_dir),
+        datacenter=DatacenterMeta(name="test"),
         num_nodes=1,
         node=NodeSpec(gpus_per_node=num_gpus, gpu=GPUSpec(name="H100", memory_capacity_gb=80.0)),
     )
 
 
-def _make_workload(tp: int = 1, pp: int = 1, num_gpus: int = 2) -> MegatronWorkload:
+def _make_workload(
+    tp: int = 1, pp: int = 1, num_gpus: int = 2, traces_dir: str | None = None
+) -> MegatronWorkload:
     return MegatronWorkload(
         framework="megatron",
         config={
@@ -62,6 +64,7 @@ def _make_workload(tp: int = 1, pp: int = 1, num_gpus: int = 2) -> MegatronWorkl
             "global-batch-size": num_gpus,
             "num_gpus": num_gpus,
         },
+        traces_dir=traces_dir,
     )
 
 
@@ -87,8 +90,8 @@ def test_trace_builds_dag_with_compute_and_collective_nodes():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc, decompose=False)
         assert len(dag.compute_nodes) > 0
         assert len(dag.collective_nodes) > 0
@@ -108,8 +111,8 @@ def test_compute_nodes_have_duration_ms():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         for cn in dag.compute_nodes:
             assert cn.duration_ms is not None
@@ -130,8 +133,8 @@ def test_comm_nodes_have_correct_bytes_and_type():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         ar_nodes = [n for n in dag.comm_nodes if n.collective_type == "AllReduce"]
         assert len(ar_nodes) > 0
@@ -172,8 +175,8 @@ def test_dag_edges_wired_sequentially():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc, decompose=False)
         for rank in {n.gpu_rank for n in dag.compute_nodes}:
             rank_cnodes = sorted(
@@ -202,8 +205,8 @@ def test_trace_with_multiple_pp_stages():
         _write_trace(
             _make_trace(events1, rank=1, world_size=2, pipeline_stage=1), traces_dir, rank=1
         )
-        workload = _make_workload(tp=1, pp=2, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=1, pp=2, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         stages = {n.pipeline_stage for n in dag.compute_nodes}
         assert 0 in stages
@@ -224,8 +227,8 @@ def test_trace_skips_pp_send_events():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=1, pp=1, num_gpus=1)
-        dc = _make_datacenter(num_gpus=1, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=1, pp=1, num_gpus=1, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=1)
         dag = _run_tracer(workload, dc)
         pp_send_nodes = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
         assert len(pp_send_nodes) == 0
@@ -254,8 +257,8 @@ def test_slot_markers_assign_microbatch_and_phase():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc, decompose=False)
         for rank in {n.gpu_rank for n in dag.compute_nodes}:
             rank_cnodes = sorted(
@@ -292,8 +295,8 @@ def test_missing_middle_trace_reused():
         _write_trace(
             _make_trace(events, rank=0, world_size=4, pipeline_stage=3), traces_dir, rank=3
         )
-        workload = _make_workload(tp=1, pp=4, num_gpus=4)
-        dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=1, pp=4, num_gpus=4, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=4)
         dag = _run_tracer(workload, dc)
         stages = {n.pipeline_stage for n in dag.compute_nodes}
         assert stages == {0, 1, 2, 3}, f"Expected all 4 stages, got {stages}"
@@ -349,8 +352,9 @@ def test_pp_send_has_activation_bytes():
                 "global-batch-size": 2,
                 "num_gpus": 2,
             },
+            traces_dir=str(traces_dir),
         )
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
         assert len(pp_sends) > 0
@@ -372,8 +376,8 @@ def test_missing_first_trace_raises():
         _write_trace(
             _make_trace(events, rank=0, world_size=2, pipeline_stage=1), traces_dir, rank=1
         )
-        workload = _make_workload(tp=1, pp=2, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=1, pp=2, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         with pytest.raises(ValueError, match="First PP stage"):
             _run_tracer(workload, dc)
 
@@ -392,8 +396,8 @@ def test_missing_last_trace_raises():
         _write_trace(
             _make_trace(events, rank=0, world_size=2, pipeline_stage=0), traces_dir, rank=0
         )
-        workload = _make_workload(tp=1, pp=2, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=1, pp=2, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         with pytest.raises(ValueError, match="Last PP stage"):
             _run_tracer(workload, dc)
 
@@ -485,8 +489,9 @@ def test_derived_trace_from_same_stage():
                 "global-batch-size": 4,
                 "num_gpus": 4,
             },
+            traces_dir=str(traces_dir),
         )
-        dc = _make_datacenter(num_gpus=4, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=4)
         dag = _run_tracer(workload, dc)
         stages = {n.pipeline_stage for n in dag.compute_nodes}
         assert stages == {0, 1, 2, 3}
@@ -511,8 +516,8 @@ def test_collective_node_comes_before_compute_after_it():
         traces_dir = Path(tmp_dir)
         trace = _make_trace(events, rank=0, world_size=2, pipeline_stage=0)
         _write_trace(trace, traces_dir, rank=0)
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc, decompose=False)
 
         rank0_compute = sorted(
@@ -613,8 +618,8 @@ def test_multi_rank_collective_dedup():
         _write_trace(
             _make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1
         )
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
 
         expected_result, _ = decompose_collective(
@@ -650,8 +655,8 @@ def test_collective_decomposition_edge_rewiring():
         _write_trace(
             _make_trace(events, rank=1, world_size=2, pipeline_stage=0), traces_dir, rank=1
         )
-        workload = _make_workload(tp=2, pp=1, num_gpus=2)
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        workload = _make_workload(tp=2, pp=1, num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
 
         rank0_compute = sorted(
@@ -740,8 +745,9 @@ def test_sync_pp_send_when_overlap_disabled():
                 "num_gpus": 2,
                 "overlap-p2p-comm": False,
             },
+            traces_dir=str(traces_dir),
         )
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
         assert len(pp_sends) > 0, "Expected at least one PP_Send"
@@ -824,8 +830,9 @@ def test_async_pp_send_when_overlap_enabled():
                 "num_gpus": 2,
                 "overlap-p2p-comm": True,
             },
+            traces_dir=str(traces_dir),
         )
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
         assert len(pp_sends) > 0, "Expected at least one PP_Send"
@@ -896,8 +903,9 @@ def test_single_slot_no_sync_edge():
                 "num_gpus": 2,
                 "overlap-p2p-comm": False,
             },
+            traces_dir=str(traces_dir),
         )
-        dc = _make_datacenter(num_gpus=2, traces_dir=str(traces_dir))
+        dc = _make_datacenter(num_gpus=2)
         dag = _run_tracer(workload, dc)
         pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
         assert len(pp_sends) > 0, "Expected at least one PP_Send"

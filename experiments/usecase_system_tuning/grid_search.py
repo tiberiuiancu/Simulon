@@ -146,10 +146,12 @@ def _write_scenario(workload_path: Path, node_size: int, link_bw: int) -> Path:
                 "electricity_cost_per_kwh": 0.15,
                 "datacenter_lifetime_years": 5,
                 "idle_fraction": 0.2,
-                "traces_dir": f"templates/gpu/h100/traces/system-tuning-{model_name}-{workload_name}",
             },
         },
-        "workload": str((workload_path / "workload.yaml").relative_to(_REPO_ROOT)),
+        "workload": {
+            "from": str((workload_path / "workload.yaml").relative_to(_REPO_ROOT)),
+            "traces_dir": f"templates/gpu/h100/traces/system-tuning-{model_name}-{workload_name}",
+        },
     }
     scenario_path = workload_path / f"node{node_size}_bw{link_bw}.yaml"
     with open(scenario_path, "w") as f:
@@ -163,9 +165,8 @@ def _scenario_trace_dir(workload_path: Path) -> Path | None:
     for scenario_path in sorted(workload_path.glob("node*_bw*.yaml")):
         try:
             sc = ScenarioConfig.from_yaml(str(scenario_path))
-            traces_dir = sc.datacenter.datacenter.traces_dir if sc.datacenter.datacenter else None
-            if traces_dir:
-                return Path(str(traces_dir))
+            if sc.workload.traces_dir:
+                return Path(str(sc.workload.traces_dir))
         except Exception:
             continue
     return None

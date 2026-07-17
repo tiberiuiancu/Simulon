@@ -1,6 +1,6 @@
 datacenter:
   num_nodes: 4
   node: templates/node/snellius-h100-4g.yaml
-  datacenter:
-    traces_dir: templates/gpu/h100/traces/workload-tuning-tp2-pp4-mbs32-vpp4
-workload: experiments/usecase_workload_tuning/scenarios/tp2_pp4_mbs32_vpp4/workload.yaml
+workload:
+  from: experiments/usecase_workload_tuning/scenarios/tp2_pp4_mbs32_vpp4/workload.yaml
+  traces_dir: templates/gpu/h100/traces/workload-tuning-tp2-pp4-mbs32-vpp4

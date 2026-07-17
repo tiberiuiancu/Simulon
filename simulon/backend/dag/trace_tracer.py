@@ -274,9 +274,8 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
     env_traces_dir = os.environ.get("SIMULON_TRACES_DIR")
     if env_traces_dir:
         return Path(env_traces_dir)
-    traces_dir = datacenter.datacenter.traces_dir if datacenter and datacenter.datacenter else None
-    if traces_dir is not None:
-        return Path(traces_dir)
+    if workload.traces_dir is not None:
+        return Path(workload.traces_dir)
     from simulon.config.resolve import resolve_gpu_spec, workload_hash
 
     gpu_spec = resolve_gpu_spec(datacenter)
@@ -286,7 +285,7 @@ def _resolve_traces_dir(datacenter: DatacenterConfig, workload: MegatronWorkload
     if not p.exists():
         raise ValueError(
             f"Traces not found at {p}. "
-            "Either set traces_dir in datacenter.datacenter or ensure traces exist "
+            "Either set traces_dir in workload or ensure traces exist "
             "in the GPU-specific hashed path."
         )
     return p

@@ -149,7 +149,7 @@ def _scan_trace_statuses(names: list[str]) -> dict[str, str]:
         try:
             with open(scenario_path) as fh:
                 sc = yaml.safe_load(fh)
-            trace_dir_rel = sc.get("datacenter", {}).get("datacenter", {}).get("traces_dir")
+            trace_dir_rel = sc.get("workload", {}).get("traces_dir")
             if not trace_dir_rel:
                 continue
             trace_dir = Path(trace_dir_rel)

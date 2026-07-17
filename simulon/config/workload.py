@@ -31,6 +31,7 @@ class MegatronWorkload(BaseModel):
         description="Fraction of All-to-All communication time overlapped with compute. "
         "All-to-All durations are multiplied by (1 - ratio).",
     )
+    traces_dir: str | None = None
 
     @field_validator("config", mode="before")
     @classmethod

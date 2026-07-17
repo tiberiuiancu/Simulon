@@ -214,12 +214,11 @@ def generate_trace(
             output_dir = Path(env_traces_dir)
         elif is_scenario:
             assert sc is not None
-            dc = sc.datacenter
-            assert not isinstance(dc, Path)
-            traces_dir = dc.datacenter.traces_dir if dc.datacenter else None
-            if traces_dir:
-                output_dir = Path(str(traces_dir))
+            if workload.traces_dir:
+                output_dir = Path(str(workload.traces_dir))
             else:
+                dc = sc.datacenter
+                assert not isinstance(dc, Path)
                 try:
                     gpu_spec = resolve_gpu_spec(dc)
                     gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
@@ -385,7 +384,7 @@ def sync_traces(
     with ``git add -f``. Local data always wins, so an existing tracked trace folder is
     overwritten.
 
-    The trace directory is read from ``datacenter.datacenter.traces_dir`` if set,
+    The trace directory is read from ``workload.traces_dir`` if set,
     otherwise it falls back to ``templates/gpu/<gpu>/traces/<workload-hash>``.
 
     Use ``--default`` to sync all traces from ``experiments`` and ``examples``,
@@ -427,8 +426,8 @@ def sync_traces(
             if not isinstance(workload, MegatronWorkload):
                 continue
 
-            if sc.datacenter.datacenter and sc.datacenter.datacenter.traces_dir:
-                trace_dir = Path(str(sc.datacenter.datacenter.traces_dir))
+            if workload.traces_dir:
+                trace_dir = Path(str(workload.traces_dir))
             else:
                 try:
                     gpu_spec = resolve_gpu_spec(sc.datacenter)

@@ -1,8 +1,6 @@
 datacenter:
   num_nodes: 8
   node: dgx-h100
-  traces_dir: templates/gpu/h100/traces/validate-bridge-gptoss-120b
-
 workload:
   framework: megatron
   config:
@@ -24,8 +22,8 @@ workload:
     group-query-attention: true
     kv-channels: 64
     attention-softmax-in-fp32: false
-    window-size: "127,0"
-    window-attn-skip-freq: "[1,0]*18"
+    window-size: 127,0
+    window-attn-skip-freq: '[1,0]*18'
     num-experts: 128
     moe-router-topk: 4
     moe-token-dispatcher-type: alltoall
@@ -50,4 +48,5 @@ workload:
     num-gpus: 64
     distributed-optimizer: true
     mock-data: true
-    split: "1000,0,0"
+    split: 1000,0,0
+  traces_dir: templates/gpu/h100/traces/validate-bridge-gptoss-120b
