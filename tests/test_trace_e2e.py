@@ -35,9 +35,9 @@ def _make_trace_file(
     path.write_text(json.dumps(trace))
 
 
-def _make_datacenter(traces_dir: str | None = None) -> DatacenterConfig:
+def _make_datacenter() -> DatacenterConfig:
     return DatacenterConfig(
-        datacenter=DatacenterMeta(name="test_cluster", traces_dir=traces_dir),
+        datacenter=DatacenterMeta(name="test_cluster"),
         num_nodes=2,
         node=NodeSpec(
             gpus_per_node=2,
@@ -51,7 +51,7 @@ def _make_datacenter(traces_dir: str | None = None) -> DatacenterConfig:
     )
 
 
-def _make_workload() -> MegatronWorkload:
+def _make_workload(traces_dir: str | None = None) -> MegatronWorkload:
     return MegatronWorkload(
         framework="megatron",
         config={
@@ -66,6 +66,7 @@ def _make_workload() -> MegatronWorkload:
             "global-batch-size": 4,
             "num_gpus": 4,
         },
+        traces_dir=traces_dir,
     )
 
 
@@ -124,8 +125,8 @@ def test_e2e_trace_driven_simulation():
             ],
         )
 
-        dc = _make_datacenter(traces_dir=str(tmp_path))
-        wl = _make_workload()
+        dc = _make_datacenter()
+        wl = _make_workload(traces_dir=str(tmp_path))
         scenario = ScenarioConfig(
             datacenter=dc,
             workload=wl,

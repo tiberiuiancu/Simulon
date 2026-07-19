@@ -6,6 +6,8 @@ from pathlib import Path
 import typer
 import yaml
 
+os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
+
 from simulon.cli.utils import _ensure_c4_dataset
 
 trace_app = typer.Typer(help="Trace generation commands.")
@@ -13,6 +15,119 @@ trace_app = typer.Typer(help="Trace generation commands.")
 _MEGATRON_ENTRYPOINT = (
     Path(__file__).parents[2] / "vendor" / "Megatron-LM-traced" / "pretrain_gpt.py"
 )
+
+
+_DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
+    "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
+    "c4": {
+        "--mock-data": False,
+        "--data-path": "./data/c4_en_llama3",
+        "--tokenizer-type": "HuggingFaceTokenizer",
+        "--tokenizer-model": "NousResearch/Meta-Llama-3-8B",
+        "--vocab-size": 128256,
+        "--split": "1000,0,0",
+    },
+}
+
+_TRACE_DEFAULTS: dict[str, str | int | bool] = {
+    "--lr": 0.001,
+    "--min-lr": 0.0,
+    "--eval-interval": 1000000,
+    "--eval-iters": 0,
+    "--save-interval": 1000000,
+    "--log-interval": 1,
+    "--mock-data": True,
+    "--no-masked-softmax-fusion": True,
+    "--no-bias-swiglu-fusion": True,
+    "--tokenizer-type": "NullTokenizer",
+    "--vocab-size": 32000,
+}
+
+
+def _build_megatron_args(
+    workload,
+    *,
+    dataset: str | None = None,
+    mock_data: bool | None = None,
+    data_path: str | None = None,
+    tokenizer_type: str | None = None,
+    tokenizer_model: str | None = None,
+    vocab_file: str | None = None,
+    merge_file: str | None = None,
+    warmup: int = 3,
+) -> tuple[dict[str, str | int | bool], set[str]]:
+    derived_args: dict[str, str | int | bool]
+    explicitly_set: set[str] = set()
+
+    def _set_arg(flag: str, value: str | int | bool) -> None:
+        derived_args[flag] = value
+        explicitly_set.add(flag)
+
+    cfg = workload.config
+    derived_args = {}
+    for key in (
+        "tensor-model-parallel-size",
+        "pipeline-model-parallel-size",
+        "micro-batch-size",
+        "global-batch-size",
+        "seq-length",
+        "expert-model-parallel-size",
+        "num-layers",
+        "hidden-size",
+        "num-attention-heads",
+        "ffn-hidden-size",
+    ):
+        if key in cfg:
+            _set_arg(f"--{key}", cfg[key])
+    if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
+        _set_arg("--max-position-embeddings", derived_args["--seq-length"])
+    skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
+    for key, value in cfg.items():
+        flag = "--use-distributed-optimizer" if key == "distributed-optimizer" else f"--{key}"
+        if flag not in derived_args and key not in skip and value is not None:
+            if isinstance(value, bool):
+                _set_arg(flag, value)
+            else:
+                _set_arg(flag, value)
+
+    if dataset is not None:
+        if dataset in _DATASET_PRESETS:
+            for flag, value in _DATASET_PRESETS[dataset].items():
+                _set_arg(flag, value)
+        else:
+            _set_arg("--mock-data", False)
+            _set_arg("--data-path", dataset)
+    if mock_data is not None:
+        _set_arg("--mock-data", mock_data)
+    if data_path is not None:
+        _set_arg("--data-path", data_path)
+    if tokenizer_type is not None:
+        _set_arg("--tokenizer-type", tokenizer_type)
+    if tokenizer_model is not None:
+        _set_arg("--tokenizer-model", tokenizer_model)
+    if vocab_file is not None:
+        _set_arg("--vocab-file", vocab_file)
+    if merge_file is not None:
+        _set_arg("--merge-file", merge_file)
+
+    if dataset == "c4" or (data_path is not None and "c4" in data_path):
+        seq_len = derived_args.get("--seq-length", 8192)
+        _ensure_c4_dataset(
+            str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len)
+        )
+
+    for flag, value in _TRACE_DEFAULTS.items():
+        if flag not in explicitly_set:
+            derived_args[flag] = value
+    if "--train-iters" not in explicitly_set:
+        derived_args["--train-iters"] = warmup + 1
+    if "--trace-warmup-iters" not in explicitly_set:
+        derived_args["--trace-warmup-iters"] = warmup
+
+    if "--eval-global-batch-size" not in explicitly_set:
+        derived_args["--eval-global-batch-size"] = 27648
+
+    return derived_args, explicitly_set
 
 
 @trace_app.command("generate")
@@ -93,121 +208,47 @@ def generate_trace(
     if not isinstance(workload, MegatronWorkload):
         raise typer.BadParameter("Workload must be a Megatron workload")
 
-    # Determine GPU name and compute default trace path if no --output-dir
     if output_dir is None:
-        if is_scenario:
+        env_traces_dir = os.environ.get("SIMULON_TRACES_DIR")
+        if env_traces_dir:
+            output_dir = Path(env_traces_dir)
+        elif is_scenario:
             assert sc is not None
-            dc = sc.datacenter
-            assert not isinstance(dc, Path)
-            try:
-                gpu_spec = resolve_gpu_spec(dc)
-                gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
-            except Exception:
-                gpu_name = "default"
+            if workload.traces_dir:
+                output_dir = Path(str(workload.traces_dir))
+            else:
+                dc = sc.datacenter
+                assert not isinstance(dc, Path)
+                try:
+                    gpu_spec = resolve_gpu_spec(dc)
+                    gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+                except Exception:
+                    gpu_name = "default"
+                h = workload_hash(workload)
+                output_dir = Path("templates/gpu") / gpu_name / "traces" / h
         else:
             assert gpu is not None
             gpu_name = gpu.lower().replace(" ", "-")
+            h = workload_hash(workload)
+            output_dir = Path("templates/gpu") / gpu_name / "traces" / h
 
-        h = workload_hash(workload)
-        output_dir = Path("templates/gpu") / gpu_name / "traces" / h
-
-    derived_args: dict[str, str | int | bool]
-    explicitly_set: set[str] = set()
-
-    def _set_arg(flag: str, value: str | int | bool) -> None:
-        derived_args[flag] = value
-        explicitly_set.add(flag)
+    derived_args, explicitly_set = _build_megatron_args(
+        workload,
+        dataset=dataset,
+        mock_data=mock_data,
+        data_path=data_path,
+        tokenizer_type=tokenizer_type,
+        tokenizer_model=tokenizer_model,
+        vocab_file=vocab_file,
+        merge_file=merge_file,
+        warmup=warmup,
+    )
 
     cfg = workload.config
-    derived_args = {}
-    for key in (
-        "tensor-model-parallel-size",
-        "pipeline-model-parallel-size",
-        "micro-batch-size",
-        "global-batch-size",
-        "seq-length",
-        "expert-model-parallel-size",
-        "num-layers",
-        "hidden-size",
-        "num-attention-heads",
-        "ffn-hidden-size",
-    ):
-        if key in cfg:
-            _set_arg(f"--{key}", cfg[key])
-    if "--max-position-embeddings" not in derived_args and "--seq-length" in derived_args:
-        _set_arg("--max-position-embeddings", derived_args["--seq-length"])
-    skip = {"num_gpus", "num-gpus", "num_microbatches", "num-microbatches"}
-    for key, value in cfg.items():
-        flag = "--use-distributed-optimizer" if key == "distributed-optimizer" else f"--{key}"
-        if flag not in derived_args and key not in skip:
-            if isinstance(value, bool):
-                _set_arg(flag, value)
-            else:
-                _set_arg(flag, value)
-
     pp = int(cfg.get("pipeline-model-parallel-size", 1))
     tp = int(cfg.get("tensor-model-parallel-size", 1))
     ep = int(cfg.get("expert-model-parallel-size", 1))
     world_size = cfg.get("num_gpus", cfg.get("num-gpus"))
-
-    _DATASET_PRESETS: dict[str, dict[str, str | int | bool]] = {
-        "mock": {"--mock-data": True, "--tokenizer-type": "NullTokenizer", "--vocab-size": 32000},
-        "c4": {
-            "--mock-data": False,
-            "--data-path": "./data/c4_en_llama3",
-            "--tokenizer-type": "HuggingFaceTokenizer",
-            "--tokenizer-model": "NousResearch/Meta-Llama-3-8B",
-            "--vocab-size": 128256,
-            "--split": "1000,0,0",
-        },
-    }
-    if dataset is not None:
-        if dataset in _DATASET_PRESETS:
-            for flag, value in _DATASET_PRESETS[dataset].items():
-                _set_arg(flag, value)
-        else:
-            _set_arg("--mock-data", False)
-            _set_arg("--data-path", dataset)
-    if mock_data is not None:
-        _set_arg("--mock-data", mock_data)
-    if data_path is not None:
-        _set_arg("--data-path", data_path)
-    if tokenizer_type is not None:
-        _set_arg("--tokenizer-type", tokenizer_type)
-    if tokenizer_model is not None:
-        _set_arg("--tokenizer-model", tokenizer_model)
-    if vocab_file is not None:
-        _set_arg("--vocab-file", vocab_file)
-    if merge_file is not None:
-        _set_arg("--merge-file", merge_file)
-
-    if dataset == "c4" or (data_path is not None and "c4" in data_path):
-        seq_len = derived_args.get("--seq-length", 8192)
-        _ensure_c4_dataset(
-            str(derived_args.get("--data-path", "./data/c4_en_llama3")), seq_length=int(seq_len)
-        )
-
-    _TRACE_DEFAULTS = {
-        "--lr": 0.001,
-        "--min-lr": 0.0,
-        "--eval-interval": 1000000,
-        "--eval-iters": 0,
-        "--save-interval": 1000000,
-        "--log-interval": 1,
-        "--mock-data": True,
-        "--no-masked-softmax-fusion": True,
-        "--no-bias-swiglu-fusion": True,
-        "--tokenizer-type": "NullTokenizer",
-        "--vocab-size": 32000,
-    }
-    for flag, value in _TRACE_DEFAULTS.items():
-        if flag not in explicitly_set:
-            derived_args[flag] = value
-    if "--train-iters" not in explicitly_set:
-        derived_args["--train-iters"] = warmup + 1
-    if "--trace-warmup-iters" not in explicitly_set:
-        derived_args["--trace-warmup-iters"] = warmup
-    stages_to_trace = stages if stages is not None else list(range(pp))
 
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -222,6 +263,7 @@ def generate_trace(
         )
     )
     ranks_per_stage = world_size // pp if world_size and pp else tp
+    stages_to_trace = stages if stages is not None else list(range(pp))
 
     if all_ranks:
         ranks_to_trace = list(range(world_size))
@@ -257,7 +299,7 @@ def generate_trace(
         if world_size is not None:
             env["WORLD_SIZE"] = str(world_size)
         try:
-            subprocess.run(cmd, check=True, env=env)
+            subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
         except FileNotFoundError as exc:
             typer.echo(f"Error: could not run Megatron entry point: {exc}", err=True)
             raise typer.Exit(1) from exc
@@ -265,6 +307,24 @@ def generate_trace(
             typer.echo(
                 f"Error: Megatron exited with code {exc.returncode} for rank {rank}", err=True
             )
+            if exc.stdout:
+                typer.echo(exc.stdout, err=True)
+            if exc.stderr:
+                typer.echo(exc.stderr, err=True)
+            error_log = output_dir / ".error.log"
+            try:
+                with open(error_log, "w") as f:
+                    f.write(f"rank={rank}\n")
+                    f.write(f"returncode={exc.returncode}\n")
+                    f.write(f"cmd={' '.join(cmd)}\n")
+                    if exc.stdout:
+                        f.write("\n--- stdout ---\n")
+                        f.write(exc.stdout)
+                    if exc.stderr:
+                        f.write("\n--- stderr ---\n")
+                        f.write(exc.stderr)
+            except Exception:
+                pass
             raise typer.Exit(1) from exc
 
     if memory_snapshot is not None:
@@ -292,6 +352,181 @@ def generate_trace(
     typer.echo(f"\nTrace generation complete. {len(trace_files)} file(s) in {output_dir}:")
     for tf in trace_files:
         typer.echo(f"  {tf.name}")
+
+
+@trace_app.command("sync")
+def sync_traces(
+    folders: list[Path] = typer.Argument(
+        None, help="Folders to crawl for scenario.yaml files (ignored with --default)"
+    ),
+    default: bool = typer.Option(
+        False,
+        "--default",
+        help='Equivalent to --prune --commit "sync traces" --push experiments examples',
+    ),
+    commit: str | None = typer.Option(
+        None, "--commit", help="Commit message (also stages all changes)"
+    ),
+    push: bool = typer.Option(
+        False, "--push", help="Run git push after committing (ignored on failure)"
+    ),
+    prune: bool = typer.Option(
+        False,
+        "--prune",
+        help="Remove trace dirs under templates/gpu not referenced by any scenario",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print actions without running them"),
+):
+    """Stage/push trace folders referenced by scenario YAMLs.
+
+    For every scenario.yaml found under the supplied folders, if the workload is a
+    Megatron workload the command resolves the target trace directory and stages it
+    with ``git add -f``. Local data always wins, so an existing tracked trace folder is
+    overwritten.
+
+    The trace directory is read from ``workload.traces_dir`` if set,
+    otherwise it falls back to ``templates/gpu/<gpu>/traces/<workload-hash>``.
+
+    Use ``--default`` to sync all traces from ``experiments`` and ``examples``,
+    prune stale ones, commit, and push in one shot.
+    """
+    if default:
+        folders = [Path("experiments"), Path("examples")]
+        prune = True
+        if commit is None:
+            commit = "sync traces"
+        push = True
+
+    if not folders:
+        raise typer.BadParameter("Provide at least one folder, or use --default.")
+
+    import shutil
+
+    from simulon.config.resolve import resolve_gpu_spec, workload_hash
+    from simulon.config.scenario import ScenarioConfig
+    from simulon.config.workload import MegatronWorkload
+
+    referenced: set[Path] = set()
+    staged = 0
+    missing = 0
+
+    for folder in folders:
+        if not folder.exists():
+            typer.echo(f"Skipping missing folder: {folder}", err=True)
+            continue
+        for scenario_path in sorted(folder.rglob("*.yaml")):
+            if scenario_path.name == "workload.yaml":
+                continue
+            try:
+                sc = ScenarioConfig.from_yaml(scenario_path)
+            except Exception:
+                continue
+
+            workload = sc.workload
+            if not isinstance(workload, MegatronWorkload):
+                continue
+
+            if workload.traces_dir:
+                trace_dir = Path(str(workload.traces_dir))
+            else:
+                try:
+                    gpu_spec = resolve_gpu_spec(sc.datacenter)
+                    gpu_name = (gpu_spec.name or "default").lower().replace(" ", "-")
+                except Exception:
+                    gpu_name = "default"
+                h = workload_hash(workload)
+                trace_dir = Path("templates/gpu") / gpu_name / "traces" / h
+
+            if not trace_dir.exists():
+                parent = trace_dir.parent
+                base_name = trace_dir.name
+                if parent.exists():
+                    candidates = sorted(
+                        (
+                            d
+                            for d in parent.iterdir()
+                            if d.is_dir()
+                            and d.name.startswith(f"{base_name}-")
+                            and d.name[len(base_name) + 1 :].isdigit()
+                        ),
+                        reverse=True,
+                    )
+                    if candidates:
+                        trace_dir = candidates[0]
+                    else:
+                        typer.echo(f"No local trace for {scenario_path} -> {trace_dir}")
+                        missing += 1
+                        continue
+                else:
+                    typer.echo(f"No local trace for {scenario_path} -> {trace_dir}")
+                    missing += 1
+                    continue
+            referenced.add(trace_dir)
+
+            cmd = ["git", "add", "-f", str(trace_dir)]
+            if dry_run:
+                typer.echo(f"Would run: {' '.join(cmd)}")
+            else:
+                subprocess.run(cmd, check=True)
+                typer.echo(f"Staged {trace_dir} (from {scenario_path})")
+            staged += 1
+
+    if prune:
+        base = Path("templates/gpu")
+        removed = 0
+        if base.exists():
+            for gpu_dir in sorted(base.iterdir()):
+                if not gpu_dir.is_dir():
+                    continue
+                traces_dir = gpu_dir / "traces"
+                if not traces_dir.is_dir():
+                    continue
+                for trace_dir in sorted(traces_dir.iterdir()):
+                    if not trace_dir.is_dir():
+                        continue
+                    if trace_dir in referenced:
+                        continue
+                    if dry_run:
+                        typer.echo(f"Would prune: {trace_dir}")
+                    else:
+                        shutil.rmtree(trace_dir)
+                        # also drop from git index if tracked
+                        subprocess.run(
+                            ["git", "rm", "-rf", "--cached", str(trace_dir)], check=False
+                        )
+                        typer.echo(f"Pruned {trace_dir}")
+                    removed += 1
+        if dry_run:
+            typer.echo(f"Would prune {removed} trace director{'y' if removed == 1 else 'ies'}.")
+        else:
+            typer.echo(f"Pruned {removed} trace director{'y' if removed == 1 else 'ies'}.")
+
+    if dry_run:
+        typer.echo(
+            f"Would stage {staged} trace folder{'s' if staged != 1 else ''}; {missing} missing."
+        )
+        return
+
+    typer.echo(f"Staged {staged} trace folder{'s' if staged != 1 else ''}; {missing} missing.")
+
+    if commit:
+        if staged == 0 and not prune:
+            typer.echo("Nothing staged; skipping commit.")
+        else:
+            cmd = ["git", "commit", "-m", commit]
+            try:
+                subprocess.run(cmd, check=True)
+                typer.echo(f"Committed: {commit}")
+            except subprocess.CalledProcessError as exc:
+                typer.echo(f"Commit failed: {exc}", err=True)
+                raise typer.Exit(1) from exc
+
+    if push:
+        try:
+            subprocess.run(["git", "push"], check=True)
+            typer.echo("Pushed.")
+        except subprocess.CalledProcessError as exc:
+            typer.echo(f"Push failed (ignored): {exc}", err=True)
 
 
 @trace_app.command("list")

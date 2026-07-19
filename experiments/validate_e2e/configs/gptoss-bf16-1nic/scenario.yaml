@@ -1,0 +1,8 @@
+datacenter:
+  num_nodes: 4
+  node:
+    from: snellius-h100-4g
+    nics_per_node: 1
+workload:
+  from: experiments/validate_e2e/configs/gptoss-bf16-1nic/workload.yaml
+  traces_dir: templates/gpu/h100/traces/validate-e2e-gptoss-bf16-1nic

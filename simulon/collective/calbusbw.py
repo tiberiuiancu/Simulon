@@ -251,11 +251,27 @@ def cal_busbw(
         )
 
     algo_measurements: NcclAlgoMeasurements = getattr(nccl_profile, collective_type, None)
-    if algo_measurements is None:
-        raise ValueError(
-            f"NcclProfile has no measurements for collective type {collective_type!r}. "
-            f"Supported: AllReduce, AllGather, ReduceScatter, AllToAll."
-        )
+    if algo_measurements is None or not any(
+        [
+            algo_measurements.ring,
+            algo_measurements.tree,
+            algo_measurements.nvls,
+            algo_measurements.nvls_tree,
+        ]
+    ):
+        algo_measurements = nccl_profile.AllReduce
+        if not any(
+            [
+                algo_measurements.ring,
+                algo_measurements.tree,
+                algo_measurements.nvls,
+                algo_measurements.nvls_tree,
+            ]
+        ):
+            raise ValueError(
+                f"NcclProfile has no measurements for collective type {collective_type!r} "
+                f"and AllReduce fallback is also empty."
+            )
 
     # -----------------------------------------------------------------------
     # Intra-node BW: from profile (1-node measurement, NVLink)

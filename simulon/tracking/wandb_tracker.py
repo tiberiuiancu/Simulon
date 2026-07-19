@@ -72,24 +72,8 @@ class WandbTracker(ExperimentTracker):
         workload_hash: str | None = None,
         config_filters: dict[str, str | int | float | bool] | None = None,
         run_name_prefix: str | None = None,
+        run_name: str | None = None,
     ) -> dict[str, Any] | None:
-        """Pull metrics for a finished run.
-
-        Parameters
-        ----------
-        workload_hash: str | None
-            Match runs whose wandb config contains this workload hash.
-            Mutually exclusive with *run_name_prefix*.
-        config_filters: dict[str, ...] | None
-            Additional flat config keys that must match (used with workload_hash).
-        run_name_prefix: str | None
-            Alternative mode: match runs whose display name starts with this prefix.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            The first matching run's summary metrics, or None if no match.
-        """
         try:
             import wandb
 
@@ -98,7 +82,9 @@ class WandbTracker(ExperimentTracker):
             api = wandb.Api()
 
             filters: dict[str, object] = {"state": "finished"}
-            if run_name_prefix is not None:
+            if run_name is not None:
+                filters["display_name"] = run_name
+            elif run_name_prefix is not None:
                 filters["display_name"] = {"$regex": f"^{run_name_prefix}"}
             if workload_hash is not None:
                 filters["config.workload_hash"] = workload_hash
@@ -107,6 +93,10 @@ class WandbTracker(ExperimentTracker):
                     filters[f"config.{k}"] = v
             runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
             for run in runs:
+                if run_name is not None and run.display_name != run_name:
+                    continue
+                if run_name_prefix is not None and not run.display_name.startswith(run_name_prefix):
+                    continue
                 return dict(run.summary)
         except Exception as exc:
             logger.warning("Failed to pull metrics from W&B: %s", exc)
@@ -138,3 +128,25 @@ class WandbTracker(ExperimentTracker):
         except Exception as exc:
             logger.warning("Failed to fetch runs from W&B: %s", exc)
         return []
+
+    def has_run(self, run_name: str | None = None, workload_hash: str | None = None) -> bool:
+        """Return True if a finished W&B run matches the name and/or workload hash."""
+        try:
+            import wandb
+
+            entity = os.environ.get("WANDB_ENTITY")
+            project = os.environ.get("WANDB_PROJECT", "simulon")
+            api = wandb.Api()
+            filters: dict[str, object] = {"state": "finished"}
+            if run_name is not None:
+                filters["display_name"] = run_name
+            if workload_hash is not None:
+                filters["config.workload_hash"] = workload_hash
+            runs = api.runs(f"{entity}/{project}" if entity else project, filters=filters)
+            for run in runs:
+                if run_name is not None and run.display_name != run_name:
+                    continue
+                return True
+        except Exception as exc:
+            logger.warning("Failed to check W&B run existence: %s", exc)
+        return False

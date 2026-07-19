@@ -1,0 +1,67 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: tiberiuiancu (tiberiuiancu-university-of-amsterdam) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.27.1
+wandb: Run data is saved locally in /gpfs/home6/tiberiui/simulon_validate/wandb/run-20260623_110428-bqvcptlb
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run validate-bridge-gptoss-120b
+wandb: ⭐️ View project at https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon
+wandb: 🚀 View run at https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon/runs/bqvcptlb
+wandb: WARNING Saving files without folders. If you want to preserve subdirectories pass base_path to wandb.save, i.e. wandb.save("/mnt/folder/file.h5", base_path="/mnt")
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+
+Iteration wall time:  15099.008 ms
+  (metrics below averaged across 64 GPUs)
+
+  Compute:        10958.436 ms   72.6%
+  Exposed comm:    1334.062 ms    8.8%
+    AllToAll:               1184.146 ms
+    ReduceScatter:           115.583 ms
+    PP_Send:                  37.933 ms
+    AllGather:                 0.004 ms
+  Bubble:          2806.510 ms   18.6%
+
+  Overlapped comm:   62.729 ms          (hidden by compute, not in totals above)
+
+Throughput:           5,425.5 tokens/s (347,233.4 tokens/s)
+                      186.26 TFLOPs/s (11920.82 TFLOPs/s)
+  MFU:                18.8%
+
+Energy per iteration:  97.0178 Wh   (avg cluster power: 23.13 kW)   (measured)
+  CO2eq:               24.6442 g
+
+Chrome trace written to output/validate-bridge-gptoss-120b  (open in https://ui.perfetto.dev)
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: updating run metadata
+wandb: uploading output/validate-bridge-gptoss-120b; uploading output.log; uploading wandb-summary.json; uploading config.yaml
+wandb: uploading output/validate-bridge-gptoss-120b
+wandb: 
+wandb: Run history:
+wandb:                     bubble_ms ▁
+wandb:                       co2eq_g ▁
+wandb:                    compute_ms ▁
+wandb:                     energy_wh ▁
+wandb:     exposed_comm.AllGather_ms ▁
+wandb:      exposed_comm.AllToAll_ms ▁
+wandb:       exposed_comm.PP_Send_ms ▁
+wandb: exposed_comm.ReduceScatter_ms ▁
+wandb:               exposed_comm_ms ▁
+wandb:              gflops_per_token ▁
+wandb:                            +8 ...
+wandb: 
+wandb: Run summary:
+wandb:                     bubble_ms 2806.51023
+wandb:                       co2eq_g 24.64422
+wandb:                    compute_ms 10958.43593
+wandb:                 energy_source measured
+wandb:                     energy_wh 97.01781
+wandb:     exposed_comm.AllGather_ms 0.00387
+wandb:      exposed_comm.AllToAll_ms 1184.1464
+wandb:       exposed_comm.PP_Send_ms 37.93318
+wandb: exposed_comm.ReduceScatter_ms 115.58324
+wandb:               exposed_comm_ms 1334.0618
+wandb:                            +9 ...
+wandb: 
+wandb: 🚀 View run validate-bridge-gptoss-120b at: https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon/runs/bqvcptlb
+wandb: ⭐️ View project at: https://wandb.ai/tiberiuiancu-university-of-amsterdam/simulon
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20260623_110428-bqvcptlb/logs

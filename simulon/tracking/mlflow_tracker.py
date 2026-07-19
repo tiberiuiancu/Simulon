@@ -67,6 +67,34 @@ class MLflowTracker(ExperimentTracker):
         with contextlib.suppress(Exception):
             mlflow.end_run()
 
+    def has_run(self, run_name: str | None = None, workload_hash: str | None = None) -> bool:
+        """Return True if a finished MLflow run matches the name and/or workload hash."""
+        try:
+            import mlflow
+
+            experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "simulon")
+            client = mlflow.tracking.MlflowClient()
+            exp = client.get_experiment_by_name(experiment_name)
+            if exp is None:
+                return False
+            filter_string = "attributes.status = 'FINISHED'"
+            if run_name is not None:
+                filter_string += f" and attributes.run_name = '{run_name}'"
+            runs = client.search_runs(
+                experiment_ids=[exp.experiment_id], filter_string=filter_string
+            )
+            for run in runs:
+                if run_name is not None and run.info.run_name != run_name:
+                    continue
+                if workload_hash is not None:
+                    wh = run.data.params.get("workload_hash")
+                    if wh != workload_hash:
+                        continue
+                return True
+        except Exception as exc:
+            logger.warning("Failed to check MLflow run existence: %s", exc)
+        return False
+
     def pull_metrics(
         self, workload_hash: str, config_filters: dict[str, str | int | float | bool] | None = None
     ) -> None:
