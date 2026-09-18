@@ -86,15 +86,24 @@ class ModelDims:
         )
 
 
-def param_count(d: ModelDims) -> int:
-    """Total parameters, derived from the architecture (GQA attention + SwiGLU MLP)."""
+def layer_param_count(d: ModelDims) -> int:
+    """Parameters in ONE transformer layer (GQA attention + SwiGLU MLP)."""
     q = d.num_heads * d.kv_channels
     kv = d.num_query_groups * d.kv_channels
     attn = d.hidden * (q + 2 * kv) + q * d.hidden          # fused QKV + output proj
     mlp = (3 if d.mlp_gated else 2) * d.hidden * d.ffn_hidden
-    per_layer = attn + mlp
-    embed = d.vocab * d.hidden * (1 if d.tie_embeddings else 2)
-    return per_layer * d.num_layers + embed
+    return attn + mlp
+
+
+def embedding_param_count(d: ModelDims) -> int:
+    """Parameters in ONE embedding matrix (input embedding, or the untied output head)."""
+    return d.vocab * d.hidden
+
+
+def param_count(d: ModelDims) -> int:
+    """Total parameters, derived from the architecture (GQA attention + SwiGLU MLP)."""
+    embed = embedding_param_count(d) * (1 if d.tie_embeddings else 2)
+    return layer_param_count(d) * d.num_layers + embed
 
 
 def model_state_bytes(n_params: int, tp: int, pp: int, dp: int) -> float:
@@ -103,34 +112,68 @@ def model_state_bytes(n_params: int, tp: int, pp: int, dp: int) -> float:
     return p * (_REPLICATED_BYTES + _SHARDED_BYTES / dp)
 
 
-def _activation_per_layer_bytes(d: ModelDims, tp: int, mbs: int, recompute: str | None) -> float:
+# Coefficient (in units of s·b·h elements) of the activations that live in the FULL
+# hidden dimension and are therefore REPLICATED on every tensor-parallel rank when
+# sequence parallelism is off: the attention input, the MLP input, and the RMSNorm
+# outputs / residual copies Megatron retains for backward.
+#
+# The two *inputs* are structural (coefficient 2).  The remainder covers the norm
+# outputs and residual copies, which are implementation-dependent and not cleanly
+# derivable; 4.0 total is fitted to the measured fit/OOM boundary and is the only
+# fitted constant in the activation term.  It is well inside the window the data
+# admits (3.6 < X < 9.8) and sits near the structural lower end.  With it, the model
+# classifies all 13 measured 16-node fit/OOM observations correctly; the previous
+# SP-unaware form got 10/13, missing every mbs=4 OOM.  See calibration note below.
+_NONTP_ACT_COEFF = 4.0
+
+
+def _activation_per_layer_bytes(d: ModelDims, tp: int, mbs: int, recompute: str | None,
+                                sequence_parallel: bool = True) -> float:
     """Stored activation bytes for one transformer layer on one microbatch.
 
-    FlashAttention assumed (no s×s score matrix). Sequence-parallel → all /TP.
+    FlashAttention assumed (no s×s score matrix).
+
+    Tensor parallelism only shards the activations that live in a *sharded*
+    dimension — the attention-projection input (per-head) and the SwiGLU
+    gate/up/down tensors (per-ffn-column).  Activations in the full hidden
+    dimension (layer input, MLP input, norm outputs, residual) are REPLICATED on
+    every TP rank unless sequence parallelism is on, which is exactly what SP
+    exists to fix: it shards them along the sequence axis instead.
+
+    Dividing *everything* by TP (as this function used to) therefore under-counts
+    badly whenever sequence_parallel=False, and the error grows with TP.  That is
+    what made the model call TP4 mbs=4 a comfortable 68.7 GB fit when it in fact
+    OOM'd with 92.74 GiB allocated by PyTorch.
+
     recompute: None (store all), "selective" (recompute core attention → drop the
     attention-projection activations), "full" (store only the layer input).
     """
     s, b, h = d.seq, mbs, d.hidden
     attn_proj = s * b * (d.num_heads * d.kv_channels)     # attention-output proj input
     if recompute == "full":
-        return _BF16 * (s * b * h) / tp                  # only the layer input
-    # bf16-stored activations: norm/QKV inputs, attn-out input, MLP in/hidden/down-in
-    linear = (
-        s * b * h                       # input to attention (norm output)
-        + attn_proj                     # attention output projection input
-        + s * b * h                     # input to MLP
+        # Only the layer input survives; it is full-hidden-dim, so SP-dependent.
+        return _BF16 * (s * b * h) / (tp if sequence_parallel else 1)
+
+    # Sharded along a tensor-parallel dimension — always divided by TP.
+    sharded = (
+        attn_proj                       # attention output projection input
         + 2 * s * b * d.ffn_hidden      # SwiGLU gate & up outputs
         + s * b * d.ffn_hidden          # down projection input
     )
     if recompute == "selective":
-        linear -= attn_proj             # core attention recomputed
-    return _BF16 * linear / tp
+        sharded -= attn_proj            # core attention recomputed
+
+    # Full-hidden-dim: replicated across TP unless sequence-parallel shards them.
+    replicated = _NONTP_ACT_COEFF * s * b * h
+
+    return _BF16 * (replicated / (tp if sequence_parallel else 1) + sharded / tp)
 
 
 def activation_bytes(d: ModelDims, tp: int, pp: int, mbs: int, recompute: str | None,
-                     n_microbatches: int, vpp_v: int = 1) -> float:
+                     n_microbatches: int, vpp_v: int = 1,
+                     sequence_parallel: bool = True) -> float:
     """Per-GPU peak activation memory (pipeline stage 0 under 1F1B)."""
-    a_layer = _activation_per_layer_bytes(d, tp, mbs, recompute)
+    a_layer = _activation_per_layer_bytes(d, tp, mbs, recompute, sequence_parallel)
     in_flight = min(pp, n_microbatches) if pp > 1 else 1
     # Interleaved 1F1B (VPP) keeps more microbatches in flight during warmup; the
     # activation grows by ≈ 1 + (pp-1)/(pp·v).  Approximate, flagged for v>1.
@@ -184,10 +227,12 @@ def estimate_memory(cfg: dict, num_gpus: int, capacity_gb: float,
                     cfg.get("num_layers_per_virtual_pipeline_stage"))
     vpp_v = (d_num_layers(cfg) // (pp * int(nlvps))) if nlvps else 1
 
+    sp = bool(cfg.get("sequence-parallel", cfg.get("sequence_parallel", False)))
+
     rc = _recompute_mode(cfg)
     n = param_count(d)
     ms = model_state_bytes(n, tp, pp, dp) / 1e9
-    ac = activation_bytes(d, tp, pp, mbs, rc, n_mb, vpp_v) / 1e9
+    ac = activation_bytes(d, tp, pp, mbs, rc, n_mb, vpp_v, sp) / 1e9
     return MemoryEstimate(ms, ac, overhead_gb, capacity_gb)
 
 

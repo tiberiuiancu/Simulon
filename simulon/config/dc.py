@@ -119,6 +119,39 @@ class NodeSpec(BaseModel):
     scale_out: ScaleOutSpec | None = None
     nccl: NcclProfile | None = None
     cost: CostField | None = None
+    # Microseconds of host-side framework time (python / dispatcher / autograd) per aten
+    # op. None (default) = host modelling off, and every existing scenario is unaffected.
+    #
+    # MEASURED, not fitted. From the 1.7B kernel-timing traces (job 1224555), host_ms/host_ops
+    # at microbatch size 1 is 18.7-21.0 us across eight cells spanning 4x in TP and 4x in PP
+    # -- a machine+toolchain constant with a real invariance check.
+    #
+    # Why the OP COUNT and not the measured host_ms duration: host_ms is the union of a
+    # slot's cpu_op intervals, and those records include time spent BLOCKED waiting on the
+    # GPU. Where the GPU binds (mbs>=2) the union saturates toward the wall-clock span --
+    # measured 28.8 us/op at mbs2, 53.1 at mbs4, 53.8 at mbs8, with host_ms reaching 88% of
+    # span. The op count carries no such contamination: it is invariant across TP and mbs
+    # and scales as 1/PP, exactly as the program structure demands.
+    #
+    # Only meaningful with kernel-timing traces; a span trace already has host stalls baked
+    # into its wall-clock spans, and replay() raises rather than double-count them.
+    #
+    # CALIBRATED VALUE (real-PG registry, job 1225995): 19.0 us/op on Jupiter GH200.
+    # Derived from a CEILING, not from scoring. For a host-bound cell the host cannot be
+    # busy longer than the iteration it produced, so iteration_ms/host_ops is a hard upper
+    # bound. Four independent host-bound cells spanning TP 1->4 agree to +-1.5%:
+    #     tp1pp1-mbs1 19.16   tp4pp1-mbs1 19.26   tp2pp1-mbs1 19.51   tp4pp1-mbs2 19.74
+    # while the GPU-bound cells sit far above (36.7 / 69.6 / 81.6) and so constrain nothing
+    # -- which is itself the prediction the two-resource model makes, and a falsification
+    # test it could have failed. The value must be <= the tightest ceiling, hence 19.0.
+    #
+    # The per-op cost is tied to the CAPTURE MODE, because the op counter differs between
+    # them: fake-PG traces report 8.7-11.6% more ops than real-PG traces of the same cell
+    # (stable across mbs, clustered by TP; the provenance of the difference is not yet
+    # established). Pair 18.2 us/op with fake-PG counts and 19.0 with real-PG counts; the
+    # PRODUCT -- host ms per iteration -- is the invariant, and mixing them is a units error
+    # worth ~9%.
+    host_cost_us: float | None = None
 
     @model_validator(mode="after")
     def set_display_name_default(self) -> NodeSpec:

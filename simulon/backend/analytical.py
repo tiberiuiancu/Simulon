@@ -41,10 +41,19 @@ def _tracer_config_from_scenario(
 ) -> DAGTracerConfig:
     c = scenario.collective
     algorithm = c.algorithm if c.algorithm != "auto" else "ring"
+    def _flag(key: str) -> bool:
+        if not isinstance(scenario.workload, MegatronWorkload):
+            return False
+        v = scenario.workload.config.get(key, scenario.workload.config.get(key.replace("-", "_"), False))
+        return v if isinstance(v, bool) else str(v).lower() in ("true", "1", "yes")
+
     return DAGTracerConfig(
         num_channels=c.num_channels,
         algorithm=algorithm,
         overlap_async_collectives=overlap_async_collectives,
+        sequence_parallel=_flag("sequence-parallel"),
+        overlap_grad_reduce=_flag("overlap-grad-reduce"),
+        overlap_param_gather=_flag("overlap-param-gather"),
     )
 
 
@@ -236,7 +245,11 @@ def simulate(
 
     total_nodes = len(dag.compute_nodes) + len(dag.comm_nodes) + len(dag.collective_nodes)
     logger.info("Replaying DAG (%d nodes) ...", total_nodes)
-    result = replay(dag, network_simulation=network_simulation)
+    result = replay(
+        dag,
+        network_simulation=network_simulation,
+        host_cost_us=resolve_node_spec(dc).host_cost_us,
+    )
     if dag.total_flops is not None:
         result.total_flops = dag.total_flops
 

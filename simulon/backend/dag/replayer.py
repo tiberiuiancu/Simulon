@@ -54,6 +54,12 @@ class SimulationResult:
     per_gpu_times_ms: dict[int, float] = field(default_factory=dict)
     total_flops: float | None = None
 
+    # GPU idle caused by the host thread not having issued the work yet, averaged across
+    # ranks. Reported separately because it would otherwise land inside bubble_ms and
+    # silently change what every published PP-bubble number means. Zero unless host
+    # modelling is enabled (NodeSpec.host_cost_us).
+    host_stall_ms: float = 0.0
+
 
 # ---------------------------------------------------------------------------
 # Interval helpers
@@ -203,7 +209,12 @@ def _summarize(dag: ExecutionDAG, total_time_ms: float, network_simulation: str 
 # ---------------------------------------------------------------------------
 
 
-def replay(dag: ExecutionDAG, *, network_simulation: str = "flow") -> SimulationResult:
+def replay(
+    dag: ExecutionDAG,
+    *,
+    network_simulation: str = "flow",
+    host_cost_us: float | None = None,
+) -> SimulationResult:
     """Critical-path walk over a fully-populated DAG.
 
     Assumes all node.duration_ms fields have been set before calling:
@@ -213,6 +224,59 @@ def replay(dag: ExecutionDAG, *, network_simulation: str = "flow") -> Simulation
 
     network_simulation controls whether CollectiveNodes are treated as atomic
     ("collective" mode) or whether the DAG only contains CommNodes ("flow" mode).
+
+    HOST MODELLING (host_cost_us)
+    -----------------------------
+    None (default) => off, and the walk is bit-identical to the pure-GPU one.
+
+    Set it and each rank additionally gets a serial HOST resource: the rank's host thread
+    issues work in `dag.rank_program` order at `host_cost_us` per op, and a node cannot start
+    on the GPU before its host thread has finished issuing everything ahead of it. GPU idle
+    then emerges wherever the host cannot keep up, instead of being charged as a flat
+    surcharge per collective.
+
+    This exists because nsys profiling of Qwen3-1.7B on 4x GH200 showed 36-41% of every
+    iteration is GPU idle on the pace-setting rank, and that 79-83% of that idle is host
+    time in framework code with no CUDA call in flight (experiments/gap_attribution.py).
+    Modelling it as a per-collective constant is what made NcclProfile.launch_latency_ms
+    drift 22-26% across microbatch size: bigger microbatches make kernels longer, which
+    hides more host time, and no per-collective constant can express that.
+
+    Two properties worth preserving if this is ever refactored:
+      * The host clock does NOT wait on GPU dependencies. CUDA launches are asynchronous;
+        making the host block on a dependency would fully expose every issue cost and
+        re-derive the flat per-collective surcharge this replaces.
+      * It DOES stop at a blocking sync point (`dag.host_sync_nodes`): pipeline P2P with
+        overlap-p2p-comm off. Past one of those the host genuinely cannot run ahead.
+        Without this the replay reports a perfectly pipelined schedule -- PP 1->2 came out
+        at +3.2% against a measured +45.9%, with the bottleneck rank's own work explaining
+        the whole iteration.
+
+        This is grounded in the source, not inferred: megatron/core/pipeline_parallel/
+        p2p_communication.py:452 ends every `_communicate` with a full
+        `torch.cuda.synchronize()` when `batch_p2p_comm and batch_p2p_sync`, and BOTH
+        default to True (model_parallel_config.py:303,308). So each p2p exchange drains the
+        whole device and blocks the host -- if anything stronger than what is modelled here,
+        which only advances the host clock to that node's own finish. Corroborated by nsys:
+        on the LAST pipeline stage of tp2pp2-mbs2 (dev2) there are 2051 ms of inter-kernel
+        gaps per iteration, 68% of it framework time, even though that stage's host work
+        (10463 ms) is well under its GPU work (12812 ms) -- i.e. idle that a freely-running-
+        ahead host model predicts as zero.
+
+    A `host_queue_kernels` bound on run-ahead (by pending CUDA launches) was tried and
+    REMOVED, twice falsified. On the fake-PG grid it throttled PP=1 far harder than it
+    helped deep pipelines (mean |error| 10.8% -> 12.4%); re-tested on the real-PG grid --
+    where the trace fidelity that confounded the first test is fixed -- it was also found
+    to be silently self-disabling: once the required budget exceeded every retired entry
+    the monotone head pointer ran off the end and no constraint was applied again for that
+    rank, so a *tighter* queue throttled *less* (q=1024 gave tp1pp1-mbs1 +19.5%, q=256 gave
+    +0.3%, identical to no bound at all). Beyond the bug, the DAG's granularity is one node
+    per slot -- ~760 kernels on these cells -- which is coarser than any plausible queue
+    depth, so the bound cannot be expressed here without inventing a fitted parameter.
+    The physics it aimed at (host cannot run ahead forever) is instead carried by
+    `dag.host_sync_nodes`, which is grounded: see below.
+      * It is a pre-pass, not a clock updated inside the walk, so the result cannot depend
+        on how Kahn's algorithm breaks ties.
     """
     # Build unified node map
     all_nodes: dict[int, ComputeNode | CommNode | CollectiveNode] = {}
@@ -303,14 +367,53 @@ def replay(dag: ExecutionDAG, *, network_simulation: str = "flow") -> Simulation
             f"Topo sort incomplete: {len(missing)} nodes not processed: {list(missing)[:10]}"
         )
 
+    # Host issue times. Two rules, and the distinction between them is the whole point:
+    #   * the host does NOT wait on GPU dependencies -- CUDA launches are asynchronous, so
+    #     making it block everywhere would fully expose every issue cost and re-derive the
+    #     flat per-collective surcharge this replaces;
+    #   * but it DOES stop at a blocking sync point (dag.host_sync_nodes: pipeline P2P with
+    #     overlap-p2p-comm off, where Megatron issues a blocking recv). Past one of those
+    #     the host genuinely cannot run ahead.
+    # Without the second rule the host runs ahead across the entire iteration and the replay
+    # reports a perfectly-pipelined schedule: PP 1->2 came out at +3.2% against a measured
+    # +45.9%, with the bottleneck rank's own work (10796 ms) explaining the whole 10928 ms
+    # iteration while hardware needed 14479 ms.
+    # A collective appears in every participant's program, so take the latest of its issue
+    # times -- it is not on the wire until the last rank has issued it.
+    host_ready: dict[int, float] = {}
+    rank_of_node: dict[int, list[int]] = {}
+    if host_cost_us is not None:
+        if not dag.rank_program:
+            raise ValueError(
+                "host modelling requested but the DAG carries no rank_program. Host time "
+                "comes from kernel-timing traces (SIMULON_TRACE_KERNEL_TIME=1); a span-only "
+                "trace already has the host gaps baked into its wall-clock spans, so "
+                "modelling host time on top of it would double-count."
+            )
+        for rank, program in dag.rank_program.items():
+            for nid in program:
+                rank_of_node.setdefault(nid, []).append(rank)
+
     # Simulation: walk nodes in topological order
     finish_time: dict[int, float] = {}
     per_gpu_finish: dict[int, float] = defaultdict(float)
+    host_stall_by_gpu: dict[int, float] = defaultdict(float)
 
+    host_clock: dict[int, float] = defaultdict(float)
     with log_progress("  replaying DAG", len(topo_order), logger) as advance:
         for nid in topo_order:
             node = all_nodes[nid]
             start_time = max((finish_time[p] for p in predecessors[nid]), default=0.0)
+            ranks = rank_of_node.get(nid)
+            if ranks is not None:
+                cost = getattr(node, "host_ops", 0.0) * host_cost_us / 1000.0
+                issued = max(host_clock[r] for r in ranks) + cost
+                for r in ranks:
+                    host_clock[r] = issued
+                if issued > start_time:
+                    if isinstance(node, ComputeNode):
+                        host_stall_by_gpu[node.gpu_rank] += issued - start_time
+                    start_time = issued
 
             if isinstance(node, ComputeNode):
                 duration = node.duration_ms if node.duration_ms is not None else 0.0
@@ -327,6 +430,12 @@ def replay(dag: ExecutionDAG, *, network_simulation: str = "flow") -> Simulation
                 finish_time[nid] = finish
                 node.start_ms = start_time
                 node.finish_ms = finish
+                if nid in dag.host_sync_nodes and ranks is not None:
+                    # Blocking recv: the host thread is parked until it completes, so it
+                    # cannot have been issuing work behind this point.
+                    for r in ranks:
+                        if finish > host_clock[r]:
+                            host_clock[r] = finish
                 if isinstance(node, CommNode):
                     if finish > per_gpu_finish[node.src_gpu]:
                         per_gpu_finish[node.src_gpu] = finish
@@ -341,5 +450,11 @@ def replay(dag: ExecutionDAG, *, network_simulation: str = "flow") -> Simulation
 
     total = max(per_gpu_finish.values(), default=0.0)
     summary = _summarize(dag, total, network_simulation)
+    n_gpu = len(per_gpu_finish) or 1
 
-    return SimulationResult(total_time_ms=total, per_gpu_times_ms=dict(per_gpu_finish), **summary)
+    return SimulationResult(
+        total_time_ms=total,
+        per_gpu_times_ms=dict(per_gpu_finish),
+        host_stall_ms=sum(host_stall_by_gpu.values()) / n_gpu,
+        **summary,
+    )

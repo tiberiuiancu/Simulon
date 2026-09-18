@@ -25,6 +25,12 @@ class ComputeNode:
     is_extrapolated: bool = (
         False  # True when duration_ms was obtained via extrapolation, not exact/partial match
     )
+    host_ops: float = 0.0  # framework ops issued here; cost = ops x NodeSpec.host_cost_us
+    # CUDA launches attributed here. Carried for diagnostics only -- the replayer's
+    # bounded-launch-queue model that once consumed it was falsified and removed
+    # (see replayer.replay). Kept because it is measured and cheap, and it is the
+    # denominator to check if a launch-rate effect is ever suspected again.
+    kernel_ct: float = 0.0
 
 
 @dataclass(slots=True)
@@ -58,6 +64,7 @@ class CollectiveNode:
     duration_ms: float | None = None
     start_ms: float | None = None
     finish_ms: float | None = None
+    host_ops: float = 0.0  # framework ops to issue this collective
 
 
 @dataclass(slots=True)
@@ -76,6 +83,15 @@ class ExecutionDAG:
     profiled_ranks: set[int] = field(default_factory=set)
     energy_kwh: float | None = None
     co2eq_kg: float | None = None
+    # Per-rank issue order: the sequence in which that rank's host thread submits work.
+    # The replayer walks it as a serial host resource, so a rank's GPU can only start a
+    # node once the host has finished issuing everything ahead of it on that rank.
+    rank_program: dict[int, list[int]] = field(default_factory=dict)
+    # Nodes whose completion BLOCKS the issuing host thread, so it cannot run ahead past
+    # them. Populated for pipeline P2P when overlap-p2p-comm is off (Megatron issues a
+    # blocking recv there). Without this the host runs ahead across the whole iteration and
+    # the replay reports a perfectly-pipelined schedule that hardware does not achieve.
+    host_sync_nodes: set[int] = field(default_factory=set)
 
     def to_dict(self) -> dict:
         return {
@@ -87,6 +103,8 @@ class ExecutionDAG:
             "profiled_ranks": sorted(self.profiled_ranks),
             "energy_kwh": self.energy_kwh,
             "co2eq_kg": self.co2eq_kg,
+            "rank_program": {str(r): ids for r, ids in self.rank_program.items()},
+            "host_sync_nodes": sorted(self.host_sync_nodes),
         }
 
     def to_json(self) -> str:

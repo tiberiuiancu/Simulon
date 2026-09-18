@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import yaml
+from pydantic import TypeAdapter
 
 
 def _deep_merge(base: dict, overrides: dict) -> dict:
@@ -32,7 +33,17 @@ def _deep_merge(base: dict, overrides: dict) -> dict:
 
 from simulon.config.dc import DatacenterConfig, GPUSpec, NodeSpec, ScaleOutSpec  # noqa: E402
 from simulon.config.nccl_profile import NcclProfile  # noqa: E402
-from simulon.config.workload import MegatronWorkload  # noqa: E402
+from simulon.config.workload import MegatronWorkload, WorkloadConfig  # noqa: E402
+
+_WORKLOAD_ADAPTER: TypeAdapter[WorkloadConfig] | None = None
+
+
+def _workload_adapter() -> TypeAdapter[WorkloadConfig]:
+    """Cached adapter for the framework-discriminated workload union."""
+    global _WORKLOAD_ADAPTER
+    if _WORKLOAD_ADAPTER is None:
+        _WORKLOAD_ADAPTER = TypeAdapter(WorkloadConfig)
+    return _WORKLOAD_ADAPTER
 
 
 def load_gpu_template(name: str) -> GPUSpec:
@@ -221,11 +232,15 @@ def resolve_workload(
     path_or_dict: Path | str | dict,
     _visited: set[str] | None = None,
     _source_file: Path | None = None,
-) -> MegatronWorkload:
-    """Resolve a MegatronWorkload from a path, YAML string, or inline dict.
+) -> WorkloadConfig:
+    """Resolve a workload from a path, YAML string, or inline dict.
 
-    Supports ``from:`` inheritance: loads the base workload YAML
-    (from ``templates/workload/<name>.yaml`` or a relative path),
+    Dispatches on the ``framework`` discriminator, so non-Megatron workloads
+    (e.g. ``framework: collective``) resolve to their own model rather than
+    being coerced into a MegatronWorkload.
+
+    Supports ``from:`` inheritance for Megatron workloads: loads the base
+    workload YAML (from ``templates/workload/<name>.yaml`` or a relative path),
     deep-merges overrides, and validates the result.
 
     Raises ``ValueError`` on circular ``from:`` chains.
@@ -252,9 +267,9 @@ def resolve_workload(
         base_dict = base_wl.model_dump(by_alias=False)
         overrides = {k: v for k, v in data.items() if k != "from"}
         merged = _deep_merge(base_dict, overrides)
-        return MegatronWorkload.model_validate(merged)
+        return _workload_adapter().validate_python(merged)
 
-    return MegatronWorkload.model_validate(data)
+    return _workload_adapter().validate_python(data)
 
 
 # Keys intentionally excluded from workload hashing.
