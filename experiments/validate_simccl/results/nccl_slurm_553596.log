@@ -1,0 +1,164 @@
+Running nccl-tests: 1n4g (1 nodes × 4 GPUs = 4 GPUs total)
+Building nccl-tests with MPI under /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests
+make: Entering directory '/e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests'
+make -C src build BUILDDIR=/e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build
+make[1]: Entering directory '/e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/src'
+Compiling  common.cu                           > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/common.o
+Compiling  util.cu                             > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/util.o
+Compiling  timer.cc                            > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/timer.o
+Compiling /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/verifiable/verifiable.o
+Compiling  all_reduce.cu                       > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/all_reduce.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/all_reduce.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/all_reduce_perf
+Compiling  all_gather.cu                       > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/all_gather.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/all_gather.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/all_gather_perf
+Compiling  broadcast.cu                        > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/broadcast.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/broadcast.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/broadcast_perf
+Compiling  reduce_scatter.cu                   > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/reduce_scatter.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/reduce_scatter.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/reduce_scatter_perf
+Compiling  reduce.cu                           > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/reduce.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/reduce.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/reduce_perf
+Compiling  alltoall.cu                         > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/alltoall.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/alltoall.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/alltoall_perf
+Compiling  scatter.cu                          > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/scatter.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/scatter.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/scatter_perf
+Compiling  gather.cu                           > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/gather.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/gather.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/gather_perf
+Compiling  sendrecv.cu                         > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/sendrecv.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/sendrecv.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/sendrecv_perf
+Compiling  hypercube.cu                        > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/hypercube.o
+Linking  /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/hypercube.o > /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/build/hypercube_perf
+make[1]: Leaving directory '/e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests/src'
+make: Leaving directory '/e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/nccl-tests'
+=== AllReduce 1n4g ===
+# Writing JSON output to /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_allreduce_1n4g_jupiter.json.0
+# nccl-tests version 2.18.2 nccl-headers=22907 nccl-library=22907
+# Collective test starting: all_reduce_perf
+# nThread 1 nGpus 1 minBytes 8388608 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0 unalign: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid 1101688 on jpbo-016-33 device  0 [0009:01:00] NVIDIA GH200 120GB
+#  Rank  1 Group  0 Pid 1101689 on jpbo-016-33 device  1 [0019:01:00] NVIDIA GH200 120GB
+#  Rank  2 Group  0 Pid 1101690 on jpbo-016-33 device  2 [0029:01:00] NVIDIA GH200 120GB
+#  Rank  3 Group  0 Pid 1101691 on jpbo-016-33 device  3 [0039:01:00] NVIDIA GH200 120GB
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+     8388608       2097152     float     sum      -1    61.72  135.92  203.89       0    61.10  137.29  205.94       0
+    16777216       4194304     float     sum      -1   102.07  164.38  246.56       0    99.32  168.92  253.39       0
+    33554432       8388608     float     sum      -1   177.54  189.00  283.50       0   177.19  189.37  284.05       0
+    67108864      16777216     float     sum      -1   335.03  200.31  300.46       0   333.13  201.45  302.18       0
+   134217728      33554432     float     sum      -1   633.24  211.96  317.93       0   633.25  211.95  317.93       0
+   268435456      67108864     float     sum      -1  1226.13  218.93  328.39       0  1227.22  218.73  328.10       0
+   536870912     134217728     float     sum      -1  2400.08  223.69  335.53       0  2404.40  223.29  334.93       0
+  1073741824     268435456     float     sum      -1  4752.26  225.94  338.91       0  4742.12  226.43  339.64       0
+  2147483648     536870912     float     sum      -1  9474.52  226.66  339.99       0  9498.00  226.10  339.15       0
+  4294967296    1073741824     float     sum      -1  18938.0  226.79  340.19       0  18948.0  226.67  340.01       0
+  8589934592    2147483648     float     sum      -1  37973.0  226.21  339.32       0  37870.5  226.82  340.24       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 307.283 
+#
+# Collective test concluded: all_reduce_perf
+#
+
+    -> /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_allreduce_1n4g_jupiter.json
+=== AllGather 1n4g ===
+# Writing JSON output to /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_allgather_1n4g_jupiter.json.0
+# nccl-tests version 2.18.2 nccl-headers=22907 nccl-library=22907
+# Collective test starting: all_gather_perf
+# nThread 1 nGpus 1 minBytes 8388608 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0 unalign: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid 1101794 on jpbo-016-33 device  0 [0009:01:00] NVIDIA GH200 120GB
+#  Rank  1 Group  0 Pid 1101795 on jpbo-016-33 device  1 [0019:01:00] NVIDIA GH200 120GB
+#  Rank  2 Group  0 Pid 1101796 on jpbo-016-33 device  2 [0029:01:00] NVIDIA GH200 120GB
+#  Rank  3 Group  0 Pid 1101797 on jpbo-016-33 device  3 [0039:01:00] NVIDIA GH200 120GB
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+     8388608        524288     float    none      -1    44.85  187.03  140.27       0    43.21  194.13  145.60       0
+    16777216       1048576     float    none      -1    65.41  256.51  192.38       0    62.71  267.55  200.66       0
+    33554432       2097152     float    none      -1   106.89  313.91  235.43       0   105.67  317.53  238.15       0
+    67108864       4194304     float    none      -1   190.28  352.68  264.51       0   187.90  357.15  267.86       0
+   134217728       8388608     float    none      -1   354.19  378.95  284.21       0   349.68  383.83  287.87       0
+   268435456      16777216     float    none      -1   677.60  396.15  297.12       0   668.06  401.82  301.36       0
+   536870912      33554432     float    none      -1  1314.97  408.28  306.21       0  1301.23  412.59  309.44       0
+  1073741824      67108864     float    none      -1  2578.16  416.48  312.36       0  2541.46  422.49  316.87       0
+  2147483648     134217728     float    none      -1  5071.95  423.40  317.55       0  5005.51  429.02  321.77       0
+  4294967296     268435456     float    none      -1  10050.9  427.32  320.49       0  9946.16  431.82  323.87       0
+  8589934592     536870912     float    none      -1  19929.2  431.02  323.27       0  19818.1  433.44  325.08       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 274.196 
+#
+# Collective test concluded: all_gather_perf
+#
+
+    -> /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_allgather_1n4g_jupiter.json
+=== ReduceScatter 1n4g ===
+# Writing JSON output to /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_reducescatter_1n4g_jupiter.json.0
+# nccl-tests version 2.18.2 nccl-headers=22907 nccl-library=22907
+# Collective test starting: reduce_scatter_perf
+# nThread 1 nGpus 1 minBytes 8388608 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0 unalign: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid 1101914 on jpbo-016-33 device  0 [0009:01:00] NVIDIA GH200 120GB
+#  Rank  1 Group  0 Pid 1101915 on jpbo-016-33 device  1 [0019:01:00] NVIDIA GH200 120GB
+#  Rank  2 Group  0 Pid 1101916 on jpbo-016-33 device  2 [0029:01:00] NVIDIA GH200 120GB
+#  Rank  3 Group  0 Pid 1101917 on jpbo-016-33 device  3 [0039:01:00] NVIDIA GH200 120GB
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+     8388608        524288     float     sum      -1    40.74  205.91  154.43       0    40.68  206.22  154.66       0
+    16777216       1048576     float     sum      -1    61.63  272.22  204.17       0    61.49  272.86  204.64       0
+    33554432       2097152     float     sum      -1   104.86  320.00  240.00       0   104.53  321.01  240.76       0
+    67108864       4194304     float     sum      -1   190.63  352.04  264.03       0   188.79  355.46  266.60       0
+   134217728       8388608     float     sum      -1   352.72  380.52  285.39       0   353.28  379.92  284.94       0
+   268435456      16777216     float     sum      -1   678.58  395.59  296.69       0   675.88  397.17  297.88       0
+   536870912      33554432     float     sum      -1  1318.61  407.15  305.36       0  1315.89  407.99  305.99       0
+  1073741824      67108864     float     sum      -1  2579.44  416.27  312.20       0  2574.43  417.08  312.81       0
+  2147483648     134217728     float     sum      -1  5087.00  422.15  316.61       0  5073.37  423.29  317.46       0
+  4294967296     268435456     float     sum      -1  10085.6  425.85  319.39       0  10030.7  428.18  321.14       0
+  8589934592     536870912     float     sum      -1  20015.2  429.17  321.88       0  19950.6  430.56  322.92       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 274.998 
+#
+# Collective test concluded: reduce_scatter_perf
+#
+
+    -> /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_reducescatter_1n4g_jupiter.json
+=== AllToAll 1n4g ===
+# Writing JSON output to /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_alltoall_1n4g_jupiter.json.0
+# nccl-tests version 2.18.2 nccl-headers=22907 nccl-library=22907
+# Collective test starting: alltoall_perf
+# nThread 1 nGpus 1 minBytes 8388608 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0 unalign: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid 1102019 on jpbo-016-33 device  0 [0009:01:00] NVIDIA GH200 120GB
+#  Rank  1 Group  0 Pid 1102020 on jpbo-016-33 device  1 [0019:01:00] NVIDIA GH200 120GB
+#  Rank  2 Group  0 Pid 1102021 on jpbo-016-33 device  2 [0029:01:00] NVIDIA GH200 120GB
+#  Rank  3 Group  0 Pid 1102022 on jpbo-016-33 device  3 [0039:01:00] NVIDIA GH200 120GB
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+     8388608        524288     float    none      -1    35.91  233.60  175.20       0    35.21  238.26  178.69    N/A
+    16777216       1048576     float    none      -1    60.46  277.48  208.11       0    58.54  286.58  214.94    N/A
+    33554432       2097152     float    none      -1   102.46  327.48  245.61       0   101.47  330.70  248.02    N/A
+    67108864       4194304     float    none      -1   177.60  377.87  283.41       0   176.92  379.31  284.49    N/A
+   134217728       8388608     float    none      -1   327.69  409.59  307.19       0   325.86  411.88  308.91    N/A
+   268435456      16777216     float    none      -1   620.46  432.64  324.48       0   618.12  434.28  325.71    N/A
+   536870912      33554432     float    none      -1  1206.23  445.08  333.81       0  1186.84  452.35  339.27    N/A
+  1073741824      67108864     float    none      -1  2713.14  395.76  296.82       0  2729.96  393.32  294.99    N/A
+  2147483648     134217728     float    none      -1  5314.60  404.07  303.05       0  5409.04  397.02  297.76    N/A
+  4294967296     268435456     float    none      -1  10513.0  408.54  306.40       0  10855.3  395.66  296.74    N/A
+  8589934592     536870912     float    none      -1  20879.6  411.40  308.55       0  21845.3  393.22  294.91    N/A
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 280.776 
+#
+# Collective test concluded: alltoall_perf
+#
+
+    -> /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/nccl_alltoall_1n4g_jupiter.json
+Done. Results in /e/home/jusers/vanosch1/jupiter/Simulon/experiments/validate_simccl/results/

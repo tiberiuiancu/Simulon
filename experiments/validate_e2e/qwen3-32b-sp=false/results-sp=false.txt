@@ -1,0 +1,17 @@
+
+Scenario: experiments/validate_e2e/qwen3-32b-sp=false/scenario.yaml  (ref: experiments/validate_e2e/qwen3-32b-sp=false/reference.yaml)
+────────────────────────────────────────────────────────────────────────
+  Metric                             Simulated       Reference     Error
+  ────────────────────────────  ──────────────  ──────────────  ────────
+  Iteration time                   11,291.5 ms     11,433.9 ms    -1.25%
+  Throughput                        92,864 t/s      91,706 t/s    +1.26%
+  Per-GPU throughput                 1,451 t/s       1,433 t/s    +1.26%
+  TFLOPs/s (total)               19331.73 TF/s               —         —
+  Per-GPU TFLOPs/s                 302.06 TF/s     298.30 TF/s    +1.26%
+  MFU                                   30.54%          30.16%    +1.26%
+
+  Breakdown                                 ms         %
+  ────────────────────────────  ──────────────  ────────
+  Compute                           8,621.9 ms    76.4%
+  Exposed comm                      2,669.6 ms    23.6%
+

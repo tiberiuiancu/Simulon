@@ -1,0 +1,270 @@
+SM clock: 1830 MHz
+==============================================================
+[21:15:33] tp2pp4-mbs2 [span] <- tp2pp4-mbs2-offload
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+Tracing rank 0 ...
+Error: Megatron exited with code 1 for rank 0
+LANG_RL Log directory: None
+INFO:datasets:PyTorch version 2.11.0a0+eb65b36914.nv26.2 available.
+using world size: 64, data-parallel size: 8, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 2, pipeline-model-parallel size: 4
+WARNING: Setting args.overlap_p2p_comm and args.align_param_gather to False since non-interleaved schedule does not support overlapping p2p communication and aligned param AG
+Number of virtual stages per pipeline stage: None
+accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+using torch.bfloat16 for parameters ...
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/opt/venv/lib/python3.12/site-packages/comet_ml/error_tracking/api.py:51: UserWarning: We won't be continuing development on SDK 3.0. Please use the last stable version of the SDK to get access to the newest features and fixes. See https://github.com/getsentry/sentry-python/discussions/4955
+  sentry_sdk.init(
+Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+/opt/venv/lib/python3.12/site-packages/modelopt/torch/__init__.py:36: UserWarning: transformers version 5.3.0 is not tested with nvidia-modelopt and may cause issues. Please install recommended version with `pip install nvidia-modelopt[hf]` if working with HF models.
+  _warnings.warn(
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: Overriding default arguments for tokenizer_type:GPT2BPETokenizer with tokenizer_type:NullTokenizer
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: check_for_nan_in_loss_and_grad is set to False for fake process group.
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: use_gloo_process_groups is set to False for fake process group.
+  warnings.warn(message)
+Traceback (most recent call last):
+  File "/opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py", line 414, in <module>
+    args = parse_and_validate_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 109, in parse_and_validate_args
+    validate_args(args, args_defaults)
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 1572, in validate_args
+    assert args.use_precision_aware_optimizer, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: The optimizer cpu offload must be used in conjunction with `--use-precision-aware-optimizer`, as the hybrid device optimizer reuses the code path of this flag.
+
+[21:16:41] tp2pp4-mbs2 [span] exit=0
+  !! still no trace (SGD did not free enough) -- continuing
+==============================================================
+[21:16:41] tp2pp4-mbs2 [kernel] <- tp2pp4-mbs2-offload
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+Tracing rank 0 ...
+Error: Megatron exited with code 1 for rank 0
+LANG_RL Log directory: None
+INFO:datasets:PyTorch version 2.11.0a0+eb65b36914.nv26.2 available.
+using world size: 64, data-parallel size: 8, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 2, pipeline-model-parallel size: 4
+WARNING: Setting args.overlap_p2p_comm and args.align_param_gather to False since non-interleaved schedule does not support overlapping p2p communication and aligned param AG
+Number of virtual stages per pipeline stage: None
+accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+using torch.bfloat16 for parameters ...
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/opt/venv/lib/python3.12/site-packages/comet_ml/error_tracking/api.py:51: UserWarning: We won't be continuing development on SDK 3.0. Please use the last stable version of the SDK to get access to the newest features and fixes. See https://github.com/getsentry/sentry-python/discussions/4955
+  sentry_sdk.init(
+Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+/opt/venv/lib/python3.12/site-packages/modelopt/torch/__init__.py:36: UserWarning: transformers version 5.3.0 is not tested with nvidia-modelopt and may cause issues. Please install recommended version with `pip install nvidia-modelopt[hf]` if working with HF models.
+  _warnings.warn(
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: Overriding default arguments for tokenizer_type:GPT2BPETokenizer with tokenizer_type:NullTokenizer
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: check_for_nan_in_loss_and_grad is set to False for fake process group.
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: use_gloo_process_groups is set to False for fake process group.
+  warnings.warn(message)
+Traceback (most recent call last):
+  File "/opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py", line 414, in <module>
+    args = parse_and_validate_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 109, in parse_and_validate_args
+    validate_args(args, args_defaults)
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 1572, in validate_args
+    assert args.use_precision_aware_optimizer, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: The optimizer cpu offload must be used in conjunction with `--use-precision-aware-optimizer`, as the hybrid device optimizer reuses the code path of this flag.
+
+[21:17:18] tp2pp4-mbs2 [kernel] exit=0
+  !! still no trace (SGD did not free enough) -- continuing
+==============================================================
+[21:17:18] tp4pp1-mbs2 [span] <- tp4pp1-mbs2-offload
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+Tracing rank 0 ...
+Error: Megatron exited with code 1 for rank 0
+LANG_RL Log directory: None
+INFO:datasets:PyTorch version 2.11.0a0+eb65b36914.nv26.2 available.
+using world size: 64, data-parallel size: 16, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 4, pipeline-model-parallel size: 1
+Number of virtual stages per pipeline stage: None
+accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+using torch.bfloat16 for parameters ...
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+/opt/venv/lib/python3.12/site-packages/modelopt/torch/__init__.py:36: UserWarning: transformers version 5.3.0 is not tested with nvidia-modelopt and may cause issues. Please install recommended version with `pip install nvidia-modelopt[hf]` if working with HF models.
+  _warnings.warn(
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: Overriding default arguments for tokenizer_type:GPT2BPETokenizer with tokenizer_type:NullTokenizer
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: check_for_nan_in_loss_and_grad is set to False for fake process group.
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: use_gloo_process_groups is set to False for fake process group.
+  warnings.warn(message)
+Traceback (most recent call last):
+  File "/opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py", line 414, in <module>
+    args = parse_and_validate_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 109, in parse_and_validate_args
+    validate_args(args, args_defaults)
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 1572, in validate_args
+    assert args.use_precision_aware_optimizer, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: The optimizer cpu offload must be used in conjunction with `--use-precision-aware-optimizer`, as the hybrid device optimizer reuses the code path of this flag.
+
+[21:17:54] tp4pp1-mbs2 [span] exit=0
+  !! still no trace (SGD did not free enough) -- continuing
+==============================================================
+[21:17:54] tp4pp1-mbs2 [kernel] <- tp4pp1-mbs2-offload
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+Tracing rank 0 ...
+Error: Megatron exited with code 1 for rank 0
+LANG_RL Log directory: None
+INFO:datasets:PyTorch version 2.11.0a0+eb65b36914.nv26.2 available.
+using world size: 64, data-parallel size: 16, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 4, pipeline-model-parallel size: 1
+Number of virtual stages per pipeline stage: None
+accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+using torch.bfloat16 for parameters ...
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/opt/venv/lib/python3.12/site-packages/comet_ml/error_tracking/api.py:51: UserWarning: We won't be continuing development on SDK 3.0. Please use the last stable version of the SDK to get access to the newest features and fixes. See https://github.com/getsentry/sentry-python/discussions/4955
+  sentry_sdk.init(
+Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+/opt/venv/lib/python3.12/site-packages/modelopt/torch/__init__.py:36: UserWarning: transformers version 5.3.0 is not tested with nvidia-modelopt and may cause issues. Please install recommended version with `pip install nvidia-modelopt[hf]` if working with HF models.
+  _warnings.warn(
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: Overriding default arguments for tokenizer_type:GPT2BPETokenizer with tokenizer_type:NullTokenizer
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: check_for_nan_in_loss_and_grad is set to False for fake process group.
+  warnings.warn(message)
+/opt/simulon/vendor/Megatron-LM-traced/megatron/training/utils.py:412: UserWarning: use_gloo_process_groups is set to False for fake process group.
+  warnings.warn(message)
+Traceback (most recent call last):
+  File "/opt/simulon/vendor/Megatron-LM-traced/pretrain_gpt.py", line 414, in <module>
+    args = parse_and_validate_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 109, in parse_and_validate_args
+    validate_args(args, args_defaults)
+  File "/opt/simulon/vendor/Megatron-LM-traced/megatron/training/arguments.py", line 1572, in validate_args
+    assert args.use_precision_aware_optimizer, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: The optimizer cpu offload must be used in conjunction with `--use-precision-aware-optimizer`, as the hybrid device optimizer reuses the code path of this flag.
+
+[21:18:30] tp4pp1-mbs2 [kernel] exit=0
+  !! still no trace (SGD did not free enough) -- continuing
+[21:18:30] done

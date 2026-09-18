@@ -1,0 +1,29 @@
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) Stages/2026
+Launching v40_qwen3_1p7b_1_pp1_tp4_mbs1_rcFalse_vppNone_spFalse_gbs256_5 on JUPITER
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+usage: torchrun [-h] [--nnodes NNODES] [--nproc-per-node NPROC_PER_NODE]
+                [--rdzv-backend RDZV_BACKEND] [--rdzv-endpoint RDZV_ENDPOINT]
+                [--rdzv-id RDZV_ID] [--rdzv-conf RDZV_CONF] [--standalone]
+                [--max-restarts MAX_RESTARTS]
+                [--monitor-interval MONITOR_INTERVAL]
+                [--start-method {spawn,fork,forkserver}]
+                [--event-log-handler EVENT_LOG_HANDLER] [--role ROLE] [-m]
+                [--no-python] [--run-path] [--log-dir LOG_DIR] [-r REDIRECTS]
+                [-t TEE] [--local-ranks-filter LOCAL_RANKS_FILTER]
+                [--duplicate-stdout-filters DUPLICATE_STDOUT_FILTERS]
+                [--duplicate-stderr-filters DUPLICATE_STDERR_FILTERS]
+                [--node-rank NODE_RANK] [--master-addr MASTER_ADDR]
+                [--master-port MASTER_PORT] [--local-addr LOCAL_ADDR]
+                [--logs-specs LOGS_SPECS]
+                [--numa-binding {node,socket,exclusive,core-complex}]
+                [--signals-to-handle SIGNALS_TO_HANDLE] [--virtual-local-rank]
+                training_script ...
+torchrun: error: argument --master-addr/--master_addr: expected one argument
+srun: error: jpbo-009-12: task 0: Exited with exit code 2
+
+=== nsys report:  ===
+NO REPORT — capture window missed the run; check iteration times

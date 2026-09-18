@@ -1,0 +1,24 @@
+component                            tp1pp1-mbs1     tp1pp1-mbs2     tp2pp1-mbs1
+forward-backward                         12590.6          9677.7         21867.8
+forward-compute                           6404.3          3976.8         12219.7
+backward-compute                          6366.7          5858.8          9544.2
+batch-generator                             45.1            25.8           141.9
+optimizer                                   20.2            20.1            23.1
+all-grads-sync                              22.7            22.8            21.8
+params-all-gather                            9.2             9.2             9.5
+optimizer-inner-step                         5.0             5.1             5.2
+optimizer-copy-main-to-model-params             1.6             1.5             2.9
+optimizer-copy-to-main-grad                  0.7             0.7             1.2
+embedding-grads-all-reduce                   0.0             0.0             0.0
+
+PER-SEQUENCE TEST (a per-sequence component: ~equal at the two 64-seq runs, ~2x at 128-seq):
+component                          mbs1/mbs2 ratio   tp2/tp1 ratio  verdict
+forward-backward                              0.77            1.74  
+forward-compute                               0.62            1.91  
+backward-compute                              0.92            1.50  
+batch-generator                               0.57            3.15  
+optimizer                                     0.99            1.15  
+all-grads-sync                                1.00            0.96  
+
+Target to attribute: real overhead ~3047 ms @ tp1pp1-mbs1 (49.3 ms/seq * 64).
+The component(s) tagged PER-SEQUENCE whose tp1pp1-mbs1 value sums to ~3000 ms is k_seq.

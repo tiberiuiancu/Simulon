@@ -1,0 +1,115 @@
+=== GPU inventory / max clocks ===
+index, name, clocks.max.sm [MHz], clocks.max.memory [MHz]
+0, NVIDIA GH200 120GB, 1980 MHz, 2619 MHz
+1, NVIDIA GH200 120GB, 1980 MHz, 2619 MHz
+2, NVIDIA GH200 120GB, 1980 MHz, 2619 MHz
+3, NVIDIA GH200 120GB, 1980 MHz, 2619 MHz
+max SM clock = 1980 MHz
+=== attempting to lock SM clock to max (may be denied without elevated perms) ===
+The current user does not have permission to change clocks for GPU 00000009:01:00.0.
+Terminating early due to previous errors.
+LOCK: DENIED — proceeding unlocked; the clock log below is the evidence
+==============================================================
+[11:15:49] tracing tp4pp4-mbs1 (clock-locked=0) -> templates/gpu/gh200_jupiter-clocklock/traces/tp4pp4-mbs1
+[11:15:49] clock just before tp4pp4-mbs1: 345 MHz, 46
+/usr/bin/rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 26.02 (build 269443100)
+PyTorch Version 2.11.0a0+eb65b36
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+Tracing rank 0 ...
+Tracing rank 16 ...
+Tracing rank 32 ...
+Tracing rank 48 ...
+
+Trace generation complete. 4 file(s) in /opt/simulon/templates/gpu/gh200_jupiter-clocklock/traces/tp4pp4-mbs1:
+  trace_rank_0.json
+  trace_rank_16.json
+  trace_rank_32.json
+  trace_rank_48.json
+[11:20:12] tp4pp4-mbs1 exit=0  clock after: 1980 MHz, 52
+==============================================================
+[11:20:12] tracing tp4pp4-mbs2 (clock-locked=0) -> templates/gpu/gh200_jupiter-clocklock/traces/tp4pp4-mbs2
+[11:20:12] clock just before tp4pp4-mbs2: 1980 MHz, 52
+/usr/bin/rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 26.02 (build 269443100)
+PyTorch Version 2.11.0a0+eb65b36
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+Tracing rank 0 ...
+Tracing rank 16 ...
+Tracing rank 32 ...
+Tracing rank 48 ...
+
+Trace generation complete. 4 file(s) in /opt/simulon/templates/gpu/gh200_jupiter-clocklock/traces/tp4pp4-mbs2:
+  trace_rank_0.json
+  trace_rank_16.json
+  trace_rank_32.json
+  trace_rank_48.json
+[11:24:16] tp4pp4-mbs2 exit=0  clock after: 1980 MHz, 53
+
+=== SM clock summary during the session (col 2 of experiments/trace_clocklock-1006317.clocks.csv) ===
+  SM clock  min=345  mean=1274  max=1980 MHz  (max hardware=1980)
+  temp      mean=58  max=71 C
+  power     mean=323  max=559 W
+[11:24:16] done — clock log: experiments/trace_clocklock-1006317.clocks.csv

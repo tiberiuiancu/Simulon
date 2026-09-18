@@ -1,0 +1,18 @@
+# Practical measurements from wandb — Qwen3-32B on Jupiter (16n×4g, TP=4, DP=16)
+# GBS=256, MBS=1, seq_len=4096, sequence-parallel=true
+# Over 10 iterations, the fastest iteration is taken
+
+# #PP=2, SP=false slurm-595523.log
+# iter_time_ms: 10636.5
+# throughput_tps: 98579.2
+# per_gpu_tps: 1540.3
+# per_gpu_tflops: 320.7
+# mfu_pct: 32.42
+
+
+##PP=2, SP=true slurm-594639.log
+iter_time_ms: 11222.8
+throughput_tps: 93433.6
+per_gpu_tps: 1459.9
+per_gpu_tflops: 303.9
+mfu_pct: 30.72

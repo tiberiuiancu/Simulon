@@ -1,0 +1,39 @@
+# Qwen3-1.7B scorecard - host model (host_cost_us=18.2) + blocking-P2P host sync
+# traces job 1224555. host_queue_kernels DISABLED (tested and falsified, see replayer)
+# generated 2026-08-03
+
+==================================================================================
+(A) NATIVE: physical (val40 iters 21-40) vs sim from each cell's OWN trace
+==================================================================================
+cell               phys ms   sim ms   delta  verdict
+tp1 pp1 mbs1          9921    10585   +6.7%  ACCEPTABLE
+tp1 pp1 mbs2          9542     8706   -8.8%  ACCEPTABLE
+tp1 pp1 mbs4          9072     8662   -4.5%  GOOD
+tp2 pp1 mbs1         21010    21323   +1.5%  GOOD
+tp2 pp1 mbs8         11124    10247   -7.9%  ACCEPTABLE
+tp4 pp1 mbs1         41449    42596   +2.8%  GOOD
+tp4 pp1 mbs2         21314    21376   +0.3%  GOOD
+tp1 pp2 mbs1         14479    17310  +19.6%  FAIL
+tp1 pp4 mbs1         20106    20439   +1.7%  GOOD
+tp1 pp1 mbs1 rc      10741    12413  +15.6%  FAIL
+tp2 pp2 mbs2         16002    13155  -17.8%  FAIL
+
+==================================================================================
+(B) EXTRAPOLATE mbs from an mbs=1 anchor trace vs physical
+==================================================================================
+leg                   phys ms   sim ms   delta  verdict
+mbs 1->2 @tp1pp1         9542     8782   -8.0%  ACCEPTABLE
+mbs 1->4 @tp1pp1         9072     8790   -3.1%  GOOD
+mbs 1->8 @tp2pp1        11124    11782   +5.9%  ACCEPTABLE
+
+==================================================================================
+AXIS-ISOLATED (NATIVE): measured effect vs simulated effect (ratios)
+==================================================================================
+axis                       meas      sim    error  verdict
+MBS 1->2 @tp1pp1          -3.8%   -17.8%   -13.9pp  FAIL
+MBS 1->4 @tp1pp1          -8.6%   -18.2%    -9.6pp  ACCEPTABLE
+TP  1->2 @pp1mbs1       +111.8%  +101.4%   -10.3pp  FAIL
+TP  2->4 @pp1mbs1        +97.3%   +99.8%    +2.5pp  GOOD
+PP  1->2 @tp1mbs1        +45.9%   +63.5%   +17.6pp  FAIL
+PP  2->4 @tp1mbs1        +38.9%   +18.1%   -20.8pp  FAIL
+RC  off->on @tp1pp1       +8.3%   +17.3%    +9.0pp  ACCEPTABLE

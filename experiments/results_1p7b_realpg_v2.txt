@@ -1,0 +1,37 @@
+==================================================================================
+(A) NATIVE: physical (val40 iters 21-40) vs sim from each cell's OWN trace
+==================================================================================
+cell               phys ms   sim ms   delta  verdict
+tp1 pp1 mbs1          9921     9933   +0.1%  GOOD
+tp1 pp1 mbs2          9542     9108   -4.5%  GOOD
+tp1 pp1 mbs4          9072     8868   -2.2%  GOOD
+tp2 pp1 mbs1         21010    20430   -2.8%  GOOD
+tp2 pp1 mbs8         11124    10854   -2.4%  GOOD
+tp4 pp1 mbs1         41449    40835   -1.5%  GOOD
+tp4 pp1 mbs2         21314    20489   -3.9%  GOOD
+tp1 pp2 mbs1         14479    17208  +18.8%  FAIL
+tp1 pp4 mbs1         20106    22029   +9.6%  ACCEPTABLE
+tp1 pp1 mbs1 rc      10741    11846  +10.3%  FAIL
+tp2 pp2 mbs2         16002    15343   -4.1%  GOOD
+tp2 pp1 mbs1 rc    MISSING          (no logs)
+tp1 pp2 mbs1 dp1   MISSING          (no logs)
+
+==================================================================================
+(B) EXTRAPOLATE mbs from an mbs=1 anchor trace vs physical
+==================================================================================
+leg                   phys ms   sim ms   delta  verdict
+mbs 1->2 @tp1pp1         9542     9297   -2.6%  GOOD
+mbs 1->4 @tp1pp1         9072     9307   +2.6%  GOOD
+mbs 1->8 @tp2pp1        11124    12421  +11.7%  FAIL
+
+==================================================================================
+AXIS-ISOLATED (NATIVE): measured effect vs simulated effect (ratios)
+==================================================================================
+axis                       meas      sim    error  verdict
+MBS 1->2 @tp1pp1          -3.8%    -8.3%    -4.5pp  GOOD
+MBS 1->4 @tp1pp1          -8.6%   -10.7%    -2.2pp  GOOD
+TP  1->2 @pp1mbs1       +111.8%  +105.7%    -6.1pp  ACCEPTABLE
+TP  2->4 @pp1mbs1        +97.3%   +99.9%    +2.6pp  GOOD
+PP  1->2 @tp1mbs1        +45.9%   +73.2%   +27.3pp  FAIL
+PP  2->4 @tp1mbs1        +38.9%   +28.0%   -10.8pp  FAIL
+RC  off->on @tp1pp1       +8.3%   +19.3%   +11.0pp  FAIL

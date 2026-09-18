@@ -1,0 +1,101 @@
+==============================================================
+[21:03:10] tracing SP=true
+  workload: templates/gpu/gh200_jupiter/traces/5a8d3f1964fbbea1/workload.yaml
+  output  : templates/gpu/gh200_jupiter-tp4pp1sptrue-rerun/traces/gbs256
+==============================================================
+/usr/bin/rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 26.02 (build 269443100)
+PyTorch Version 2.11.0a0+eb65b36
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+Tracing rank 0 ...
+
+Trace generation complete. 1 file(s) in /opt/simulon/templates/gpu/gh200_jupiter-tp4pp1sptrue-rerun/traces/gbs256:
+  trace_rank_0.json
+[21:04:32] exit=0 for SP=true
+total 2050
+drwxr-xr-x+ 2 vanosch1 vanosch1    4096 Jul 19 21:04 .
+drwxr-xr-x+ 3 vanosch1 vanosch1    4096 Jul 19 21:03 ..
+-rw-r--r--+ 1 vanosch1 vanosch1 3072019 Jul 19 21:04 trace_rank_0.json
+-rw-r--r--+ 1 vanosch1 vanosch1    1487 Jul 19 21:04 workload.yaml
+==============================================================
+[21:04:32] tracing SP=false
+  workload: templates/gpu/gh200_jupiter-sp=false/traces/5a8d3f1964fbbea1/workload.yaml
+  output  : templates/gpu/gh200_jupiter-tp4pp1spfalse-rerun/traces/gbs256
+==============================================================
+/usr/bin/rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 26.02 (build 269443100)
+PyTorch Version 2.11.0a0+eb65b36
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+rm: cannot remove '/usr/local/cuda/compat/lib': Read-only file system
+Tracing rank 0 ...
+
+Trace generation complete. 1 file(s) in /opt/simulon/templates/gpu/gh200_jupiter-tp4pp1spfalse-rerun/traces/gbs256:
+  trace_rank_0.json
+[21:05:34] exit=0 for SP=false
+total 746
+drwxr-xr-x+ 2 vanosch1 vanosch1   4096 Jul 19 21:05 .
+drwxr-xr-x+ 3 vanosch1 vanosch1   4096 Jul 19 21:04 ..
+-rw-r--r--+ 1 vanosch1 vanosch1 760396 Jul 19 21:05 trace_rank_0.json
+-rw-r--r--+ 1 vanosch1 vanosch1   1488 Jul 19 21:05 workload.yaml
+[21:05:34] done

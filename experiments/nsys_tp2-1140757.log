@@ -1,0 +1,1158 @@
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) Stages/2026
+NOTE: nsys not on host PATH; it is invoked INSIDE the container
+Launching v40_qwen3_1p7b_1_pp1_tp2_mbs1_rcFalse_vppNone_spFalse_gbs256_4 on JUPITER
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[W731 16:31:46.566447933 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [jpbo-051-48.jupiter.internal]:20074 (errno: 97 - Address family not supported by protocol).
+[default0]:/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+[default0]:  import pynvml  # type: ignore[import]
+[default1]:/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+[default1]:  import pynvml  # type: ignore[import]
+[default2]:/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+[default2]:  import pynvml  # type: ignore[import]
+[default3]:/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+[default3]:  import pynvml  # type: ignore[import]
+[default0]:Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[default1]:Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[default2]:Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[default3]:Error.  nthreads cannot be larger than environment variable "NUMEXPR_MAX_THREADS" (64)[default1]:Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+[default2]:Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+[default3]:Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+[default0]:Multiple distributions found for package modelopt. Picked distribution: nvidia-modelopt
+[default1]:[W731 16:32:47.479169096 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [r51-nod74.jupiter.internal]:20074 (errno: 97 - Address family not supported by protocol).
+[default0]:[W731 16:32:47.479171272 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [jpbo-051-48.jupiter.internal]:20074 (errno: 97 - Address family not supported by protocol).
+[default2]:[W731 16:32:47.479117513 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [r51-nod74.jupiter.internal]:20074 (errno: 97 - Address family not supported by protocol).
+[default0]:[rank0]:[W731 16:32:48.884429026 ProcessGroupNCCL.cpp:5178] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+[default3]:wandb: Tracking run with wandb version 0.26.0
+[default3]:wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+[default3]:wandb: Run data is saved locally in output/qwen3-1p7b/v40_qwen3_1p7b_1_pp1_tp2_mbs1_rcFalse_vppNone_spFalse_gbs256/wandb/wandb/offline-run-20260731_163247-4fwin8c1
+[default3]:wandb: Detected [mcp] in use.
+[default3]:wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
+[default3]:wandb: For more information, check out the docs at: https://weave-docs.wandb.ai
+[default3]:[W731 16:32:50.416076229 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [r51-nod74.jupiter.internal]:20074 (errno: 97 - Address family not supported by protocol).
+[default0]:[INFO] Running in WANDB offline mode
+[default1]:[INFO] Running in WANDB offline mode
+[default3]:[INFO] Running in WANDB offline mode
+[default2]:[INFO] Running in WANDB offline mode
+[default3]:LANG_RL Log directory: None
+[default2]:LANG_RL Log directory: None
+[default1]:LANG_RL Log directory: None
+[default0]:LANG_RL Log directory: None
+[default3]:WARNING:megatron.core.datasets.megatron_tokenizer:You’re using the legacy tokenizer system, which is deprecated and will be removed in a future release. Please migrate to the new tokenizer system (`megatron.core.tokenizers.MegatronTokenizer`).
+[default3]:> setting tensorboard ...
+[default2]:WARNING:megatron.core.datasets.megatron_tokenizer:You’re using the legacy tokenizer system, which is deprecated and will be removed in a future release. Please migrate to the new tokenizer system (`megatron.core.tokenizers.MegatronTokenizer`).
+[default1]:WARNING:megatron.core.datasets.megatron_tokenizer:You’re using the legacy tokenizer system, which is deprecated and will be removed in a future release. Please migrate to the new tokenizer system (`megatron.core.tokenizers.MegatronTokenizer`).
+[default0]:using world size: 4, data-parallel size: 2, context-parallel size: 1, hierarchical context-parallel sizes: None, tensor-model-parallel size: 2, pipeline-model-parallel size: 1
+[default0]:WARNING: overriding default arguments for tokenizer_type:GPT2BPETokenizer                        with tokenizer_type:NullTokenizer
+[default0]:Number of virtual stages per pipeline stage: None
+[default0]:accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+[default0]:using torch.bfloat16 for parameters ...
+[default0]:------------------------ arguments ------------------------
+[default0]:  account_for_embedding_in_pipeline_split ......... False
+[default0]:  account_for_loss_in_pipeline_split .............. False
+[default0]:  accumulate_allreduce_grads_in_fp32 .............. True
+[default0]:  activation_func_clamp_value ..................... None
+[default0]:  adam_beta1 ...................................... 0.9
+[default0]:  adam_beta2 ...................................... 0.95
+[default0]:  adam_eps ........................................ 1e-08
+[default0]:  add_bias_linear ................................. False
+[default0]:  add_position_embedding .......................... True
+[default0]:  add_qkv_bias .................................... False
+[default0]:  adlr_autoresume ................................. False
+[default0]:  adlr_autoresume_interval ........................ 1000
+[default0]:  align_grad_reduce ............................... True
+[default0]:  align_param_gather .............................. False
+[default0]:  allow_ambiguous_pad_tokens ...................... False
+[default0]:  app_tag_run_name ................................ None
+[default0]:  app_tag_run_version ............................. 0.0.0
+[default0]:  apply_layernorm_1p .............................. False
+[default0]:  apply_query_key_layer_scaling ................... False
+[default0]:  apply_residual_connection_post_layernorm ........ False
+[default0]:  apply_rope_fusion ............................... True
+[default0]:  async_save ...................................... None
+[default0]:  async_tensor_model_parallel_allreduce ........... True
+[default0]:  attention_backend ............................... AttnBackend.auto
+[default0]:  attention_dropout ............................... 0.0
+[default0]:  attention_softmax_in_fp32 ....................... True
+[default0]:  auto_detect_ckpt_format ......................... False
+[default0]:  barrier_with_L1_time ............................ True
+[default0]:  bert_binary_head ................................ True
+[default0]:  bert_embedder_type .............................. megatron
+[default0]:  bert_load ....................................... None
+[default0]:  bf16 ............................................ True
+[default0]:  bias_dropout_fusion ............................. True
+[default0]:  bias_gelu_fusion ................................ False
+[default0]:  bias_swiglu_fusion .............................. True
+[default0]:  biencoder_projection_dim ........................ 0
+[default0]:  biencoder_shared_query_context_model ............ False
+[default0]:  block_data_path ................................. None
+[default0]:  cache_mla_latents ............................... False
+[default0]:  calc_ft_timeouts ................................ False
+[default0]:  calculate_per_token_loss ........................ False
+[default0]:  check_for_large_grads ........................... False
+[default0]:  check_for_nan_in_loss_and_grad .................. False
+[default0]:  check_for_spiky_loss ............................ False
+[default0]:  check_weight_hash_across_dp_replicas_interval ... None
+[default0]:  ckpt_assume_constant_structure .................. False
+[default0]:  ckpt_convert_format ............................. None
+[default0]:  ckpt_convert_save ............................... None
+[default0]:  ckpt_convert_update_legacy_dist_opt_format ...... False
+[default0]:  ckpt_format ..................................... torch_dist
+[default0]:  ckpt_fully_parallel_load ........................ False
+[default0]:  ckpt_fully_parallel_save ........................ True
+[default0]:  ckpt_fully_parallel_save_deprecated ............. False
+[default0]:  ckpt_step ....................................... None
+[default0]:  classes_fraction ................................ 1.0
+[default0]:  clip_grad ....................................... 1.0
+[default0]:  clone_scatter_output_in_embedding ............... True
+[default0]:  config_logger_dir ............................... 
+[default0]:  consumed_train_samples .......................... 0
+[default0]:  consumed_valid_samples .......................... 0
+[default0]:  context_parallel_size ........................... 1
+[default0]:  cp_comm_type .................................... ['p2p']
+[default0]:  cpu_offloading_num_layers ....................... 0
+[default0]:  create_attention_mask_in_dataloader ............. True
+[default0]:  cross_entropy_fusion_impl ....................... native
+[default0]:  cross_entropy_loss_fusion ....................... False
+[default0]:  cuda_graph_impl ................................. none
+[default0]:  cuda_graph_scope ................................ full
+[default0]:  cuda_graph_warmup_steps ......................... 3
+[default0]:  data_args_path .................................. None
+[default0]:  data_cache_path ................................. .cache
+[default0]:  data_parallel_random_init ....................... False
+[default0]:  data_parallel_sharding_strategy ................. no_shard
+[default0]:  data_parallel_size .............................. 2
+[default0]:  data_path ....................................... None
+[default0]:  data_per_class_fraction ......................... 1.0
+[default0]:  data_sharding ................................... True
+[default0]:  dataloader_type ................................. cyclic
+[default0]:  ddp_average_in_collective ....................... False
+[default0]:  ddp_bucket_size ................................. None
+[default0]:  ddp_num_buckets ................................. None
+[default0]:  ddp_pad_buckets_for_high_nccl_busbw ............. False
+[default0]:  ddp_reduce_scatter_with_fp32_accumulation ....... False
+[default0]:  decode_only_cuda_graphs ......................... False
+[default0]:  decoder_first_pipeline_num_layers ............... None
+[default0]:  decoder_last_pipeline_num_layers ................ None
+[default0]:  decoder_num_layers .............................. None
+[default0]:  decoder_seq_length .............................. None
+[default0]:  decoupled_lr .................................... None
+[default0]:  decoupled_min_lr ................................ None
+[default0]:  decrease_batch_size_if_needed ................... False
+[default0]:  defer_embedding_wgrad_compute ................... False
+[default0]:  delay_wgrad_compute ............................. False
+[default0]:  deprecated_use_mcore_models ..................... False
+[default0]:  deterministic_mode .............................. False
+[default0]:  dino_bottleneck_size ............................ 256
+[default0]:  dino_freeze_last_layer .......................... 1
+[default0]:  dino_head_hidden_size ........................... 2048
+[default0]:  dino_local_crops_number ......................... 10
+[default0]:  dino_local_img_size ............................. 96
+[default0]:  dino_norm_last_layer ............................ False
+[default0]:  dino_teacher_temp ............................... 0.07
+[default0]:  dino_warmup_teacher_temp ........................ 0.04
+[default0]:  dino_warmup_teacher_temp_epochs ................. 30
+[default0]:  disable_bf16_reduced_precision_matmul ........... False
+[default0]:  disable_chunked_prefill ......................... False
+[default0]:  disable_mamba_mem_eff_path ...................... False
+[default0]:  disable_straggler_on_startup .................... False
+[default0]:  disable_symmetric_registration .................. False
+[default0]:  dist_ckpt_format_deprecated ..................... None
+[default0]:  dist_ckpt_optim_fully_reshardable ............... False
+[default0]:  dist_ckpt_save_pre_mcore_014 .................... False
+[default0]:  dist_ckpt_strictness ............................ assume_ok_unexpected
+[default0]:  distrib_optim_fully_reshardable_mem_efficient ... False
+[default0]:  distribute_saved_activations .................... False
+[default0]:  distributed_backend ............................. nccl
+[default0]:  distributed_timeout_minutes ..................... 30
+[default0]:  distributed_timeout_seconds_after_init .......... None
+[default0]:  dump_param_to_param_group_map ................... None
+[default0]:  embedding_init_method_std ....................... None
+[default0]:  embedding_path .................................. None
+[default0]:  empty_unused_memory_level ....................... 0
+[default0]:  enable_cuda_graph ............................... False
+[default0]:  enable_experimental ............................. False
+[default0]:  enable_ft_package ............................... False
+[default0]:  enable_full_sharding_in_hsdp .................... False
+[default0]:  enable_gloo_process_groups ...................... True
+[default0]:  enable_gpt_oss .................................. False
+[default0]:  enable_msc ...................................... True
+[default0]:  enable_one_logger ............................... True
+[default0]:  encoder_num_layers .............................. 28
+[default0]:  encoder_seq_length .............................. 4096
+[default0]:  end_weight_decay ................................ 0.05
+[default0]:  eod_mask_loss ................................... False
+[default0]:  error_injection_rate ............................ 0
+[default0]:  error_injection_type ............................ transient_error
+[default0]:  eval_interval ................................... 999999
+[default0]:  eval_iters ...................................... 0
+[default0]:  evidence_data_path .............................. None
+[default0]:  exit_duration_in_mins ........................... None
+[default0]:  exit_interval ................................... None
+[default0]:  exit_on_missing_checkpoint ...................... False
+[default0]:  exit_signal ..................................... SIGTERM
+[default0]:  exit_signal_handler ............................. False
+[default0]:  exp_avg_dtype ................................... torch.float32
+[default0]:  exp_avg_sq_dtype ................................ torch.float32
+[default0]:  expert_model_parallel_size ...................... 1
+[default0]:  expert_tensor_parallel_size ..................... 2
+[default0]:  export_force_local_attention .................... False
+[default0]:  export_kd_cfg ................................... None
+[default0]:  export_kd_teacher_ckpt_format ................... None
+[default0]:  export_kd_teacher_load .......................... None
+[default0]:  export_kv_cache_quant ........................... False
+[default0]:  export_legacy_megatron .......................... False
+[default0]:  export_model_type ............................... GPTModel
+[default0]:  export_moe_apply_probs_on_input ................. False
+[default0]:  export_offline_model ............................ False
+[default0]:  export_qk_l2_norm ............................... False
+[default0]:  export_quant_cfg ................................ None
+[default0]:  export_real_quant_cfg ........................... None
+[default0]:  export_te_mcore_model ........................... False
+[default0]:  external_cuda_graph ............................. False
+[default0]:  fake_process_group .............................. False
+[default0]:  ffn_hidden_size ................................. 6144
+[default0]:  fim_data ........................................ False
+[default0]:  fim_eod_token ................................... <|endoftext|>
+[default0]:  fim_fragment_rate ............................... None
+[default0]:  fim_middle_token ................................ <fim_middle>
+[default0]:  fim_no_prefix ................................... None
+[default0]:  fim_pad_token ................................... <fim_pad>
+[default0]:  fim_prefix_token ................................ <fim_prefix>
+[default0]:  fim_rate ........................................ 0.5
+[default0]:  fim_split_sample ................................ None
+[default0]:  fim_spm_rate .................................... 0.5
+[default0]:  fim_suffix_token ................................ <fim_suffix>
+[default0]:  finetune ........................................ False
+[default0]:  finetune_data_split ............................. train
+[default0]:  finetune_hf_dataset ............................. None
+[default0]:  first_last_layers_bf16 .......................... False
+[default0]:  flash_decode .................................... False
+[default0]:  fp16 ............................................ False
+[default0]:  fp16_lm_cross_entropy ........................... False
+[default0]:  fp32_residual_connection ........................ False
+[default0]:  fp4 ............................................. None
+[default0]:  fp4_param ....................................... False
+[default0]:  fp4_quantizer_factory ........................... None
+[default0]:  fp4_recipe ...................................... nvfp4
+[default0]:  fp8 ............................................. None
+[default0]:  fp8_amax_compute_algo ........................... most_recent
+[default0]:  fp8_amax_history_len ............................ 1
+[default0]:  fp8_interval .................................... 1
+[default0]:  fp8_margin ...................................... 0
+[default0]:  fp8_param_gather ................................ False
+[default0]:  fp8_quantizer_factory ........................... None
+[default0]:  fp8_recipe ...................................... delayed
+[default0]:  fp8_wgrad ....................................... True
+[default0]:  fsdp_double_buffer .............................. False
+[default0]:  full_validation ................................. False
+[default0]:  global_batch_size ............................... 256
+[default0]:  glu_linear_offset ............................... 0.0
+[default0]:  grad_reduce_in_bf16 ............................. False
+[default0]:  gradient_accumulation_fusion .................... True
+[default0]:  gradient_reduce_div_fusion ...................... True
+[default0]:  group_query_attention ........................... True
+[default0]:  grpo_clamp_eps_lower ............................ 0.01
+[default0]:  grpo_clamp_eps_upper ............................ 0.01
+[default0]:  grpo_default_temperature ........................ 1.0
+[default0]:  grpo_default_top_p .............................. 0
+[default0]:  grpo_entropy_term_weight ........................ 0.0
+[default0]:  grpo_filter_groups_with_same_reward ............. False
+[default0]:  grpo_group_size ................................. 2
+[default0]:  grpo_iterations ................................. 2
+[default0]:  grpo_kl_beta .................................... 0.001
+[default0]:  grpo_prompts_per_step ........................... 32
+[default0]:  head_lr_mult .................................... 1.0
+[default0]:  heterogeneous_layers_config_encoded_json ........ None
+[default0]:  heterogeneous_layers_config_path ................ None
+[default0]:  hidden_dropout .................................. 0.0
+[default0]:  hidden_size ..................................... 2048
+[default0]:  hierarchical_context_parallel_sizes ............. None
+[default0]:  high_priority_stream_groups ..................... []
+[default0]:  hybrid_attention_ratio .......................... 0.0
+[default0]:  hybrid_mlp_ratio ................................ 0.0
+[default0]:  hybrid_override_pattern ......................... None
+[default0]:  hysteresis ...................................... 2
+[default0]:  ict_head_size ................................... None
+[default0]:  ict_load ........................................ None
+[default0]:  img_h ........................................... 224
+[default0]:  img_w ........................................... 224
+[default0]:  indexer_batch_size .............................. 128
+[default0]:  indexer_log_interval ............................ 1000
+[default0]:  inference_batch_times_seqlen_threshold .......... -1
+[default0]:  inference_coordinator_port ...................... 12346
+[default0]:  inference_dynamic_batching ...................... False
+[default0]:  inference_dynamic_batching_block_size ........... 256
+[default0]:  inference_dynamic_batching_buffer_size_gb ....... 40.0
+[default0]:  inference_dynamic_batching_cuda_graph_max_tokens  16384
+[default0]:  inference_dynamic_batching_cuda_graph_mixed_prefill_count  16
+[default0]:  inference_dynamic_batching_max_tokens ........... None
+[default0]:  inference_dynamic_batching_num_cuda_graphs ...... 16
+[default0]:  inference_dynamic_batching_track_paused_request_events  False
+[default0]:  inference_dynamic_batching_unified_memory_level . 1
+[default0]:  inference_max_batch_size ........................ 8
+[default0]:  inference_max_seq_length ........................ 2560
+[default0]:  inference_rng_tracker ........................... False
+[default0]:  inference_wandb_logging_step_interval ........... 0
+[default0]:  init_method_std ................................. 0.02
+[default0]:  init_method_xavier_uniform ...................... False
+[default0]:  init_model_with_meta_device ..................... False
+[default0]:  initial_loss_scale .............................. 4294967296
+[default0]:  inprocess_active_world_size ..................... 4
+[default0]:  inprocess_barrier_timeout ....................... 120
+[default0]:  inprocess_completion_timeout .................... 120
+[default0]:  inprocess_empty_cuda_cache ...................... False
+[default0]:  inprocess_granularity ........................... node
+[default0]:  inprocess_hard_timeout .......................... 90
+[default0]:  inprocess_heartbeat_interval .................... 30
+[default0]:  inprocess_heartbeat_timeout ..................... 60
+[default0]:  inprocess_last_call_wait ........................ 1
+[default0]:  inprocess_max_iterations ........................ None
+[default0]:  inprocess_monitor_process_interval .............. 1.0
+[default0]:  inprocess_monitor_thread_interval ............... 1.0
+[default0]:  inprocess_progress_watchdog_interval ............ 1.0
+[default0]:  inprocess_restart ............................... False
+[default0]:  inprocess_soft_timeout .......................... 60
+[default0]:  inprocess_termination_grace_time ................ 1
+[default0]:  is_hybrid_model ................................. False
+[default0]:  iter_per_epoch .................................. 1250
+[default0]:  iterations_to_skip .............................. []
+[default0]:  keep_fp8_transpose_cache ........................ False
+[default0]:  kitchen_config_file ............................. None
+[default0]:  kitchen_recipe_number ........................... None
+[default0]:  kv_channels ..................................... 128
+[default0]:  kv_lora_rank .................................... 32
+[default0]:  langrl_env_config ............................... None
+[default0]:  langrl_external_server .......................... False
+[default0]:  langrl_inference_server_conversation_template ... None
+[default0]:  langrl_inference_server_type .................... inplace_megatron
+[default0]:  lazy_mpu_init ................................... None
+[default0]:  legacy_tokenizer ................................ False
+[default0]:  load ............................................ None
+[default0]:  load_main_params_from_ckpt ...................... None
+[default0]:  local_rank ...................................... 0
+[default0]:  log_energy ...................................... False
+[default0]:  log_interval .................................... 1
+[default0]:  log_loss_scale_to_tensorboard ................... True
+[default0]:  log_memory_to_tensorboard ....................... False
+[default0]:  log_num_zeros_in_grad ........................... False
+[default0]:  log_params_norm ................................. False
+[default0]:  log_progress .................................... True
+[default0]:  log_straggler ................................... False
+[default0]:  log_throughput .................................. True
+[default0]:  log_timers_to_tensorboard ....................... True
+[default0]:  log_validation_ppl_to_tensorboard ............... False
+[default0]:  log_world_size_to_tensorboard ................... False
+[default0]:  logging_level ................................... None
+[default0]:  loss_scale ...................................... None
+[default0]:  loss_scale_window ............................... 1000
+[default0]:  lr .............................................. 1e-08
+[default0]:  lr_decay_iters .................................. 1
+[default0]:  lr_decay_samples ................................ None
+[default0]:  lr_decay_style .................................. WSD
+[default0]:  lr_warmup_fraction .............................. None
+[default0]:  lr_warmup_init .................................. 0.0
+[default0]:  lr_warmup_iters ................................. 0
+[default0]:  lr_warmup_samples ............................... 0
+[default0]:  lr_wsd_decay_iters .............................. 1
+[default0]:  lr_wsd_decay_samples ............................ None
+[default0]:  lr_wsd_decay_style .............................. linear
+[default0]:  main_grads_dtype ................................ torch.float32
+[default0]:  main_params_dtype ............................... torch.float32
+[default0]:  make_vocab_size_divisible_by .................... 128
+[default0]:  mamba_head_dim .................................. 64
+[default0]:  mamba_num_groups ................................ 8
+[default0]:  mamba_num_heads ................................. None
+[default0]:  mamba_state_dim ................................. 128
+[default0]:  manual_gc ....................................... False
+[default0]:  manual_gc_eval .................................. True
+[default0]:  manual_gc_interval .............................. 0
+[default0]:  mask_factor ..................................... 1.0
+[default0]:  mask_prob ....................................... 0.15
+[default0]:  mask_type ....................................... random
+[default0]:  masked_softmax_fusion ........................... True
+[default0]:  max_position_embeddings ......................... 4096
+[default0]:  max_tokens_to_oom ............................... 12000
+[default0]:  memory_snapshot_path ............................ snapshot.pickle
+[default0]:  merge_file ...................................... None
+[default0]:  micro_batch_size ................................ 1
+[default0]:  microbatch_group_size_per_vp_stage .............. None
+[default0]:  mid_level_dataset_surplus ....................... 0.005
+[default0]:  min_loss_scale .................................. 1.0
+[default0]:  min_lr .......................................... 0.0
+[default0]:  mlp_chunks_for_prefill .......................... 1
+[default0]:  mmap_bin_files .................................. True
+[default0]:  mock_data ....................................... True
+[default0]:  modelopt_enabled ................................ False
+[default0]:  moe_apply_probs_on_input ........................ False
+[default0]:  moe_aux_loss_coeff .............................. 0.0
+[default0]:  moe_deepep_num_sms .............................. 20
+[default0]:  moe_enable_deepep ............................... False
+[default0]:  moe_expert_capacity_factor ...................... None
+[default0]:  moe_extended_tp ................................. False
+[default0]:  moe_ffn_hidden_size ............................. None
+[default0]:  moe_flex_dispatcher_backend ..................... deepep
+[default0]:  moe_grouped_gemm ................................ False
+[default0]:  moe_hybridep_num_sms ............................ 16
+[default0]:  moe_input_jitter_eps ............................ None
+[default0]:  moe_layer_freq .................................. 1
+[default0]:  moe_layer_recompute ............................. False
+[default0]:  moe_pad_expert_input_to_capacity ................ False
+[default0]:  moe_pad_experts_for_cuda_graph_inference ........ False
+[default0]:  moe_per_layer_logging ........................... False
+[default0]:  moe_permute_fusion .............................. False
+[default0]:  moe_router_bias_update_rate ..................... 0.001
+[default0]:  moe_router_dtype ................................ None
+[default0]:  moe_router_enable_expert_bias ................... False
+[default0]:  moe_router_force_load_balancing ................. False
+[default0]:  moe_router_fusion ............................... False
+[default0]:  moe_router_group_topk ........................... None
+[default0]:  moe_router_load_balancing_type .................. aux_loss
+[default0]:  moe_router_num_groups ........................... None
+[default0]:  moe_router_padding_for_fp8 ...................... False
+[default0]:  moe_router_padding_for_quantization ............. False
+[default0]:  moe_router_pre_softmax .......................... False
+[default0]:  moe_router_score_function ....................... softmax
+[default0]:  moe_router_topk ................................. 2
+[default0]:  moe_router_topk_scaling_factor .................. None
+[default0]:  moe_shared_expert_intermediate_size ............. None
+[default0]:  moe_shared_expert_overlap ....................... False
+[default0]:  moe_token_dispatcher_type ....................... allgather
+[default0]:  moe_token_drop_policy ........................... probs
+[default0]:  moe_upcycling_granularity ....................... 1
+[default0]:  moe_use_legacy_grouped_gemm ..................... False
+[default0]:  moe_use_upcycling ............................... False
+[default0]:  moe_z_loss_coeff ................................ None
+[default0]:  mrope_section ................................... None
+[default0]:  mscale .......................................... 1.0
+[default0]:  mscale_all_dim .................................. 0.0
+[default0]:  mtp_loss_scaling_factor ......................... 0.1
+[default0]:  mtp_num_layers .................................. None
+[default0]:  multi_latent_attention .......................... False
+[default0]:  multiple_validation_sets ........................ False
+[default0]:  nccl_all_reduce_for_prefill ..................... False
+[default0]:  nccl_communicator_config_path ................... None
+[default0]:  nccl_ub ......................................... False
+[default0]:  no_load_optim ................................... None
+[default0]:  no_load_rng ..................................... None
+[default0]:  no_persist_layer_norm ........................... False
+[default0]:  no_rope_freq .................................... None
+[default0]:  no_save_optim ................................... None
+[default0]:  no_save_rng ..................................... None
+[default0]:  non_persistent_ckpt_type ........................ None
+[default0]:  non_persistent_global_ckpt_dir .................. None
+[default0]:  non_persistent_local_ckpt_algo .................. fully_parallel
+[default0]:  non_persistent_local_ckpt_dir ................... None
+[default0]:  non_persistent_save_interval .................... None
+[default0]:  norm_epsilon .................................... 1e-05
+[default0]:  normalization ................................... RMSNorm
+[default0]:  num_attention_heads ............................. 16
+[default0]:  num_channels .................................... 3
+[default0]:  num_classes ..................................... 1000
+[default0]:  num_dataset_builder_threads ..................... 1
+[default0]:  num_distributed_optimizer_instances ............. 1
+[default0]:  num_experts ..................................... None
+[default0]:  num_layers ...................................... 28
+[default0]:  num_layers_at_end_in_bf16 ....................... 1
+[default0]:  num_layers_at_start_in_bf16 ..................... 1
+[default0]:  num_layers_per_virtual_pipeline_stage ........... None
+[default0]:  num_query_groups ................................ 8
+[default0]:  num_virtual_stages_per_pipeline_rank ............ None
+[default0]:  num_workers ..................................... 2
+[default0]:  object_storage_cache_path ....................... None
+[default0]:  one_logger_async ................................ False
+[default0]:  one_logger_project .............................. megatron-lm
+[default0]:  one_logger_run_name ............................. None
+[default0]:  onnx_safe ....................................... None
+[default0]:  openai_gelu ..................................... False
+[default0]:  optimizer ....................................... adam
+[default0]:  optimizer_cpu_offload ........................... False
+[default0]:  optimizer_offload_fraction ...................... 1.0
+[default0]:  output_bert_embeddings .......................... False
+[default0]:  overlap_cpu_optimizer_d2h_h2d ................... False
+[default0]:  overlap_grad_reduce ............................. False
+[default0]:  overlap_moe_expert_parallel_comm ................ False
+[default0]:  overlap_p2p_comm ................................ False
+[default0]:  overlap_p2p_comm_warmup_flush ................... False
+[default0]:  overlap_param_gather ............................ False
+[default0]:  overlap_param_gather_with_optimizer_step ........ False
+[default0]:  override_opt_param_scheduler .................... False
+[default0]:  padded_vocab_size ............................... 262272
+[default0]:  params_dtype .................................... torch.bfloat16
+[default0]:  patch_dim ....................................... 16
+[default0]:  per_split_data_args_path ........................ None
+[default0]:  perform_initialization .......................... True
+[default0]:  perform_rl_step ................................. False
+[default0]:  pin_cpu_grads ................................... True
+[default0]:  pin_cpu_params .................................. True
+[default0]:  pipeline_model_parallel_comm_backend ............ None
+[default0]:  pipeline_model_parallel_layout .................. None
+[default0]:  pipeline_model_parallel_size .................... 1
+[default0]:  position_embedding_type ......................... rope
+[default0]:  pretrained_checkpoint ........................... None
+[default0]:  profile ......................................... False
+[default0]:  profile_ranks ................................... [0]
+[default0]:  profile_step_end ................................ 12
+[default0]:  profile_step_start .............................. 5
+[default0]:  q_lora_rank ..................................... None
+[default0]:  qk_head_dim ..................................... 128
+[default0]:  qk_l2_norm ...................................... False
+[default0]:  qk_layernorm .................................... True
+[default0]:  qk_pos_emb_head_dim ............................. 64
+[default0]:  query_in_block_prob ............................. 0.1
+[default0]:  quick_geglu ..................................... False
+[default0]:  rampup_batch_size ............................... None
+[default0]:  rank ............................................ 0
+[default0]:  recompute_granularity ........................... None
+[default0]:  recompute_method ................................ None
+[default0]:  recompute_modules ............................... None
+[default0]:  recompute_num_layers ............................ None
+[default0]:  record_memory_history ........................... False
+[default0]:  relative_attention_max_distance ................. 128
+[default0]:  relative_attention_num_buckets .................. 32
+[default0]:  replication ..................................... False
+[default0]:  replication_factor .............................. 2
+[default0]:  replication_jump ................................ None
+[default0]:  rerun_mode ...................................... disabled
+[default0]:  reset_attention_mask ............................ False
+[default0]:  reset_position_ids .............................. False
+[default0]:  result_rejected_tracker_filename ................ None
+[default0]:  retriever_report_topk_accuracies ................ []
+[default0]:  retriever_score_scaling ......................... False
+[default0]:  retriever_seq_length ............................ 256
+[default0]:  retro_add_retriever ............................. False
+[default0]:  retro_attention_gate ............................ 1
+[default0]:  retro_cyclic_train_iters ........................ None
+[default0]:  retro_encoder_attention_dropout ................. 0.1
+[default0]:  retro_encoder_hidden_dropout .................... 0.1
+[default0]:  retro_encoder_layers ............................ 2
+[default0]:  retro_num_neighbors ............................. 2
+[default0]:  retro_num_retrieved_chunks ...................... 2
+[default0]:  retro_project_dir ............................... None
+[default0]:  retro_verify_neighbor_count ..................... True
+[default0]:  reuse_grad_buf_for_mxfp8_param_ag ............... False
+[default0]:  rl_calculate_intra_group_similarity ............. False
+[default0]:  rl_importance_sampling_truncation_coef .......... None
+[default0]:  rl_inference_logprobs_is_correction ............. False
+[default0]:  rl_offload_kv_cache_during_training ............. False
+[default0]:  rl_offload_optimizer_during_inference ........... False
+[default0]:  rl_partial_rollouts ............................. False
+[default0]:  rl_prompts_per_eval ............................. 32
+[default0]:  rl_remove_kv_cache_during_training .............. False
+[default0]:  rl_reset_cuda_graphs ............................ False
+[default0]:  rl_sequence_packing_algo ........................ fifo
+[default0]:  rl_sequence_packing_bin_size .................... 8192
+[default0]:  rl_use_sequence_packing ......................... False
+[default0]:  rope_scaling_factor ............................. 8.0
+[default0]:  rope_type ....................................... None
+[default0]:  rotary_base ..................................... 10000
+[default0]:  rotary_interleaved .............................. False
+[default0]:  rotary_percent .................................. 1.0
+[default0]:  rotary_scaling_factor ........................... 1.0
+[default0]:  rotary_seq_len_interpolation_factor ............. None
+[default0]:  run_workload_inspector_server ................... False
+[default0]:  sample_rate ..................................... 1.0
+[default0]:  save ............................................ None
+[default0]:  save_extra_steps ................................ []
+[default0]:  save_interval ................................... 2000
+[default0]:  save_retain_interval ............................ None
+[default0]:  scatter_gather_tensors_in_pipeline .............. True
+[default0]:  seed ............................................ 1234
+[default0]:  seq_length ...................................... 4096
+[default0]:  sequence_parallel ............................... False
+[default0]:  sft ............................................. False
+[default0]:  sft_tokenizer_prompt_format ..................... nemotron-h-aligned
+[default0]:  sgd_momentum .................................... 0.9
+[default0]:  sharp_enabled_group ............................. None
+[default0]:  short_seq_prob .................................. 0.1
+[default0]:  skip_train ...................................... False
+[default0]:  skipped_train_samples ........................... 0
+[default0]:  softmax_type .................................... vanilla
+[default0]:  spec ............................................ None
+[default0]:  split ........................................... None
+[default0]:  squared_relu .................................... False
+[default0]:  start_weight_decay .............................. 0.05
+[default0]:  straggler_ctrlr_port ............................ 65535
+[default0]:  straggler_minmax_count .......................... 1
+[default0]:  strict_fsdp_dtensor_load ........................ True
+[default0]:  suggested_communication_unit_size ............... None
+[default0]:  swiglu .......................................... True
+[default0]:  swin_backbone_type .............................. tiny
+[default0]:  symmetric_ar_type ............................... None
+[default0]:  te_rng_tracker .................................. False
+[default0]:  teacher_model_config ............................ None
+[default0]:  tensor_model_parallel_size ...................... 2
+[default0]:  tensorboard_dir ................................. ./output/qwen3-1p7b/v40_qwen3_1p7b_1_pp1_tp2_mbs1_rcFalse_vppNone_spFalse_gbs256/tensorboard
+[default0]:  tensorboard_log_interval ........................ 1
+[default0]:  tensorboard_queue_size .......................... 5
+[default0]:  test_data_path .................................. None
+[default0]:  test_mode ....................................... False
+[default0]:  tiktoken_num_special_tokens ..................... 1000
+[default0]:  tiktoken_pattern ................................ None
+[default0]:  tiktoken_special_tokens ......................... None
+[default0]:  timing_log_level ................................ 0
+[default0]:  timing_log_option ............................... minmax
+[default0]:  titles_data_path ................................ None
+[default0]:  tokenizer_metadata .............................. None
+[default0]:  tokenizer_model ................................. None
+[default0]:  tokenizer_type .................................. NullTokenizer
+[default0]:  torch_fsdp2_reshard_after_forward ............... True
+[default0]:  tp_comm_bootstrap_backend ....................... nccl
+[default0]:  tp_comm_bulk_dgrad .............................. True
+[default0]:  tp_comm_bulk_wgrad .............................. True
+[default0]:  tp_comm_overlap ................................. False
+[default0]:  tp_comm_overlap_ag .............................. True
+[default0]:  tp_comm_overlap_cfg ............................. None
+[default0]:  tp_comm_overlap_rs .............................. True
+[default0]:  tp_comm_overlap_rs_dgrad ........................ False
+[default0]:  tp_comm_split_ag ................................ True
+[default0]:  tp_comm_split_rs ................................ True
+[default0]:  train_data_path ................................. None
+[default0]:  train_iters ..................................... 40
+[default0]:  train_samples ................................... None
+[default0]:  train_sync_interval ............................. None
+[default0]:  transformer_impl ................................ transformer_engine
+[default0]:  transformer_pipeline_model_parallel_size ........ 1
+[default0]:  trust_remote_code ............................... False
+[default0]:  untie_embeddings_and_output_weights ............. False
+[default0]:  use_checkpoint_args ............................. False
+[default0]:  use_checkpoint_opt_param_scheduler .............. False
+[default0]:  use_cpu_initialization .......................... None
+[default0]:  use_dist_ckpt ................................... True
+[default0]:  use_dist_ckpt_deprecated ........................ False
+[default0]:  use_distributed_optimizer ....................... True
+[default0]:  use_flash_attn .................................. True
+[default0]:  use_fused_weighted_squared_relu ................. False
+[default0]:  use_legacy_models ............................... False
+[default0]:  use_legacy_static_engine ........................ False
+[default0]:  use_megatron_fsdp ............................... False
+[default0]:  use_mp_args_from_checkpoint_args ................ False
+[default0]:  use_one_sent_docs ............................... False
+[default0]:  use_persistent_ckpt_worker ...................... False
+[default0]:  use_precision_aware_optimizer ................... False
+[default0]:  use_pytorch_profiler ............................ False
+[default0]:  use_ring_exchange_p2p ........................... False
+[default0]:  use_rope_scaling ................................ False
+[default0]:  use_rotary_position_embeddings .................. False
+[default0]:  use_sharp ....................................... False
+[default0]:  use_te_activation_func .......................... False
+[default0]:  use_tokenizer_model_from_checkpoint_args ........ True
+[default0]:  use_torch_fsdp2 ................................. False
+[default0]:  use_torch_optimizer_for_cpu_offload ............. False
+[default0]:  use_tp_pp_dp_mapping ............................ False
+[default0]:  v_head_dim ...................................... 128
+[default0]:  valid_data_path ................................. None
+[default0]:  variable_seq_lengths ............................ False
+[default0]:  virtual_pipeline_model_parallel_size ............ None
+[default0]:  vision_backbone_type ............................ vit
+[default0]:  vision_pretraining .............................. False
+[default0]:  vision_pretraining_type ......................... classify
+[default0]:  vocab_extra_ids ................................. 0
+[default0]:  vocab_file ...................................... None
+[default0]:  vocab_size ...................................... 262144
+[default0]:  wandb_entity .................................... 
+[default0]:  wandb_exp_name .................................. v40_qwen3_1p7b_1_pp1_tp2_mbs1_rcFalse_vppNone_spFalse_gbs256
+[default0]:  wandb_project ................................... sanity-checks
+[default0]:  wandb_save_dir .................................. ./output/qwen3-1p7b/v40_qwen3_1p7b_1_pp1_tp2_mbs1_rcFalse_vppNone_spFalse_gbs256/wandb
+[default0]:  weight_decay .................................... 0.05
+[default0]:  weight_decay_incr_style ......................... constant
+[default0]:  wgrad_deferral_limit ............................ 0
+[default0]:  window_attn_skip_freq ........................... None
+[default0]:  window_size ..................................... None
+[default0]:  world_size ...................................... 4
+[default0]:  yaml_cfg ........................................ None
+[default0]:-------------------- end of arguments ---------------------
+[default0]:INFO:megatron.core.num_microbatches_calculator:setting number of microbatches to constant 128
+[default0]:> building NullTokenizer tokenizer ...
+[default0]:WARNING:megatron.core.datasets.megatron_tokenizer:You’re using the legacy tokenizer system, which is deprecated and will be removed in a future release. Please migrate to the new tokenizer system (`megatron.core.tokenizers.MegatronTokenizer`).
+[default0]:WARNING:megatron.core.rerun_state_machine:RerunStateMachine initialized in mode RerunMode.DISABLED
+[default0]:> initializing torch distributed ...
+[default0]:> initialized tensor model parallel with size 2
+[default0]:> initialized pipeline model parallel with size 1
+[default0]:> setting random seeds to 1234 ...
+[default0]:> compiling dataset index builder ...
+[default0]:make: Entering directory '/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/datasets'
+[default0]:make: Nothing to be done for 'default'.
+[default0]:make: Leaving directory '/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/datasets'
+[default0]:>>> done with dataset index builder. Compilation time: 1.204 seconds
+[default0]:> compiling and loading fused kernels ...
+[default3]:WARNING: one_logger package is required to enable e2e metrics tracking. please go to https://confluence.nvidia.com/display/MLWFO/Package+Repositories for details to install it
+[default0]:>>> done with compiling and loading fused kernels. Compilation time: 4.769 seconds
+[default0]:time to initialize megatron (seconds): 12.697
+[default0]:[after megatron is initialized] datetime: 2026-07-31 16:32:58 
+[default0]:building GPT model ...
+[default1]: > number of parameters on (tensor, pipeline) model parallel rank (1, 0): 973333504
+[default0]: > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 973333504
+[default0]:INFO:megatron.core.distributed.distributed_data_parallel:Setting up DistributedDataParallel with config DistributedDataParallelConfig(grad_reduce_in_fp32=True, overlap_grad_reduce=False, overlap_param_gather=False, align_param_gather=False, use_distributed_optimizer=True, num_distributed_optimizer_instances=1, check_for_nan_in_grad=False, check_for_large_grads=False, bucket_size=None, pad_buckets_for_high_nccl_busbw=False, reduce_scatter_with_fp32_accumulation=False, average_in_collective=False, fp8_param_gather=False, reuse_grad_buf_for_mxfp8_param_ag=False, use_megatron_fsdp=False, use_custom_fsdp=False, data_parallel_sharding_strategy='no_shard', gradient_reduce_div_fusion=True, suggested_communication_unit_size=None, preserve_fp32_weights=True, keep_fp8_transpose_cache=False, nccl_ub=False, fsdp_double_buffer=False, outer_dp_sharding_strategy='no_shard', disable_symmetric_registration=False, delay_wgrad_compute=False)
+[default0]:INFO:megatron.core.distributed.param_and_grad_buffer:Number of buckets for gradient all-reduce / reduce-scatter: 1
+[default0]:Params for bucket 1 (973333504 elements, 973333504 padded size):
+[default0]:	module.decoder.layers.4.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.3.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.2.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.1.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.0.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.0.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.3.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.2.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.1.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.19.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.18.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.17.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.16.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.15.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.14.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.7.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.6.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.18.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.19.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.17.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.16.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.15.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.14.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.13.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.13.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.12.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.11.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.11.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.10.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.9.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.8.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.7.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.6.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.5.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.4.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.6.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.25.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.24.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.23.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.22.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.21.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.20.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.3.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.2.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.1.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.19.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.18.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.21.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.25.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.24.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.23.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.22.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.20.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.17.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.16.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.14.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.8.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.13.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.12.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.11.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.10.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.9.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.8.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.7.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.12.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.6.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.5.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.4.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.3.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.2.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.1.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.7.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.27.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.26.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.13.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.12.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.5.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.4.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.3.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.27.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.26.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.25.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.24.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.23.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.22.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.21.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.20.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.5.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.4.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.19.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.18.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.17.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.16.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.15.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.15.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.14.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.0.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.embedding.word_embeddings.weight
+[default0]:	module.decoder.layers.26.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.19.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.18.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.17.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.16.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.15.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.14.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.11.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.10.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.9.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.19.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.18.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.17.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.16.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.15.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.14.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.11.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.10.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.9.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.8.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.27.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.13.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.12.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.11.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.10.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.9.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.8.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.6.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.0.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.25.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.24.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.23.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.22.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.21.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.20.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.6.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.4.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.25.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.24.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.23.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.22.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.21.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.20.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.21.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.26.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.25.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.24.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.23.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.20.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.22.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.13.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.13.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.12.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.0.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.19.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.18.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.17.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.16.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.15.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.14.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.4.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.27.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.26.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.11.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.10.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.9.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.8.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.7.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.5.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.27.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.26.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.8.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.6.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.3.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.2.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.1.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.27.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.19.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.18.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.17.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.16.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.15.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.14.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.2.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.1.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.0.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.21.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.20.self_attention.q_layernorm.weight
+[default0]:	module.decoder.final_layernorm.weight
+[default0]:	module.decoder.layers.25.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.24.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.23.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.22.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.11.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.10.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.9.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.6.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.5.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.7.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.8.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.21.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.25.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.24.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.23.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.22.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.20.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.9.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.3.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.2.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.1.self_attention.k_layernorm.weight
+[default0]:	module.decoder.layers.27.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.7.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.26.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.7.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.0.mlp.linear_fc1.weight
+[default0]:	module.decoder.layers.5.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.27.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.26.mlp.linear_fc2.weight
+[default0]:	module.decoder.layers.13.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.12.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.0.self_attention.linear_proj.weight
+[default0]:	module.decoder.layers.12.mlp.linear_fc1.layer_norm_weight
+[default0]:	module.decoder.layers.5.self_attention.q_layernorm.weight
+[default0]:	module.decoder.layers.10.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.4.self_attention.linear_qkv.layer_norm_weight
+[default0]:	module.decoder.layers.3.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.2.self_attention.linear_qkv.weight
+[default0]:	module.decoder.layers.1.self_attention.linear_qkv.weight
+[default0]:INFO:megatron.core.optimizer:Setting up optimizer with config AdamOptimizerConfig(lr=1e-08, min_lr=0.0, weight_decay=0.05, fp8_recipe='delayed', fp16=False, bf16=True, reuse_grad_buf_for_mxfp8_param_ag=False, params_dtype=torch.bfloat16, use_precision_aware_optimizer=False, store_param_remainders=True, main_grads_dtype=torch.float32, main_params_dtype=torch.float32, exp_avg_dtype=torch.float32, exp_avg_sq_dtype=torch.float32, optimizer='adam', loss_scale=None, initial_loss_scale=4294967296, min_loss_scale=1.0, loss_scale_window=1000, hysteresis=2, adam_beta1=0.9, adam_beta2=0.95, adam_eps=1e-08, decoupled_weight_decay=True, sgd_momentum=0.9, use_distributed_optimizer=True, overlap_param_gather=False, overlap_param_gather_with_optimizer_step=False, optimizer_cpu_offload=False, optimizer_offload_fraction=1.0, use_torch_optimizer_for_cpu_offload=False, overlap_cpu_optimizer_d2h_h2d=False, pin_cpu_grads=True, pin_cpu_params=True, clip_grad=1.0, log_num_zeros_in_grad=False, barrier_with_L1_time=True, timers=<megatron.core.timers.Timers object at 0x4005833205c0>, config_logger_dir='')
+[default0]:INFO:megatron.core.optimizer_param_scheduler:> learning rate decay style: WSD
+[default0]:[after model, optimizer, and learning rate scheduler are built] datetime: 2026-07-31 16:32:59 
+[default0]:> building train, validation, and test datasets ...
+[default0]: > datasets target sizes (minimum size):
+[default0]:    train:      10240
+[default0]:    validation: 0
+[default0]:    test:       0
+[default0]:INFO:megatron.core.datasets.blended_megatron_dataset_config:Let mock = True, as both blend and blend_per_split are None
+[default0]:INFO:megatron.core.datasets.blended_megatron_dataset_config:Let split = 1,1,1, an arbitrarily even split, as mock is True
+[default0]:INFO:megatron.core.datasets.blended_megatron_dataset_config:Let split_matrix = [(0, 0.3333333333333333), (0.3333333333333333, 0.6666666666666666), (0.6666666666666666, 1.0)]
+[default0]:> building train, validation, and test datasets for GPT ...
+W0731 16:42:04.684000 3425965 torch/distributed/elastic/agent/server/api.py:739] Received 15 death signal, shutting down workers
+W0731 16:42:04.685000 3425965 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3426046 closing signal SIGTERM
+W0731 16:42:04.686000 3425965 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3426047 closing signal SIGTERM
+W0731 16:42:04.687000 3425965 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3426048 closing signal SIGTERM
+W0731 16:42:04.687000 3425965 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3426049 closing signal SIGTERM
+[default3]:Stack (most recent call first):
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 170 in custom_backward
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 466 in backward_step
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 610 in forward_backward_no_pipelining
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 1349 in train_step
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 2404 in train
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 766 in pretrain
+[default3]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/./submodules/Megatron-LM/pretrain_gpt.py", line 260 in <module>
+[default1]:Stack (most recent call first):
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 170 in custom_backward
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 466 in backward_step
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 610 in forward_backward_no_pipelining
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 1349 in train_step
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 2404 in train
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 766 in pretrain
+[default1]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/./submodules/Megatron-LM/pretrain_gpt.py", line 260 in <module>
+[default2]:Stack (most recent call first):
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 3006 in all_reduce
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83 in wrapper
+[default2]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/distributed.py", line 1953 in allreduce
+[default2]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/module/linear.py", line 362 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/autograd/function.py", line 583 in apply
+[default2]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/module/linear.py", line 1461 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 1220 in _fn
+[default2]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/jit.py", line 67 in wrapper
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/extensions/transformer_engine.py", line 427 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/attention.py", line 965 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_layer.py", line 499 in _forward_attention
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_layer.py", line 434 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/module.py", line 305 in __call__
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_layer.py", line 852 in __call__
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_block.py", line 697 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/module.py", line 305 in __call__
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_block.py", line 553 in __call__
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/models/gpt/gpt_model.py", line 455 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/module.py", line 429 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/distributed/data_parallel_base.py", line 22 in forward
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default2]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/./submodules/Megatron-LM/pretrain_gpt.py", line 153 in forward_step
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 402 in forward_step
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 595 in forward_backward_no_pipelining
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 1349 in train_step
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 2404 in train
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 766 in pretrain
+[default2]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/./submodules/Megatron-LM/pretrain_gpt.py", line 260 in <module>
+[default0]:Stack (most recent call first):
+[default0]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/module/linear.py", line 433 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/autograd/function.py", line 583 in apply
+[default0]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/module/linear.py", line 1461 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 1220 in _fn
+[default0]:  File "/opt/venv/lib/python3.12/site-packages/transformer_engine/pytorch/jit.py", line 67 in wrapper
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/extensions/transformer_engine.py", line 427 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/attention.py", line 965 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_layer.py", line 499 in _forward_attention
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_layer.py", line 434 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/module.py", line 305 in __call__
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_layer.py", line 852 in __call__
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_block.py", line 697 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/module.py", line 305 in __call__
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/transformer_block.py", line 553 in __call__
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/models/gpt/gpt_model.py", line 455 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/transformer/module.py", line 429 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/distributed/data_parallel_base.py", line 22 in forward
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789 in _call_impl
+[default0]:  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778 in _wrapped_call_impl
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/./submodules/Megatron-LM/pretrain_gpt.py", line 153 in forward_step
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 402 in forward_step
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/core/pipeline_parallel/schedules.py", line 595 in forward_backward_no_pipelining
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 1349 in train_step
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 2404 in train
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/submodules/Megatron-LM/megatron/training/training.py", line 766 in pretrain
+[default0]:  File "/e/home/jusers/vanosch1/jupiter/oellm-autoexp/./submodules/Megatron-LM/pretrain_gpt.py", line 260 in <module>
+[default0]:INFO:megatron.core.datasets.blended_megatron_dataset_builder:Building MockGPTDataset splits with sizes=(10240, 0, 0) and config=GPTDatasetConfig(random_seed=1234, sequence_length=4096, blend=None, blend_per_split=None, multiple_validation_sets=False, full_validation=False, split='1,1,1', split_matrix=[(0, 0.3333333333333333), (0.3333333333333333, 0.6666666666666666), (0.6666666666666666, 1.0)], num_dataset_builder_threads=1, path_to_cache='.cache', mmap_bin_files=True, mock=True, tokenizer=<megatron.core.tokenizers.text.models.default_tokenizer.DefaultTokenizerText object at 0x4005bfc43cb0>, mid_level_dataset_surplus=0.005, allow_ambiguous_pad_tokens=False, reset_position_ids=False, reset_attention_mask=False, eod_mask_loss=False, create_attention_mask=True, drop_last_partial_validation_sequence=True, add_extra_token_to_sequence=True, object_storage_cache_path=None)
+[default0]:INFO:megatron.core.datasets.gpt_dataset:Load the MockGPTDataset train indices
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the document index from a860e1979d681499340adff690bdd724-MockGPTDataset-train-document_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the sample index from a860e1979d681499340adff690bdd724-MockGPTDataset-train-sample_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the shuffle index from a860e1979d681499340adff690bdd724-MockGPTDataset-train-shuffle_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:> total number of samples: 16648
+[default0]:INFO:megatron.core.datasets.gpt_dataset:Load the MockGPTDataset valid indices
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the document index from f7b4a7ff89319d79cc8c8c2c005209e9-MockGPTDataset-valid-document_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the sample index from f7b4a7ff89319d79cc8c8c2c005209e9-MockGPTDataset-valid-sample_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the shuffle index from f7b4a7ff89319d79cc8c8c2c005209e9-MockGPTDataset-valid-shuffle_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:> total number of samples: 16640
+[default0]:INFO:megatron.core.datasets.gpt_dataset:Load the MockGPTDataset test indices
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the document index from 93db3e1d19ae458d5992c03a1e9b607a-MockGPTDataset-test-document_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the sample index from 93db3e1d19ae458d5992c03a1e9b607a-MockGPTDataset-test-sample_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:	Load the shuffle index from 93db3e1d19ae458d5992c03a1e9b607a-MockGPTDataset-test-shuffle_index.npy
+[default0]:INFO:megatron.core.datasets.gpt_dataset:> total number of samples: 16671
+[default0]:> finished creating GPT datasets ...
+[default0]:[after dataloaders are built] datetime: 2026-07-31 16:32:59 
+[default0]:done with setup ...
+[default0]:training ...
+[default0]:Overwriting rerun_state_machine.current_iteration from -1 to 0...
+[default3]:INFO:megatron.core.timers:(min, max) time across ranks (ms):
+[default3]:    model-and-optimizer-setup ......................: (867.97, 868.27)
+[default3]:    train/valid/test-data-iterators-setup ..........: (634.40, 634.47)
+[default0]:[before the start of training step] datetime: 2026-07-31 16:33:00 
+[default1]:[Rank 1] (after 1 iterations) memory (MB) | allocated: 11797.1728515625 | max allocated: 16031.6748046875 | reserved: 17572.0 | max reserved: 17572.0
+[default3]: [2026-07-31 16:33:28] iteration        1/      40 | consumed samples:          256 | elapsed time per iteration (ms): 28646.2 | mem usages: 0.2072 | throughput per GPU (TFLOP/s/GPU): 119.8 | Tokens per second per GPU (Tok/s/GPU): 9151.1 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.291027E+01 | loss scale: 1.0 | grad norm: 15.668 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default0]:Number of parameters in transformer block in billions:  1.41
+[default0]:Number of parameters in embedding layers in billions: 0.54
+[default0]:Total number of parameters in billions: 1.95
+[default0]:Number of parameters in most loaded shard in billions: 0.9733
+[default0]:compute_activation_memory_without_sp
+[default0]:Activation memory footprint per transformer layer (precise, without SP): 176.0 MB
+[default0]:Theoretical memory footprints: weight and optimizer=11138.84 MB, activation=6275.36 MB, total=17414.19 MB
+[default0]:
+[default0]:[Rank 0] (after 1 iterations) memory (MB) | allocated: 11797.1728515625 | max allocated: 16031.6748046875 | reserved: 17572.0 | max reserved: 17572.0
+[default1]:[Rank 1] (after 2 iterations) memory (MB) | allocated: 11797.1728515625 | max allocated: 19744.6484375 | reserved: 20812.0 | max reserved: 20812.0
+[default3]: [2026-07-31 16:33:51] iteration        2/      40 | consumed samples:          512 | elapsed time per iteration (ms): 22599.5 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.8 | Tokens per second per GPU (Tok/s/GPU): 11599.6 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290911E+01 | loss scale: 1.0 | grad norm: 15.493 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default0]:Number of parameters in transformer block in billions:  1.41
+[default0]:Number of parameters in embedding layers in billions: 0.54
+[default0]:Total number of parameters in billions: 1.95
+[default0]:Number of parameters in most loaded shard in billions: 0.9733
+[default0]:compute_activation_memory_without_sp
+[default0]:Activation memory footprint per transformer layer (precise, without SP): 176.0 MB
+[default0]:Theoretical memory footprints: weight and optimizer=11138.84 MB, activation=6275.36 MB, total=17414.19 MB
+[default0]:
+[default0]:[Rank 0] (after 2 iterations) memory (MB) | allocated: 11797.1728515625 | max allocated: 19744.6484375 | reserved: 20312.0 | max reserved: 20312.0
+[default3]: [2026-07-31 16:34:14] iteration        3/      40 | consumed samples:          768 | elapsed time per iteration (ms): 23190.4 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 147.9 | Tokens per second per GPU (Tok/s/GPU): 11304.0 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290806E+01 | loss scale: 1.0 | grad norm: 15.584 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:34:36] iteration        4/      40 | consumed samples:         1024 | elapsed time per iteration (ms): 21793.8 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 157.4 | Tokens per second per GPU (Tok/s/GPU): 12028.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290880E+01 | loss scale: 1.0 | grad norm: 15.708 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:34:58] iteration        5/      40 | consumed samples:         1280 | elapsed time per iteration (ms): 22644.8 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.5 | Tokens per second per GPU (Tok/s/GPU): 11576.3 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290875E+01 | loss scale: 1.0 | grad norm: 15.491 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:35:21] iteration        6/      40 | consumed samples:         1536 | elapsed time per iteration (ms): 22642.6 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.5 | Tokens per second per GPU (Tok/s/GPU): 11577.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290950E+01 | loss scale: 1.0 | grad norm: 15.539 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:35:43] iteration        7/      40 | consumed samples:         1792 | elapsed time per iteration (ms): 22253.8 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 154.2 | Tokens per second per GPU (Tok/s/GPU): 11779.7 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290854E+01 | loss scale: 1.0 | grad norm: 15.654 | number of skipped iterations:   0 | number of nan iterations:   0 |
+Traceback (most recent call last):
+  File "/usr/local/bin/torchrun", line 6, in <module>
+[default3]: [2026-07-31 16:36:06] iteration        8/      40 | consumed samples:         2048 | elapsed time per iteration (ms): 22455.4 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 152.8 | Tokens per second per GPU (Tok/s/GPU): 11674.0 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290832E+01 | loss scale: 1.0 | grad norm: 15.571 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:36:29] iteration        9/      40 | consumed samples:         2304 | elapsed time per iteration (ms): 22917.9 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 149.7 | Tokens per second per GPU (Tok/s/GPU): 11438.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290871E+01 | loss scale: 1.0 | grad norm: 15.487 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:36:52] iteration       10/      40 | consumed samples:         2560 | elapsed time per iteration (ms): 22956.9 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 149.4 | Tokens per second per GPU (Tok/s/GPU): 11419.0 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290740E+01 | loss scale: 1.0 | grad norm: 15.567 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:37:14] iteration       11/      40 | consumed samples:         2816 | elapsed time per iteration (ms): 21991.4 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 156.0 | Tokens per second per GPU (Tok/s/GPU): 11920.3 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290938E+01 | loss scale: 1.0 | grad norm: 15.520 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:37:36] iteration       12/      40 | consumed samples:         3072 | elapsed time per iteration (ms): 22675.5 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.3 | Tokens per second per GPU (Tok/s/GPU): 11560.7 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290923E+01 | loss scale: 1.0 | grad norm: 15.475 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:37:59] iteration       13/      40 | consumed samples:         3328 | elapsed time per iteration (ms): 22609.1 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.7 | Tokens per second per GPU (Tok/s/GPU): 11594.6 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290912E+01 | loss scale: 1.0 | grad norm: 15.364 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:38:22] iteration       14/      40 | consumed samples:         3584 | elapsed time per iteration (ms): 22673.9 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.3 | Tokens per second per GPU (Tok/s/GPU): 11561.5 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290861E+01 | loss scale: 1.0 | grad norm: 15.673 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:38:44] iteration       15/      40 | consumed samples:         3840 | elapsed time per iteration (ms): 22344.2 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 153.5 | Tokens per second per GPU (Tok/s/GPU): 11732.1 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290916E+01 | loss scale: 1.0 | grad norm: 15.546 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:39:07] iteration       16/      40 | consumed samples:         4096 | elapsed time per iteration (ms): 22642.8 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.5 | Tokens per second per GPU (Tok/s/GPU): 11577.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290815E+01 | loss scale: 1.0 | grad norm: 15.660 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:39:29] iteration       17/      40 | consumed samples:         4352 | elapsed time per iteration (ms): 22881.9 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 149.9 | Tokens per second per GPU (Tok/s/GPU): 11456.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290835E+01 | loss scale: 1.0 | grad norm: 15.454 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:39:52] iteration       18/      40 | consumed samples:         4608 | elapsed time per iteration (ms): 22965.1 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 149.4 | Tokens per second per GPU (Tok/s/GPU): 11414.9 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290844E+01 | loss scale: 1.0 | grad norm: 15.664 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:40:15] iteration       19/      40 | consumed samples:         4864 | elapsed time per iteration (ms): 22320.2 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 153.7 | Tokens per second per GPU (Tok/s/GPU): 11744.7 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290856E+01 | loss scale: 1.0 | grad norm: 15.811 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:40:37] iteration       20/      40 | consumed samples:         5120 | elapsed time per iteration (ms): 22636.8 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 151.6 | Tokens per second per GPU (Tok/s/GPU): 11580.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290842E+01 | loss scale: 1.0 | grad norm: 15.556 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:41:01] iteration       21/      40 | consumed samples:         5376 | elapsed time per iteration (ms): 23790.5 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 144.2 | Tokens per second per GPU (Tok/s/GPU): 11018.9 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290828E+01 | loss scale: 1.0 | grad norm: 15.434 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:41:27] iteration       22/      40 | consumed samples:         5632 | elapsed time per iteration (ms): 26284.1 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 130.5 | Tokens per second per GPU (Tok/s/GPU): 9973.5 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290853E+01 | loss scale: 1.0 | grad norm: 15.712 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[default3]: [2026-07-31 16:41:51] iteration       23/      40 | consumed samples:         5888 | elapsed time per iteration (ms): 23615.7 | mem usages: 0.2354 | throughput per GPU (TFLOP/s/GPU): 145.3 | Tokens per second per GPU (Tok/s/GPU): 11100.4 | learning rate: 0.000000E+00 | global batch size:   256 | lm loss: 1.290942E+01 | loss scale: 1.0 | grad norm: 15.406 | number of skipped iterations:   0 | number of nan iterations:   0 |
+    sys.exit(main())
+             ^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 990, in main
+    run(args)
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 981, in run
+    elastic_launch(
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 308, in launch_agent
+    result = agent.run()
+             ^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/metrics/api.py", line 134, in wrapper
+    result = f(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 731, in run
+    result = self._invoke_run(role)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 908, in _invoke_run
+    time.sleep(monitor_interval)
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/api.py", line 86, in _terminate_process_handler
+    raise SignalException(f"Process {os.getpid()} got signal: {sigval}", sigval=sigval)
+torch.distributed.elastic.multiprocessing.api.SignalException: Process 3425965 got signal: 15
+Collecting data...
+Generating '/tmp/nsys-report-242b.qdstrm'
+[1/1] [0%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [0%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [0%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [5%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [6%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [7%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [8%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [9%                          ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [10%                         ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [11%                         ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [12%                         ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [13%                         ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [14%                         ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=15%                        ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=16%                        ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=17%                        ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==18%                       ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==19%                       ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==20%                       ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==21%                       ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [===22%                      ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [===23%                      ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [===24%                      ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [====25%                     ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [====26%                     ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [====27%                     ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [====28%                     ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=====29%                    ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=====30%                    ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=====31%                    ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=====32%                    ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [======33%                   ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [======34%                   ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [======35%                   ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=======36%                  ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=======37%                  ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=======38%                  ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=======39%                  ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [========40%                 ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [========41%                 ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [========42%                 ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=========43%                ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=========44%                ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=========45%                ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [=========46%                ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==========47%               ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==========48%               ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [==========49%               ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [===========50%              ] tp2pp1_mbs1_1140757.nsys-rep[1/1] [========================100%] tp2pp1_mbs1_1140757.nsys-rep[1/1] [========================100%] tp2pp1_mbs1_1140757.nsys-rep
+Generated:
+	/e/scratch/e-sta-openeurollm/vanosch1/nsys/tp2pp1_mbs1_1140757.nsys-rep
+srun: error: jpbo-051-48: task 0: Exited with exit code 1
+
+=== nsys report: /e/scratch/e-sta-openeurollm/vanosch1/nsys/tp2pp1_mbs1_1140757.nsys-rep ===
+--- top kernels ---
+Generating SQLite file /e/scratch/e-sta-openeurollm/vanosch1/nsys/tp2pp1_mbs1_1140757.sqlite from /e/scratch/e-sta-openeurollm/vanosch1/nsys/tp2pp1_mbs1_1140757.nsys-rep
+Processing [/e/scratch/e-sta-openeurollm/vanosch1/nsys/tp2pp1_mbs1_1140757.sqlite] with [/usr/local/cuda-13.1/NsightSystems-cli-2026.1.1/target-linux-sbsa-armv8/reports/cuda_gpu_kern_sum.py]... 
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+34.1,45900724419,97590,470342.5,213760.0,172864,750836068,2794491.3,ncclDevKernel_AllReduce_Sum_bf16_RING_LL(ncclDevKernelArgsStorage<(unsigned long)4096>)
+13.8,18649979765,6,3108329960.8,4233259170.0,19332801,5072508672,2421800934.2,ncclDevKernel_ReduceScatter_Sum_f32_RING_LL(ncclDevKernelArgsStorage<(unsigned long)4096>)
+8.5,11451700444,110673,103473.3,68000.0,23616,3513056,310169.8,nvjet_sm90_tst_256x128_64x4_1x2_h_bz_coopA_NNT
+7.7,10306107270,54848,187903.1,129360.0,48352,357024,83640.4,nvjet_sm90_tss_256x128_64x4_1x2_h_badd_coopA_NTT
+5.7,7652950657,27425,279050.2,276800.0,258976,321088,9990.5,cudnn_generated_fort_native_sdpa_sm90_flash_bprop_wgmma_f16_knob_26_64x64x128_1x4x1_cga1x1x1_kernel0_0
+4.4,5986634304,82060,72954.4,52592.0,25344,174144,47283.6,nvjet_sm90_tst_256x128_64x4_1x2_h_bz_coopA_TNT
+3.1,4157353090,54850,75795.0,75584.0,71936,82336,1534.2,"void transformer_engine::normalization::rmsnorm_bwd_finalize_general_kernel<__nv_bfloat16, float, (unsigned int)4, (unsigned int)1, (unsigned int)4, (unsigned int)32>(transformer_engine::normalization::BackwardKernelParams)"
+3.0,3973524253,979,4058758.2,4083680.0,3801408,4193792,86946.8,nvjet_sm90_tss_192x192_64x3_1x2_h_badd_coopB_NTN
+2.0,2633186310,732,3597249.1,3612128.0,3422784,3691232,66146.4,nvjet_sm90_tst_320x128_64x3_1x2_h_bz_coopB_TNT
+1.8,2432551099,27423,88704.8,88256.0,74272,105184,4553.7,nvjet_sm90_tss_192x128_64x5_1x2_h_badd_coopB_NTT
+1.5,1969081379,20516,95977.8,95808.0,91840,108864,1352.0,cudnn_generated_fort_native_sdpa_sm90_flash_fprop_wgmma_f16_knob_7_64x128x128_4x1x1_cga1x1x1_kernel0_0
+1.2,1659689952,2937,565097.0,844800.0,1376,856736,398549.8,"void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)"
+
+  total GPU kernel time in window :   133764.3 ms
+    of which NCCL                  :    64795.3 ms (48.4%)
+    of which COMPUTE               :    68969.0 ms (51.6%)
+
+  Capture window was 50 s across ~2 iterations of ~21 s.
+  Per iteration, compare COMPUTE against the 9384 ms the 1-GPU trace records.
+  * compute >> 9384  -> the fake-PG trace under-represents real TP compute
+  * compute ~= 9384 and a large unaccounted remainder -> the time is IDLE
+[16:42:41] done

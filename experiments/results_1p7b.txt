@@ -1,0 +1,34 @@
+==================================================================================
+(A) NATIVE: physical (val40 iters 21-40) vs sim from each cell's OWN trace
+==================================================================================
+cell               phys ms   sim ms   delta  verdict
+tp1 pp1 mbs1          9921    11170  +12.6%  FAIL
+tp1 pp1 mbs2          9542     9178   -3.8%  GOOD
+tp1 pp1 mbs4          9072     8590   -5.3%  ACCEPTABLE
+tp2 pp1 mbs1         21010    19247   -8.4%  ACCEPTABLE
+tp2 pp1 mbs8         11124     9103  -18.2%  FAIL
+tp4 pp1 mbs1         41449    47389  +14.3%  FAIL
+tp1 pp2 mbs1         14479    13274   -8.3%  ACCEPTABLE
+tp1 pp4 mbs1         20106    18790   -6.5%  ACCEPTABLE
+tp1 pp1 mbs1 rc      10741    11872  +10.5%  FAIL
+tp2 pp2 mbs2         16002    15751   -1.6%  GOOD
+
+==================================================================================
+(B) EXTRAPOLATE mbs from an mbs=1 anchor trace vs physical
+==================================================================================
+leg                   phys ms   sim ms   delta  verdict
+mbs 1->2 @tp1pp1         9542    11125  +16.6%  FAIL
+mbs 1->4 @tp1pp1         9072    11129  +22.7%  FAIL
+mbs 1->8 @tp2pp1        11124    19046  +71.2%  FAIL
+
+==================================================================================
+AXIS-ISOLATED (NATIVE): measured effect vs simulated effect (ratios)
+==================================================================================
+axis                       meas      sim    error  verdict
+MBS 1->2 @tp1pp1          -3.8%   -17.8%   -14.0pp  FAIL
+MBS 1->4 @tp1pp1          -8.6%   -23.1%   -14.5pp  FAIL
+TP  1->2 @pp1mbs1       +111.8%   +72.3%   -39.5pp  FAIL
+TP  2->4 @pp1mbs1        +97.3%  +146.2%   +48.9pp  FAIL
+PP  1->2 @tp1mbs1        +45.9%   +18.8%   -27.1pp  FAIL
+PP  2->4 @tp1mbs1        +38.9%   +41.6%    +2.7pp  GOOD
+RC  off->on @tp1pp1       +8.3%    +6.3%    -2.0pp  GOOD

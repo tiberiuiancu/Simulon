@@ -1,0 +1,35 @@
+==================================================================================
+(A) NATIVE: physical (val40 iters 21-40) vs sim from each cell's OWN trace
+==================================================================================
+cell               phys ms   sim ms   delta  verdict
+tp1 pp1 mbs1          9921     9947   +0.3%  GOOD
+tp1 pp1 mbs2          9542     9053   -5.1%  ACCEPTABLE
+tp1 pp1 mbs4          9072     8959   -1.2%  GOOD
+tp2 pp1 mbs1         21010    20475   -2.5%  GOOD
+tp2 pp1 mbs8         11124    10959   -1.5%  GOOD
+tp4 pp1 mbs1         41449    41035   -1.0%  GOOD
+tp4 pp1 mbs2         21314    20564   -3.5%  GOOD
+tp1 pp2 mbs1         14479    17176  +18.6%  FAIL
+tp1 pp4 mbs1         20106    21693   +7.9%  ACCEPTABLE
+tp1 pp1 mbs1 rc      10741    11859  +10.4%  FAIL
+tp2 pp2 mbs2         16002    14877   -7.0%  ACCEPTABLE
+
+==================================================================================
+(B) EXTRAPOLATE mbs from an mbs=1 anchor trace vs physical
+==================================================================================
+leg                   phys ms   sim ms   delta  verdict
+mbs 1->2 @tp1pp1         9542     9082   -4.8%  GOOD
+mbs 1->4 @tp1pp1         9072     9073   +0.0%  GOOD
+mbs 1->8 @tp2pp1        11124    12258  +10.2%  FAIL
+
+==================================================================================
+AXIS-ISOLATED (NATIVE): measured effect vs simulated effect (ratios)
+==================================================================================
+axis                       meas      sim    error  verdict
+MBS 1->2 @tp1pp1          -3.8%    -9.0%    -5.2pp  ACCEPTABLE
+MBS 1->4 @tp1pp1          -8.6%    -9.9%    -1.4pp  GOOD
+TP  1->2 @pp1mbs1       +111.8%  +105.8%    -5.9pp  ACCEPTABLE
+TP  2->4 @pp1mbs1        +97.3%  +100.4%    +3.1pp  GOOD
+PP  1->2 @tp1mbs1        +45.9%   +72.7%   +26.7pp  FAIL
+PP  2->4 @tp1mbs1        +38.9%   +26.3%   -12.6pp  FAIL
+RC  off->on @tp1pp1       +8.3%   +19.2%   +11.0pp  FAIL

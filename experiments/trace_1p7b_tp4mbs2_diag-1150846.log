@@ -1,0 +1,57 @@
+container: /e/project1/e-sta-openeurollm/container/nemo_26.04.sif
+SM clock : 1830 MHz
+host mem : 857 GB total, 760 GB available
+sampling to experiments/trace_1p7b_tp4mbs2_diag-1150846.mem.csv
+[23:19:22] launching trace generate (span, kt=0) under srun
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+Tracing rank 0 ...
+
+Trace generation complete. 1 file(s) in /opt/simulon/templates/gpu/gh200_jupiter-1p7b-unified/traces/tp4pp1-mbs2:
+  trace_rank_0.json
+[23:22:02] srun returned rc=0
+TRACE OK
+=== peak memory seen by the sampler ===
+  host available RAM bottomed at 731 GB
+  GPU used peaked at 19811 MiB
+=== last 10 samples ===
+23:21:41,731,19811
+23:21:44,731,19811
+23:21:46,731,19811
+23:21:48,731,19811
+23:21:50,731,19811
+23:21:52,731,19811
+23:21:54,731,19811
+23:21:56,731,19811
+23:21:59,732,19811
+23:22:01,732,19811
+NEXT: sacct -j 1150846 --format=JobID%16,State,ExitCode,MaxRSS  # OUT_OF_MEMORY?
+[23:22:02] batch shell EXITING (rc=0) — if this is the last line, the cgroup was killed

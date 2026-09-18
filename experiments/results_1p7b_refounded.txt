@@ -1,0 +1,16 @@
+CALIBRATION anchor=tp1pp1-mbs1: phys=9921 kernel=6847 comm=27 bubble=0  ->  f = 0.445
+  (f = launch-bound overhead fraction of compute; one physical run pins it)
+
+REFOUNDED: iter = kernel*(1+0.445) + comm + bubble    [* = KT under-captured]
+cell         axis      phys  refnd      Δ   f_cell  verdict
+tp1pp1-mbs1  anchor    9921   9921  +0.0%    0.445  GOOD
+tp1pp1-mbs2  mbs       9542   9261  -2.9%    0.489  GOOD
+tp2pp1-mbs1  TP       21010  20257  -3.6%    0.503  GOOD
+tp4pp1-mbs1  TP       41449  36413 -12.1%    0.653  FAIL
+tp1pp2-mbs1  PP       14479  12937 -10.7%    0.658  FAIL
+tp1pp4-mbs1  PP       20106  18245  -9.3%    0.708  ACCEPTABLE
+tp1pp1-mbs4  mbs*      9072   6004 -33.8%    1.187  FAIL
+tp2pp1-mbs8  mbs*     11124   5170 -53.5%    2.179  FAIL
+
+per-cell f across clean axis cells: {tp1pp1mbs1=0.45, tp1pp1mbs2=0.49, tp2pp1mbs1=0.50, tp4pp1mbs1=0.65, tp1pp2mbs1=0.66, tp1pp4mbs1=0.71}
+  f mean=0.576  spread=59%  -> f DRIFTS across an axis (scope it)

@@ -1,0 +1,183 @@
+container: /e/project1/e-sta-openeurollm/container/nemo_26.04.sif
+SM clock : 1830 MHz
+
+############### world_size=1 ###############
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[W731 16:16:23.042748539 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+========================================================================
+(1) KERNEL LAUNCH COST  [1 GPU]
+========================================================================
+  CPU dispatch per trivial kernel :     5.60 us
+  GEMM wall per iter              :    27.82 us
+  GEMM pure device time           :    27.85 us
+  => per-kernel GAP               :    -0.03 us
+
+  The gap is the compute-side fixed cost the fitted `f` stands in for.
+exit=0
+
+############### world_size=2 ###############
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+W0731 16:17:36.610000 2634375 torch/distributed/run.py:851] 
+W0731 16:17:36.610000 2634375 torch/distributed/run.py:851] *****************************************
+W0731 16:17:36.610000 2634375 torch/distributed/run.py:851] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0731 16:17:36.610000 2634375 torch/distributed/run.py:851] *****************************************
+[W731 16:17:38.353757074 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[W731 16:18:25.402983358 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+[W731 16:18:25.402982974 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+[rank0]:[W731 16:18:25.469389745 ProcessGroupNCCL.cpp:5178] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+========================================================================
+(2) COLLECTIVE EXPOSURE  [2 ranks, AllReduce 16.8 MB]
+========================================================================
+  A  compute only                 :      58.0 us/iter
+  B  compute + blocking AllReduce :     228.0 us/iter
+  => EXPOSED cost per collective  :     170.1 us   <== the term
+
+  C  back-to-back AllReduce       :     177.7 us (nccl-tests regime)
+     nccl-tests reference         :     178.8 us  -> harness -1% OK
+
+  PRE-REGISTERED PREDICTION       :     531.0 us
+  VERDICT: PARTIAL — real but not the whole gap; decompose further.
+
+  exposure beyond raw transfer    :      -7.6 us
+exit=0
+
+############### world_size=4 ###############
+
+====================
+== NeMo Framework ==
+====================
+
+NVIDIA Release  (build 297524220)
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+W0731 16:18:52.655000 2634763 torch/distributed/run.py:851] 
+W0731 16:18:52.655000 2634763 torch/distributed/run.py:851] *****************************************
+W0731 16:18:52.655000 2634763 torch/distributed/run.py:851] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0731 16:18:52.655000 2634763 torch/distributed/run.py:851] *****************************************
+[W731 16:18:54.386561167 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[W731 16:18:56.243205472 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+[W731 16:18:56.251574557 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+[W731 16:18:56.261690424 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+[W731 16:18:56.271765044 socket.cpp:764] [c10d] The client socket cannot be initialized to connect to [localhost]:29531 (errno: 97 - Address family not supported by protocol).
+/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+[rank0]:[W731 16:18:56.280127825 ProcessGroupNCCL.cpp:5178] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+========================================================================
+(2) COLLECTIVE EXPOSURE  [4 ranks, AllReduce 16.8 MB]
+========================================================================
+  A  compute only                 :      58.0 us/iter
+  B  compute + blocking AllReduce :     164.8 us/iter
+  => EXPOSED cost per collective  :     106.9 us   <== the term
+
+  C  back-to-back AllReduce       :      97.2 us (nccl-tests regime)
+     nccl-tests reference         :     105.3 us  -> harness -8% OK
+
+  PRE-REGISTERED PREDICTION       :     900.0 us
+  VERDICT: REFUTED — exposure is far too small; the TP gap is NOT per-collective. Look at the PP/bubble model and the accounting.
+
+  exposure beyond raw transfer    :       9.7 us
+exit=0
+
+[16:19:41] done
