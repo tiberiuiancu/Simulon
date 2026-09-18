@@ -6,7 +6,7 @@ calbusbw.py for algorithm selection and effective bandwidth derivation.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class NcclDataPoint(BaseModel):
@@ -22,16 +22,27 @@ class NcclAlgoMeasurements(BaseModel):
 
 
 class NcclProfile(BaseModel):
+    """Measured NCCL bus-bandwidth curves for a cluster.
+
+    REMOVED FIELD: ``launch_latency_ms``. It was a fixed per-collective cost fitted to a
+    residual (0.911 ms at tp4/mbs1, then 22-26% too high at mbs2 -- it declines with
+    microbatch size, so no constant works). ``NodeSpec.host_cost_us`` models the same
+    physics from measured per-slot host time and supersedes it.
+
+    It was deleted rather than defaulted to 0 because of how it failed: it was applied
+    unless ``host_cost_us`` happened to be set, so any caller that passed a node template
+    by name silently got 16,430 collectives/rank x 0.911 ms = ~15 s of phantom
+    communication (hit while diagnosing the comm model, 2026-09-17). A term that is armed
+    by default and disarmed by an unrelated setting is worse than no term. Setting it now
+    raises instead of being ignored.
+    """
+
     gpus_per_node: int = 8
     name: str | None = None
     AllReduce: NcclAlgoMeasurements = NcclAlgoMeasurements()
     AllGather: NcclAlgoMeasurements = NcclAlgoMeasurements()
     ReduceScatter: NcclAlgoMeasurements = NcclAlgoMeasurements()
     AllToAll: NcclAlgoMeasurements = NcclAlgoMeasurements()
-    # Optional per-call latency added on top of the bandwidth-limited collective time.
-    # Default 0.0 — only set if you have a reliable direct measurement of NCCL launch
-    # overhead for this cluster (not a calibration residual).
-    launch_latency_ms: float = 0.0
     # Optional sub-profiles measured at a specific intra-node communicator size
     # (number of GPUs participating). On NVLink fabrics busbw is NOT rank-count
     # independent — a TP=2 group over 2 GPUs reaches only ~1/3 of the 4-GPU busbw
@@ -46,6 +57,19 @@ class NcclProfile(BaseModel):
     # the duration is taken directly from real measurement instead of the modelled
     # NIC-efficiency table (calbusbw). Falls back to the model for unmeasured topologies.
     by_topology: dict[str, "NcclProfile"] = {}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_launch_latency(cls, data):
+        if isinstance(data, dict) and "launch_latency_ms" in data:
+            raise ValueError(
+                "launch_latency_ms was removed (see the class docstring): it is a fitted "
+                "per-collective constant that does not hold across microbatch size, and it "
+                "was applied silently whenever host_cost_us was unset. Set "
+                "NodeSpec.host_cost_us instead -- calibrate it with "
+                "experiments/host_cost_transfer.py."
+            )
+        return data
 
     def for_nranks(self, nranks: int) -> "NcclProfile":
         """Return the sub-profile measured at this communicator size, else self.

@@ -19,12 +19,9 @@ scale_up:
 nccl:
   name: jupiter-gh200-4g
   gpus_per_node: 4
-  # Per-call collective overhead. Set to 0: the previous 0.111ms was a fit-to-residual
-  # ((SP=True gap − SP=False gap)/call-count) — a magic number tuned to the very gap it
-  # was meant to validate, so it is removed. A real per-call latency floor must be
-  # MEASURED (small-message nccl-tests, y-intercept of time-vs-size), not back-derived.
-  # Any residual is reported as honest model error, not absorbed here.
-  launch_latency_ms: 0.0
+  # Rank-skew exposure per collective, 4-rank communicator. Measured, not fitted —
+  # see the full provenance note in templates/node/jupiter-gh200-4g.yaml. Kept in sync
+  # with that file; the two templates share the same measured NCCL profile.
   AllReduce:
     ring:
       - {size_bytes:       8388608, bus_bw_GBps: 204.795}
@@ -85,7 +82,7 @@ nccl:
   by_nranks:
     2:
       gpus_per_node: 2
-      launch_latency_ms: 0.0
+      # Rank-skew exposure, 2-rank communicator (see jupiter-gh200-4g.yaml).
       AllReduce:
         ring:
           - {size_bytes:       8388608, bus_bw_GBps:   85.823}

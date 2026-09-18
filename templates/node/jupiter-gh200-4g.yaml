@@ -4,6 +4,13 @@
 name: jupiter-gh200-4g
 gpus_per_node: 4
 gpu: gh200_jupiter
+# Per-op host cost for the two-resource replay. Calibrated on this cluster's own trace
+# CAPTURE runs (experiments/host_cost_transfer.py): each capture independently implies
+# 22.7-29.5 us/op across PP2/PP4/PP8, plain and interleaved layouts, bf16 and fp8
+# (mean 27.0, sd 9%), so it behaves as a machine property rather than a per-config fit.
+# 26.0 is the value the clean anchors jointly solve to. Replaces the deleted
+# launch_latency_ms, which was fitted to a residual and did not hold across mbs.
+host_cost_us: 26.0
 scale_out:
   nic:
     speed: 200Gbps
@@ -21,12 +28,57 @@ scale_up:
 nccl:
   name: jupiter-gh200-4g
   gpus_per_node: 4
-  # Per-call collective overhead. Set to 0: the previous 0.111ms was a fit-to-residual
-  # ((SP=True gap − SP=False gap)/call-count) — a magic number tuned to the very gap it
-  # was meant to validate, so it is removed. A real per-call latency floor must be
-  # MEASURED (small-message nccl-tests, y-intercept of time-vs-size), not back-derived.
-  # Any residual is reported as honest model error, not absorbed here.
-  launch_latency_ms: 0.0
+  # Fixed per-collective cost on top of the bandwidth-limited transfer, for a 4-rank
+  # (full-node) communicator. This is RANK-SKEW EXPOSURE, not launch overhead: a
+  # collective cannot complete until every participant arrives, and in real training the
+  # ranks are not synchronised, so the wait shows up as idle on early ranks and as
+  # inflated NCCL kernel time on late ones.
+  #
+  # HONEST STATUS OF THESE NUMBERS — read before trusting them.
+  # The FUNCTIONAL FORM (cost per collective, scaling with communicator size) is validated:
+  # tp2pp1 and tp2pp2 have the SAME 128 microbatches but 15626 vs 8201 collectives, and the
+  # lost time tracked the collective count (x0.53 vs x0.56), refuting a per-microbatch law
+  # by 1.78x. nsys also observes the mechanism directly (jobs 1140757/1141312/1144045:
+  # extreme per-GPU imbalance, one rank 98.6% busy inside NCCL while another idles 58%,
+  # AllReduce max 750 ms against a 213 us median).
+  # The MAGNITUDES were first obtained by residual — (physical - modelled compute - modelled
+  # comm) / n_coll — which is a fit. They are now CORROBORATED BY DIRECT MEASUREMENT of the
+  # same physical quantity, from NCCL kernel start timestamps alone (no compute model, no
+  # comm model, no physical-vs-simulated comparison): mean over collectives of
+  # (latest rank's start - earliest rank's start). Regenerate with
+  #     python experiments/measure_skew.py <nsys.sqlite> --groups 0,1 2,3
+  #
+  #   size | calibrated (this file) | directly measured arrival spread
+  #     2  |        0.538 ms        | 0.667 / 0.435 (tp2pp2), 0.645 (tp2pp1)  -> mean 0.582
+  #     4  |        0.911 ms        | >1.133 (measured over 3 of 4 ranks = a lower bound)
+  #
+  # The calibrated values sit just BELOW the raw spread, which is the expected relationship:
+  # part of the wait overlaps the collective's own transfer, so only a fraction is exposed.
+  # The 2-rank spread itself varies 0.435-0.667 across groups within a single run, so ~+-20%
+  # is the intrinsic precision available here — do not chase a tighter number.
+  #
+  # SCOPE: sizes 2 and 4 only, both intra-node, and ONE model (Qwen3-1.7B). This top-level
+  # value doubles as the fallback for unmeasured communicators including multi-node, where it
+  # is an UNVALIDATED LOWER BOUND (skew grows with participant count). Current exposure is
+  # small — the 32B traces carry only ~2 collectives above 4 ranks per rank-trace — but
+  # re-measure before a multi-node sweep, and before a large change in model size or
+  # sequence length (skew plausibly depends on the work between sync points).
+  #
+  # !!! k IS NOT A CONSTANT — IT DECLINES WITH MICROBATCH SIZE. DO NOT SWEEP mbs ON IT. !!!
+  # Settled 2026-08-01 by the out-of-sample cell tp4pp1-mbs2 (physical job 1148929, nsys
+  # profile 1196684). Two independent routes agree that the 4-rank per-collective cost falls
+  # ~25% from mbs1 to mbs2:
+  #     direct arrival spread   1132 us (mbs1) -> 888 us (mbs2)   -22%   [timestamps only]
+  #     residual lost/collective 973 us (mbs1) -> 720 us (mbs2)   -26%   [iteration - compute]
+  # The per-collective FORM survives (lost time still scales with collective count); it is
+  # this COEFFICIENT that moves. So no single value works:
+  #     k=0.911 -> mbs1  +0.0%, mbs2 +25.0%
+  #     k=0.720 -> mbs1 -14.0%, mbs2 +11.9%
+  # 0.911 is kept because it is the mbs1-calibrated value and keeps the published scorecard
+  # reproducible; it OVER-predicts as mbs grows. Same direction as the 2-rank data
+  # (538 us at mbs1 -> 372 us at mbs8), so the 2-rank value has the same weakness — it was
+  # simply calibrated at small mbs. Modelling k as a function of work-per-collective is the
+  # open task; until then, treat any mbs sweep at TP>=2 as uncalibrated.
   AllReduce:
     ring:
       - {size_bytes:       8388608, bus_bw_GBps: 204.795}
@@ -87,7 +139,10 @@ nccl:
   by_nranks:
     2:
       gpus_per_node: 2
-      launch_latency_ms: 0.0
+      # Rank-skew exposure for a 2-rank communicator — see the top-level
+      # launch_latency_ms comment. Lower than the 4-rank value because a collective
+      # waits on fewer participants. nsys: 547 us (tp2pp1) / 532 us (tp2pp2);
+      # scorecard residual: 538 us.
       AllReduce:
         ring:
           - {size_bytes:       8388608, bus_bw_GBps:   85.823}
@@ -422,3 +477,447 @@ nccl:
           - {size_bytes:    2147483648, bus_bw_GBps:   26.335}
           - {size_bytes:    4294967296, bus_bw_GBps:   26.386}
           - {size_bytes:    8589934592, bus_bw_GBps:   26.403}
+
+    # ---- large-scale fabric, from ~/nccl-tests AllReduce sweeps (scripts/nccl_slurm_to_topology.py) ----
+    # RS/AG = AllReduce x 1.00: on every profiled INTER-node topology above (2n1g, 16n1g, 4n2g, 4n4g)
+    # the ring RS/AG busbw equals the AllReduce busbw at >= 1 GB (NIC-bound); 2n4g's 0.6 is intra-node.
+    64n4g:
+      gpus_per_node: 4
+      # MEASURED AllReduce: nccl-tests job 358778, 64 nodes x 4 GPUs (NCCL 2.29.7+cuda13.0, Stages/2026, NCCL_IB_HCA=mlx5, April 2026).
+      # DERIVED ReduceScatter/AllGather = AllReduce x 1.00/1.00 (ratio measured on the profiled 16n1g/4n4g curves at >= 1 GB).
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:   22.410}
+          - {size_bytes:      16777216, bus_bw_GBps:   38.220}
+          - {size_bytes:      33554432, bus_bw_GBps:   28.920}
+          - {size_bytes:      67108864, bus_bw_GBps:   34.220}
+          - {size_bytes:     134217728, bus_bw_GBps:   35.350}
+          - {size_bytes:     268435456, bus_bw_GBps:   43.690}
+          - {size_bytes:     536870912, bus_bw_GBps:   52.820}
+          - {size_bytes:    1073741824, bus_bw_GBps:   69.920}
+          - {size_bytes:    2147483648, bus_bw_GBps:   70.430}
+          - {size_bytes:    4294967296, bus_bw_GBps:   79.140}
+          - {size_bytes:    8589934592, bus_bw_GBps:   81.480}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:   22.410}
+          - {size_bytes:      16777216, bus_bw_GBps:   38.220}
+          - {size_bytes:      33554432, bus_bw_GBps:   28.920}
+          - {size_bytes:      67108864, bus_bw_GBps:   34.220}
+          - {size_bytes:     134217728, bus_bw_GBps:   35.350}
+          - {size_bytes:     268435456, bus_bw_GBps:   43.690}
+          - {size_bytes:     536870912, bus_bw_GBps:   52.820}
+          - {size_bytes:    1073741824, bus_bw_GBps:   69.920}
+          - {size_bytes:    2147483648, bus_bw_GBps:   70.430}
+          - {size_bytes:    4294967296, bus_bw_GBps:   79.140}
+          - {size_bytes:    8589934592, bus_bw_GBps:   81.480}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:   22.410}
+          - {size_bytes:      16777216, bus_bw_GBps:   38.220}
+          - {size_bytes:      33554432, bus_bw_GBps:   28.920}
+          - {size_bytes:      67108864, bus_bw_GBps:   34.220}
+          - {size_bytes:     134217728, bus_bw_GBps:   35.350}
+          - {size_bytes:     268435456, bus_bw_GBps:   43.690}
+          - {size_bytes:     536870912, bus_bw_GBps:   52.820}
+          - {size_bytes:    1073741824, bus_bw_GBps:   69.920}
+          - {size_bytes:    2147483648, bus_bw_GBps:   70.430}
+          - {size_bytes:    4294967296, bus_bw_GBps:   79.140}
+          - {size_bytes:    8589934592, bus_bw_GBps:   81.480}
+    64n1g:
+      gpus_per_node: 1
+      # DERIVED, not measured: AllReduce(64n4g, job 358778) x 0.306, the single measured 1g/4g pair
+      # (job 409071: 64 nodes, 32 GB, 24.55 vs 80.13 GB/s). One GPU per node is NIC-bound (~25 GB/s);
+      # the 4g curve supplies the fabric's scale dependence. RS/AG further x 1.00/1.00.
+      # Replace with a measured 64n1g sweep when one exists.
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    6.866}
+          - {size_bytes:      16777216, bus_bw_GBps:   11.710}
+          - {size_bytes:      33554432, bus_bw_GBps:    8.860}
+          - {size_bytes:      67108864, bus_bw_GBps:   10.484}
+          - {size_bytes:     134217728, bus_bw_GBps:   10.830}
+          - {size_bytes:     268435456, bus_bw_GBps:   13.386}
+          - {size_bytes:     536870912, bus_bw_GBps:   16.183}
+          - {size_bytes:    1073741824, bus_bw_GBps:   21.422}
+          - {size_bytes:    2147483648, bus_bw_GBps:   21.578}
+          - {size_bytes:    4294967296, bus_bw_GBps:   24.247}
+          - {size_bytes:    8589934592, bus_bw_GBps:   24.964}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    6.866}
+          - {size_bytes:      16777216, bus_bw_GBps:   11.710}
+          - {size_bytes:      33554432, bus_bw_GBps:    8.860}
+          - {size_bytes:      67108864, bus_bw_GBps:   10.484}
+          - {size_bytes:     134217728, bus_bw_GBps:   10.830}
+          - {size_bytes:     268435456, bus_bw_GBps:   13.386}
+          - {size_bytes:     536870912, bus_bw_GBps:   16.183}
+          - {size_bytes:    1073741824, bus_bw_GBps:   21.422}
+          - {size_bytes:    2147483648, bus_bw_GBps:   21.578}
+          - {size_bytes:    4294967296, bus_bw_GBps:   24.247}
+          - {size_bytes:    8589934592, bus_bw_GBps:   24.964}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    6.866}
+          - {size_bytes:      16777216, bus_bw_GBps:   11.710}
+          - {size_bytes:      33554432, bus_bw_GBps:    8.860}
+          - {size_bytes:      67108864, bus_bw_GBps:   10.484}
+          - {size_bytes:     134217728, bus_bw_GBps:   10.830}
+          - {size_bytes:     268435456, bus_bw_GBps:   13.386}
+          - {size_bytes:     536870912, bus_bw_GBps:   16.183}
+          - {size_bytes:    1073741824, bus_bw_GBps:   21.422}
+          - {size_bytes:    2147483648, bus_bw_GBps:   21.578}
+          - {size_bytes:    4294967296, bus_bw_GBps:   24.247}
+          - {size_bytes:    8589934592, bus_bw_GBps:   24.964}
+    128n4g:
+      gpus_per_node: 4
+      # MEASURED AllReduce: nccl-tests job 358777, 128 nodes x 4 GPUs (NCCL 2.29.7+cuda13.0, Stages/2026, NCCL_IB_HCA=mlx5, April 2026).
+      # DERIVED ReduceScatter/AllGather = AllReduce x 1.00/1.00 (ratio measured on the profiled 16n1g/4n4g curves at >= 1 GB).
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:   15.540}
+          - {size_bytes:      16777216, bus_bw_GBps:   12.860}
+          - {size_bytes:      33554432, bus_bw_GBps:   20.860}
+          - {size_bytes:      67108864, bus_bw_GBps:   25.240}
+          - {size_bytes:     134217728, bus_bw_GBps:   32.630}
+          - {size_bytes:     268435456, bus_bw_GBps:   48.950}
+          - {size_bytes:     536870912, bus_bw_GBps:   61.960}
+          - {size_bytes:    1073741824, bus_bw_GBps:   61.450}
+          - {size_bytes:    2147483648, bus_bw_GBps:   73.040}
+          - {size_bytes:    4294967296, bus_bw_GBps:   69.830}
+          - {size_bytes:    8589934592, bus_bw_GBps:   80.440}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:   15.540}
+          - {size_bytes:      16777216, bus_bw_GBps:   12.860}
+          - {size_bytes:      33554432, bus_bw_GBps:   20.860}
+          - {size_bytes:      67108864, bus_bw_GBps:   25.240}
+          - {size_bytes:     134217728, bus_bw_GBps:   32.630}
+          - {size_bytes:     268435456, bus_bw_GBps:   48.950}
+          - {size_bytes:     536870912, bus_bw_GBps:   61.960}
+          - {size_bytes:    1073741824, bus_bw_GBps:   61.450}
+          - {size_bytes:    2147483648, bus_bw_GBps:   73.040}
+          - {size_bytes:    4294967296, bus_bw_GBps:   69.830}
+          - {size_bytes:    8589934592, bus_bw_GBps:   80.440}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:   15.540}
+          - {size_bytes:      16777216, bus_bw_GBps:   12.860}
+          - {size_bytes:      33554432, bus_bw_GBps:   20.860}
+          - {size_bytes:      67108864, bus_bw_GBps:   25.240}
+          - {size_bytes:     134217728, bus_bw_GBps:   32.630}
+          - {size_bytes:     268435456, bus_bw_GBps:   48.950}
+          - {size_bytes:     536870912, bus_bw_GBps:   61.960}
+          - {size_bytes:    1073741824, bus_bw_GBps:   61.450}
+          - {size_bytes:    2147483648, bus_bw_GBps:   73.040}
+          - {size_bytes:    4294967296, bus_bw_GBps:   69.830}
+          - {size_bytes:    8589934592, bus_bw_GBps:   80.440}
+    128n1g:
+      gpus_per_node: 1
+      # DERIVED, not measured: AllReduce(128n4g, job 358777) x 0.306, the single measured 1g/4g pair
+      # (job 409071: 64 nodes, 32 GB, 24.55 vs 80.13 GB/s). One GPU per node is NIC-bound (~25 GB/s);
+      # the 4g curve supplies the fabric's scale dependence. RS/AG further x 1.00/1.00.
+      # Replace with a measured 128n1g sweep when one exists.
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    4.761}
+          - {size_bytes:      16777216, bus_bw_GBps:    3.940}
+          - {size_bytes:      33554432, bus_bw_GBps:    6.391}
+          - {size_bytes:      67108864, bus_bw_GBps:    7.733}
+          - {size_bytes:     134217728, bus_bw_GBps:    9.997}
+          - {size_bytes:     268435456, bus_bw_GBps:   14.997}
+          - {size_bytes:     536870912, bus_bw_GBps:   18.983}
+          - {size_bytes:    1073741824, bus_bw_GBps:   18.827}
+          - {size_bytes:    2147483648, bus_bw_GBps:   22.378}
+          - {size_bytes:    4294967296, bus_bw_GBps:   21.394}
+          - {size_bytes:    8589934592, bus_bw_GBps:   24.645}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    4.761}
+          - {size_bytes:      16777216, bus_bw_GBps:    3.940}
+          - {size_bytes:      33554432, bus_bw_GBps:    6.391}
+          - {size_bytes:      67108864, bus_bw_GBps:    7.733}
+          - {size_bytes:     134217728, bus_bw_GBps:    9.997}
+          - {size_bytes:     268435456, bus_bw_GBps:   14.997}
+          - {size_bytes:     536870912, bus_bw_GBps:   18.983}
+          - {size_bytes:    1073741824, bus_bw_GBps:   18.827}
+          - {size_bytes:    2147483648, bus_bw_GBps:   22.378}
+          - {size_bytes:    4294967296, bus_bw_GBps:   21.394}
+          - {size_bytes:    8589934592, bus_bw_GBps:   24.645}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    4.761}
+          - {size_bytes:      16777216, bus_bw_GBps:    3.940}
+          - {size_bytes:      33554432, bus_bw_GBps:    6.391}
+          - {size_bytes:      67108864, bus_bw_GBps:    7.733}
+          - {size_bytes:     134217728, bus_bw_GBps:    9.997}
+          - {size_bytes:     268435456, bus_bw_GBps:   14.997}
+          - {size_bytes:     536870912, bus_bw_GBps:   18.983}
+          - {size_bytes:    1073741824, bus_bw_GBps:   18.827}
+          - {size_bytes:    2147483648, bus_bw_GBps:   22.378}
+          - {size_bytes:    4294967296, bus_bw_GBps:   21.394}
+          - {size_bytes:    8589934592, bus_bw_GBps:   24.645}
+    256n4g:
+      gpus_per_node: 4
+      # MEASURED AllReduce: nccl-tests job 358776, 256 nodes x 4 GPUs (NCCL 2.29.7+cuda13.0, Stages/2026, NCCL_IB_HCA=mlx5, April 2026).
+      # DERIVED ReduceScatter/AllGather = AllReduce x 1.00/1.00 (ratio measured on the profiled 16n1g/4n4g curves at >= 1 GB).
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    5.030}
+          - {size_bytes:      16777216, bus_bw_GBps:    6.150}
+          - {size_bytes:      33554432, bus_bw_GBps:   11.520}
+          - {size_bytes:      67108864, bus_bw_GBps:   19.250}
+          - {size_bytes:     134217728, bus_bw_GBps:   20.670}
+          - {size_bytes:     268435456, bus_bw_GBps:   35.310}
+          - {size_bytes:     536870912, bus_bw_GBps:   50.400}
+          - {size_bytes:    1073741824, bus_bw_GBps:   64.510}
+          - {size_bytes:    2147483648, bus_bw_GBps:   59.620}
+          - {size_bytes:    4294967296, bus_bw_GBps:   73.180}
+          - {size_bytes:    8589934592, bus_bw_GBps:   70.170}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    5.030}
+          - {size_bytes:      16777216, bus_bw_GBps:    6.150}
+          - {size_bytes:      33554432, bus_bw_GBps:   11.520}
+          - {size_bytes:      67108864, bus_bw_GBps:   19.250}
+          - {size_bytes:     134217728, bus_bw_GBps:   20.670}
+          - {size_bytes:     268435456, bus_bw_GBps:   35.310}
+          - {size_bytes:     536870912, bus_bw_GBps:   50.400}
+          - {size_bytes:    1073741824, bus_bw_GBps:   64.510}
+          - {size_bytes:    2147483648, bus_bw_GBps:   59.620}
+          - {size_bytes:    4294967296, bus_bw_GBps:   73.180}
+          - {size_bytes:    8589934592, bus_bw_GBps:   70.170}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    5.030}
+          - {size_bytes:      16777216, bus_bw_GBps:    6.150}
+          - {size_bytes:      33554432, bus_bw_GBps:   11.520}
+          - {size_bytes:      67108864, bus_bw_GBps:   19.250}
+          - {size_bytes:     134217728, bus_bw_GBps:   20.670}
+          - {size_bytes:     268435456, bus_bw_GBps:   35.310}
+          - {size_bytes:     536870912, bus_bw_GBps:   50.400}
+          - {size_bytes:    1073741824, bus_bw_GBps:   64.510}
+          - {size_bytes:    2147483648, bus_bw_GBps:   59.620}
+          - {size_bytes:    4294967296, bus_bw_GBps:   73.180}
+          - {size_bytes:    8589934592, bus_bw_GBps:   70.170}
+    256n1g:
+      gpus_per_node: 1
+      # DERIVED, not measured: AllReduce(256n4g, job 358776) x 0.306, the single measured 1g/4g pair
+      # (job 409071: 64 nodes, 32 GB, 24.55 vs 80.13 GB/s). One GPU per node is NIC-bound (~25 GB/s);
+      # the 4g curve supplies the fabric's scale dependence. RS/AG further x 1.00/1.00.
+      # Replace with a measured 256n1g sweep when one exists.
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.541}
+          - {size_bytes:      16777216, bus_bw_GBps:    1.884}
+          - {size_bytes:      33554432, bus_bw_GBps:    3.529}
+          - {size_bytes:      67108864, bus_bw_GBps:    5.898}
+          - {size_bytes:     134217728, bus_bw_GBps:    6.333}
+          - {size_bytes:     268435456, bus_bw_GBps:   10.818}
+          - {size_bytes:     536870912, bus_bw_GBps:   15.441}
+          - {size_bytes:    1073741824, bus_bw_GBps:   19.764}
+          - {size_bytes:    2147483648, bus_bw_GBps:   18.266}
+          - {size_bytes:    4294967296, bus_bw_GBps:   22.421}
+          - {size_bytes:    8589934592, bus_bw_GBps:   21.498}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.541}
+          - {size_bytes:      16777216, bus_bw_GBps:    1.884}
+          - {size_bytes:      33554432, bus_bw_GBps:    3.529}
+          - {size_bytes:      67108864, bus_bw_GBps:    5.898}
+          - {size_bytes:     134217728, bus_bw_GBps:    6.333}
+          - {size_bytes:     268435456, bus_bw_GBps:   10.818}
+          - {size_bytes:     536870912, bus_bw_GBps:   15.441}
+          - {size_bytes:    1073741824, bus_bw_GBps:   19.764}
+          - {size_bytes:    2147483648, bus_bw_GBps:   18.266}
+          - {size_bytes:    4294967296, bus_bw_GBps:   22.421}
+          - {size_bytes:    8589934592, bus_bw_GBps:   21.498}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.541}
+          - {size_bytes:      16777216, bus_bw_GBps:    1.884}
+          - {size_bytes:      33554432, bus_bw_GBps:    3.529}
+          - {size_bytes:      67108864, bus_bw_GBps:    5.898}
+          - {size_bytes:     134217728, bus_bw_GBps:    6.333}
+          - {size_bytes:     268435456, bus_bw_GBps:   10.818}
+          - {size_bytes:     536870912, bus_bw_GBps:   15.441}
+          - {size_bytes:    1073741824, bus_bw_GBps:   19.764}
+          - {size_bytes:    2147483648, bus_bw_GBps:   18.266}
+          - {size_bytes:    4294967296, bus_bw_GBps:   22.421}
+          - {size_bytes:    8589934592, bus_bw_GBps:   21.498}
+    512n4g:
+      gpus_per_node: 4
+      # MEASURED AllReduce: nccl-tests job 358775, 512 nodes x 4 GPUs (NCCL 2.29.7+cuda13.0, Stages/2026, NCCL_IB_HCA=mlx5, April 2026).
+      # DERIVED ReduceScatter/AllGather = AllReduce x 1.00/1.00 (ratio measured on the profiled 16n1g/4n4g curves at >= 1 GB).
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.840}
+          - {size_bytes:      16777216, bus_bw_GBps:    4.270}
+          - {size_bytes:      33554432, bus_bw_GBps:    9.260}
+          - {size_bytes:      67108864, bus_bw_GBps:   11.270}
+          - {size_bytes:     134217728, bus_bw_GBps:   19.480}
+          - {size_bytes:     268435456, bus_bw_GBps:   28.640}
+          - {size_bytes:     536870912, bus_bw_GBps:   50.620}
+          - {size_bytes:    1073741824, bus_bw_GBps:   59.700}
+          - {size_bytes:    2147483648, bus_bw_GBps:   64.620}
+          - {size_bytes:    4294967296, bus_bw_GBps:   60.440}
+          - {size_bytes:    8589934592, bus_bw_GBps:   72.890}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.840}
+          - {size_bytes:      16777216, bus_bw_GBps:    4.270}
+          - {size_bytes:      33554432, bus_bw_GBps:    9.260}
+          - {size_bytes:      67108864, bus_bw_GBps:   11.270}
+          - {size_bytes:     134217728, bus_bw_GBps:   19.480}
+          - {size_bytes:     268435456, bus_bw_GBps:   28.640}
+          - {size_bytes:     536870912, bus_bw_GBps:   50.620}
+          - {size_bytes:    1073741824, bus_bw_GBps:   59.700}
+          - {size_bytes:    2147483648, bus_bw_GBps:   64.620}
+          - {size_bytes:    4294967296, bus_bw_GBps:   60.440}
+          - {size_bytes:    8589934592, bus_bw_GBps:   72.890}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.840}
+          - {size_bytes:      16777216, bus_bw_GBps:    4.270}
+          - {size_bytes:      33554432, bus_bw_GBps:    9.260}
+          - {size_bytes:      67108864, bus_bw_GBps:   11.270}
+          - {size_bytes:     134217728, bus_bw_GBps:   19.480}
+          - {size_bytes:     268435456, bus_bw_GBps:   28.640}
+          - {size_bytes:     536870912, bus_bw_GBps:   50.620}
+          - {size_bytes:    1073741824, bus_bw_GBps:   59.700}
+          - {size_bytes:    2147483648, bus_bw_GBps:   64.620}
+          - {size_bytes:    4294967296, bus_bw_GBps:   60.440}
+          - {size_bytes:    8589934592, bus_bw_GBps:   72.890}
+    512n1g:
+      gpus_per_node: 1
+      # DERIVED, not measured: AllReduce(512n4g, job 358775) x 0.306, the single measured 1g/4g pair
+      # (job 409071: 64 nodes, 32 GB, 24.55 vs 80.13 GB/s). One GPU per node is NIC-bound (~25 GB/s);
+      # the 4g curve supplies the fabric's scale dependence. RS/AG further x 1.00/1.00.
+      # Replace with a measured 512n1g sweep when one exists.
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    0.564}
+          - {size_bytes:      16777216, bus_bw_GBps:    1.308}
+          - {size_bytes:      33554432, bus_bw_GBps:    2.837}
+          - {size_bytes:      67108864, bus_bw_GBps:    3.453}
+          - {size_bytes:     134217728, bus_bw_GBps:    5.968}
+          - {size_bytes:     268435456, bus_bw_GBps:    8.775}
+          - {size_bytes:     536870912, bus_bw_GBps:   15.509}
+          - {size_bytes:    1073741824, bus_bw_GBps:   18.291}
+          - {size_bytes:    2147483648, bus_bw_GBps:   19.798}
+          - {size_bytes:    4294967296, bus_bw_GBps:   18.517}
+          - {size_bytes:    8589934592, bus_bw_GBps:   22.332}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    0.564}
+          - {size_bytes:      16777216, bus_bw_GBps:    1.308}
+          - {size_bytes:      33554432, bus_bw_GBps:    2.837}
+          - {size_bytes:      67108864, bus_bw_GBps:    3.453}
+          - {size_bytes:     134217728, bus_bw_GBps:    5.968}
+          - {size_bytes:     268435456, bus_bw_GBps:    8.775}
+          - {size_bytes:     536870912, bus_bw_GBps:   15.509}
+          - {size_bytes:    1073741824, bus_bw_GBps:   18.291}
+          - {size_bytes:    2147483648, bus_bw_GBps:   19.798}
+          - {size_bytes:    4294967296, bus_bw_GBps:   18.517}
+          - {size_bytes:    8589934592, bus_bw_GBps:   22.332}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    0.564}
+          - {size_bytes:      16777216, bus_bw_GBps:    1.308}
+          - {size_bytes:      33554432, bus_bw_GBps:    2.837}
+          - {size_bytes:      67108864, bus_bw_GBps:    3.453}
+          - {size_bytes:     134217728, bus_bw_GBps:    5.968}
+          - {size_bytes:     268435456, bus_bw_GBps:    8.775}
+          - {size_bytes:     536870912, bus_bw_GBps:   15.509}
+          - {size_bytes:    1073741824, bus_bw_GBps:   18.291}
+          - {size_bytes:    2147483648, bus_bw_GBps:   19.798}
+          - {size_bytes:    4294967296, bus_bw_GBps:   18.517}
+          - {size_bytes:    8589934592, bus_bw_GBps:   22.332}
+    1024n4g:
+      gpus_per_node: 4
+      # MEASURED AllReduce: nccl-tests job 358773, 1024 nodes x 4 GPUs (NCCL 2.29.7+cuda13.0, Stages/2026, NCCL_IB_HCA=mlx5, April 2026).
+      # DERIVED ReduceScatter/AllGather = AllReduce x 1.00/1.00 (ratio measured on the profiled 16n1g/4n4g curves at >= 1 GB).
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.870}
+          - {size_bytes:      16777216, bus_bw_GBps:    2.840}
+          - {size_bytes:      33554432, bus_bw_GBps:    5.910}
+          - {size_bytes:      67108864, bus_bw_GBps:   11.590}
+          - {size_bytes:     134217728, bus_bw_GBps:   11.860}
+          - {size_bytes:     268435456, bus_bw_GBps:   19.840}
+          - {size_bytes:     536870912, bus_bw_GBps:   37.910}
+          - {size_bytes:    1073741824, bus_bw_GBps:   46.800}
+          - {size_bytes:    2147483648, bus_bw_GBps:   49.590}
+          - {size_bytes:    4294967296, bus_bw_GBps:   59.650}
+          - {size_bytes:    8589934592, bus_bw_GBps:   62.500}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.870}
+          - {size_bytes:      16777216, bus_bw_GBps:    2.840}
+          - {size_bytes:      33554432, bus_bw_GBps:    5.910}
+          - {size_bytes:      67108864, bus_bw_GBps:   11.590}
+          - {size_bytes:     134217728, bus_bw_GBps:   11.860}
+          - {size_bytes:     268435456, bus_bw_GBps:   19.840}
+          - {size_bytes:     536870912, bus_bw_GBps:   37.910}
+          - {size_bytes:    1073741824, bus_bw_GBps:   46.800}
+          - {size_bytes:    2147483648, bus_bw_GBps:   49.590}
+          - {size_bytes:    4294967296, bus_bw_GBps:   59.650}
+          - {size_bytes:    8589934592, bus_bw_GBps:   62.500}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    1.870}
+          - {size_bytes:      16777216, bus_bw_GBps:    2.840}
+          - {size_bytes:      33554432, bus_bw_GBps:    5.910}
+          - {size_bytes:      67108864, bus_bw_GBps:   11.590}
+          - {size_bytes:     134217728, bus_bw_GBps:   11.860}
+          - {size_bytes:     268435456, bus_bw_GBps:   19.840}
+          - {size_bytes:     536870912, bus_bw_GBps:   37.910}
+          - {size_bytes:    1073741824, bus_bw_GBps:   46.800}
+          - {size_bytes:    2147483648, bus_bw_GBps:   49.590}
+          - {size_bytes:    4294967296, bus_bw_GBps:   59.650}
+          - {size_bytes:    8589934592, bus_bw_GBps:   62.500}
+    1024n1g:
+      gpus_per_node: 1
+      # DERIVED, not measured: AllReduce(1024n4g, job 358773) x 0.306, the single measured 1g/4g pair
+      # (job 409071: 64 nodes, 32 GB, 24.55 vs 80.13 GB/s). One GPU per node is NIC-bound (~25 GB/s);
+      # the 4g curve supplies the fabric's scale dependence. RS/AG further x 1.00/1.00.
+      # Replace with a measured 1024n1g sweep when one exists.
+      AllReduce:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    0.573}
+          - {size_bytes:      16777216, bus_bw_GBps:    0.870}
+          - {size_bytes:      33554432, bus_bw_GBps:    1.811}
+          - {size_bytes:      67108864, bus_bw_GBps:    3.551}
+          - {size_bytes:     134217728, bus_bw_GBps:    3.634}
+          - {size_bytes:     268435456, bus_bw_GBps:    6.079}
+          - {size_bytes:     536870912, bus_bw_GBps:   11.615}
+          - {size_bytes:    1073741824, bus_bw_GBps:   14.338}
+          - {size_bytes:    2147483648, bus_bw_GBps:   15.193}
+          - {size_bytes:    4294967296, bus_bw_GBps:   18.275}
+          - {size_bytes:    8589934592, bus_bw_GBps:   19.149}
+      ReduceScatter:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    0.573}
+          - {size_bytes:      16777216, bus_bw_GBps:    0.870}
+          - {size_bytes:      33554432, bus_bw_GBps:    1.811}
+          - {size_bytes:      67108864, bus_bw_GBps:    3.551}
+          - {size_bytes:     134217728, bus_bw_GBps:    3.634}
+          - {size_bytes:     268435456, bus_bw_GBps:    6.079}
+          - {size_bytes:     536870912, bus_bw_GBps:   11.615}
+          - {size_bytes:    1073741824, bus_bw_GBps:   14.338}
+          - {size_bytes:    2147483648, bus_bw_GBps:   15.193}
+          - {size_bytes:    4294967296, bus_bw_GBps:   18.275}
+          - {size_bytes:    8589934592, bus_bw_GBps:   19.149}
+      AllGather:
+        ring:
+          - {size_bytes:       8388608, bus_bw_GBps:    0.573}
+          - {size_bytes:      16777216, bus_bw_GBps:    0.870}
+          - {size_bytes:      33554432, bus_bw_GBps:    1.811}
+          - {size_bytes:      67108864, bus_bw_GBps:    3.551}
+          - {size_bytes:     134217728, bus_bw_GBps:    3.634}
+          - {size_bytes:     268435456, bus_bw_GBps:    6.079}
+          - {size_bytes:     536870912, bus_bw_GBps:   11.615}
+          - {size_bytes:    1073741824, bus_bw_GBps:   14.338}
+          - {size_bytes:    2147483648, bus_bw_GBps:   15.193}
+          - {size_bytes:    4294967296, bus_bw_GBps:   18.275}
+          - {size_bytes:    8589934592, bus_bw_GBps:   19.149}

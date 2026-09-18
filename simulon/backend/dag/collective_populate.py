@@ -233,8 +233,6 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
 
     nic_bw_GBps, nics_per_node = _nic_bw_GBps(datacenter)
 
-    launch_latency_ms = nccl_profile.launch_latency_ms
-
     with log_progress(
         "  populating collective durations", len(dag.collective_nodes), logger
     ) as advance:
@@ -247,7 +245,6 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
                 node.duration_ms = _multi_node_duration_ms(
                     node, gpus_per_node, nic_bw_GBps, nics_per_node, nccl_profile
                 )
-            node.duration_ms += launch_latency_ms
             advance()
 
     pp_sends = [n for n in dag.comm_nodes if n.collective_type == "PP_Send"]
@@ -275,7 +272,6 @@ def populate_collective_network(dag: ExecutionDAG, datacenter: DatacenterConfig)
                 comm_node.duration_ms = inter_latency + (
                     comm_node.bytes / effective_bw if effective_bw > 0 else 0.0
                 )
-            comm_node.duration_ms += launch_latency_ms
             advance()
 
     return dag
